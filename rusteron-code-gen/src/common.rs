@@ -7,7 +7,7 @@ use std::{any, fmt, ptr};
 /// are properly released when they go out of scope.
 pub struct ManagedCResource<T> {
     resource: *mut T,
-    cleanup: Box<dyn FnMut(*mut *mut T) -> i32>,
+    cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
 }
 
 impl<T> Debug for ManagedCResource<T> {
@@ -37,8 +37,15 @@ impl<T> ManagedCResource<T> {
 
         Ok(Self {
             resource,
-            cleanup: Box::new(cleanup),
+            cleanup: Some(Box::new(cleanup)),
         })
+    }
+
+    pub fn new_borrowed(value: *mut T) -> Self {
+        Self {
+            resource: value,
+            cleanup: None,
+        }
     }
 
     /// Gets a raw pointer to the resource.
@@ -50,13 +57,16 @@ impl<T> ManagedCResource<T> {
     ///
     /// If cleanup fails, it returns an `AeronError`.
     pub fn close(&mut self) -> Result<(), AeronCError> {
-        if !self.resource.is_null() {
-            let result = (self.cleanup)(&mut self.resource);
-            if result < 0 {
-                return Err(AeronCError::from_code(result));
+        if let Some(mut cleanup) = self.cleanup.take() {
+            if !self.resource.is_null() {
+                let result = (cleanup)(&mut self.resource);
+                if result < 0 {
+                    return Err(AeronCError::from_code(result));
+                }
+                self.resource = std::ptr::null_mut();
             }
-            self.resource = std::ptr::null_mut();
         }
+
         Ok(())
     }
 }

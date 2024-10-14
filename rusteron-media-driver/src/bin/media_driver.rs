@@ -16,12 +16,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let aeron_context = AeronDriverContext::new()?;
 
     let x = std::ffi::CString::new("target/test")?.into_raw();
-    aeron_context.set_dir(x);
-    aeron_context.aeron_driver_context_get_dir_delete_on_start();
+    aeron_context.set_dir(x)?;
 
     // Create Aeron driver
     let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;
-    aeron_driver.start(false);
+    aeron_driver.start(false)?;
     // Start the Aeron driver
     println!("Aeron media driver started successfully. Press Ctrl+C to stop.");
 
@@ -33,11 +32,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .aeron_driver_context_print_configuration();
     }
-    aeron_driver.main_do_work();
+    aeron_driver.main_do_work()?;
 
     // Poll for work until Ctrl+C is pressed
     while running.load(Ordering::Acquire) {
-        aeron_driver.main_do_work();
+        aeron_driver.main_do_work()?;
     }
 
     println!("Received signal to stop the media driver.");

@@ -24,6 +24,51 @@ pub struct Method {
     pub docs: HashSet<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ReturnType {
+    original: String,
+    wrappers: HashMap<String, CWrapper>,
+}
+
+pub const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
+
+impl ReturnType {
+    pub fn new(original: String, wrappers: HashMap<String, CWrapper>) -> Self {
+        ReturnType { original, wrappers }
+    }
+
+    pub fn get_new_return_type(&self) -> proc_macro2::TokenStream {
+        if self.original.starts_with("* mut ") {
+            let type_name = self.original.split(" ").last().unwrap();
+            if let Some(wrapper) = self.wrappers.get(type_name) {
+                let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
+                    .expect("Invalid class name in wrapper");
+                return quote! { #new_type };
+            }
+        }
+        if self.original == C_INT_RETURN_TYPE_STR {
+            return quote! { Result<i32, AeronCError> };
+        }
+        let return_type: syn::Type =
+            syn::parse_str(&self.original).expect("Invalid return type");
+        quote! { #return_type }
+    }
+
+    pub fn handle_return(&self, result: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+        if self.original == C_INT_RETURN_TYPE_STR {
+            quote! {
+                if result < 0 {
+                    return Err(AeronCError::from_code(result));
+                } else {
+                    return Ok(result)
+                }
+            }
+        } else {
+            quote! { #result.into() }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct CWrapper {
     pub class_name: String,
@@ -61,8 +106,10 @@ impl CWrapper {
                     },
                     proc_macro2::Span::call_site(),
                 );
-                let return_type: syn::Type =
-                    syn::parse_str(&method.return_type).expect("Invalid return type");
+
+
+                let return_type_helper = ReturnType::new(method.return_type.clone(), wrappers.clone());
+                let return_type= return_type_helper.get_new_return_type();
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
@@ -121,12 +168,14 @@ impl CWrapper {
                     })
                     .collect();
 
+                let converter = return_type_helper.handle_return(quote! { result });
                 quote! {
                     #[inline]
                     #(#method_docs)*
                     pub fn #fn_name(&self, #(#fn_arguments),*) -> #return_type {
                         unsafe {
-                            #ffi_call(#(#arg_names),*)
+                            let result = #ffi_call(#(#arg_names),*);
+                            #converter
                         }
                     }
                 }
@@ -149,8 +198,8 @@ impl CWrapper {
             .map(|method| {
                 let fn_name =
                     syn::Ident::new(&method.struct_method_name, proc_macro2::Span::call_site());
-                let return_type: syn::Type =
-                    syn::parse_str(&method.return_type).expect("Invalid return type");
+                let return_type_helper = ReturnType::new(method.return_type.clone(), wrappers.clone());
+                let return_type = return_type_helper.get_new_return_type();
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
@@ -209,12 +258,15 @@ impl CWrapper {
                     })
                     .collect();
 
+                let converter = return_type_helper.handle_return(quote! { result });
+
                 quote! {
                     #[inline]
                     #(#method_docs)*
                     pub fn #fn_name(&self, #(#fn_arguments),*) -> #return_type {
                         unsafe {
-                            #ffi_call(#(#arg_names),*)
+                            let result = #ffi_call(#(#arg_names),*);
+                            #converter
                         }
                     }
                 }
@@ -247,7 +299,7 @@ impl CWrapper {
                     .find(|m| close_fn.to_string().contains(&m.fn_name));
                 let found_close = init_fn != close_fn
                     && close_method.is_some()
-                    && close_method.unwrap().return_type == ":: std :: os :: raw :: c_int";
+                    && close_method.unwrap().return_type == C_INT_RETURN_TYPE_STR;
                 if found_close {
                     let init_args: Vec<proc_macro2::TokenStream> = method
                         .arguments
@@ -430,6 +482,15 @@ pub fn generate_rust_code(
 
             fn deref(&self) -> &Self::Target {
                 unsafe { &*self.inner.get() }
+            }
+        }
+
+        impl From<*mut #type_name> for #class_name {
+            #[inline]
+            fn from(value: *mut #type_name) -> Self {
+                #class_name {
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
+                }
             }
         }
 
