@@ -1,10 +1,12 @@
 name: CI
 
 on:
-  push:
-    branches: [master, staging, trying]
-  pull_request:
-    branches: [master]
+  push:    # This triggers the workflow on any push event
+  pull_request:  # This triggers the workflow when a pull request is opened, synchronized, or reopened#
+#  push:
+#    branches: [master, staging, trying]
+#  pull_request:
+#    branches: [master]
 
 env:
   RUST_BACKTRACE: 1
