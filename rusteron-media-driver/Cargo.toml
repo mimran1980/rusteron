@@ -25,6 +25,9 @@ quote = {  workspace = true }
 itertools = {  workspace = true }
 rusteron-code-gen = {path = "../rusteron-code-gen"}
 
+[features]
+static = []
+
 [[bin]]
 name = "media_driver"
 path = "src/bin/media_driver.rs"

@@ -22,3 +22,6 @@ quote = {  workspace = true }
 itertools = {  workspace = true }
 rusteron-code-gen = {path = "../rusteron-code-gen"}
 ctrlc = { workspace = true }
+
+[features]
+static = []
