@@ -22,6 +22,9 @@ build:
 release:
   cargo build --all-targets --release
 
+docs:
+  cargo doc --open
+
 # run unit tests
 test:
   cargo test --all-targets --all-features
