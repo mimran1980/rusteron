@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     unsafe {
         aeron_driver
-            .conductor
+            .conductor()
             .context
             .as_ref()
             .unwrap()

@@ -3,6 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use syn::Type;
 
 pub const COMMON_CODE: &str = include_str!("common.rs");
 pub const CLIENT_BINDINGS: &str = include_str!("../bindings/client.rs");
@@ -109,7 +110,7 @@ impl CWrapper {
 
 
                 let return_type_helper = ReturnType::new(method.return_type.clone(), wrappers.clone());
-                let return_type= return_type_helper.get_new_return_type();
+                let return_type = return_type_helper.get_new_return_type();
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
@@ -268,6 +269,31 @@ impl CWrapper {
                             let result = #ffi_call(#(#arg_names),*);
                             #converter
                         }
+                    }
+                }
+            })
+            .collect()
+    }
+
+    /// Generate the fields
+    fn generate_fields(&self, cwrappers: &HashMap<String, CWrapper>) -> Vec<proc_macro2::TokenStream> {
+        self.fields
+            .iter()
+            .filter( |(name, _)| !self.methods.iter().any(|m|m.struct_method_name.as_str() == name))
+            .map(|(field_name, return_type)| {
+                let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
+
+                let return_type = if return_type == C_INT_RETURN_TYPE_STR {
+                    let r_type: Type = syn::parse_str(return_type).unwrap();
+                    quote! { #r_type }
+                } else {
+                    ReturnType::new(return_type.clone(), cwrappers.clone()).get_new_return_type()
+                };
+
+                quote! {
+                    #[inline]
+                    pub fn #fn_name(&self) -> #return_type {
+                        self.#fn_name.into()
                     }
                 }
             })
@@ -445,6 +471,9 @@ pub fn generate_rust_code(
             }
         })
         .collect();
+
+    let fields = wrapper.generate_fields(&wrappers);
+
     // Generate the struct definition and impl block
 
     let methods_impl = if !methods_t.is_empty() {
@@ -468,6 +497,7 @@ pub fn generate_rust_code(
 
         impl #class_name {
             #(#constructor)*
+            #(#fields)*
             #(#methods)*
 
             pub fn get_inner(&self) -> *mut #type_name {
@@ -493,6 +523,15 @@ pub fn generate_rust_code(
                 }
             }
         }
+
+        // impl *mut #type_name {
+        //     #[inline]
+        //     pub fn as_struct(value: *mut #type_name) -> #class_name {
+        //         #class_name {
+        //             inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
+        //         }
+        //     }
+        // }
 
        #common_code
     }
