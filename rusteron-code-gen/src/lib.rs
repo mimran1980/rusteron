@@ -71,6 +71,7 @@ mod tests {
     use std::fs;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn media_driver() {
         let bindings = parse_bindings(&"../rusteron-code-gen/bindings/media-driver.rs".into());
         assert_eq!(
@@ -102,6 +103,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn client() {
         let bindings = parse_bindings(&"../rusteron-code-gen/bindings/client.rs".into());
         assert_eq!(
@@ -128,6 +130,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn archive() {
         let bindings = parse_bindings(&"../rusteron-code-gen/bindings/archive.rs".into());
         assert_eq!(
