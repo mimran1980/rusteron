@@ -34,6 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     aeron_driver.main_do_work()?;
 
+    println!("aeron dir: {:?}", aeron_context.get_dir());
+
     // Poll for work until Ctrl+C is pressed
     while running.load(Ordering::Acquire) {
         aeron_driver.main_do_work()?;

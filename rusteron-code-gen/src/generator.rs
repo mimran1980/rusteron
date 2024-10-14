@@ -32,6 +32,7 @@ pub struct ReturnType {
 }
 
 pub const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
+pub const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
 
 impl ReturnType {
     pub fn new(original: String, wrappers: HashMap<String, CWrapper>) -> Self {
@@ -50,6 +51,9 @@ impl ReturnType {
         if self.original == C_INT_RETURN_TYPE_STR {
             return quote! { Result<i32, AeronCError> };
         }
+        if self.original == C_CHAR_STR {
+            return quote! { &str };
+        }
         let return_type: syn::Type =
             syn::parse_str(&self.original).expect("Invalid return type");
         quote! { #return_type }
@@ -64,6 +68,8 @@ impl ReturnType {
                     return Ok(result)
                 }
             }
+        } else if self.original == C_CHAR_STR {
+            return quote! { unsafe { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
         } else {
             quote! { #result.into() }
         }
@@ -286,6 +292,13 @@ impl CWrapper {
                 let return_type = if return_type == C_INT_RETURN_TYPE_STR {
                     let r_type: Type = syn::parse_str(return_type).unwrap();
                     quote! { #r_type }
+                } else if return_type == C_CHAR_STR {
+                    return quote! {
+                        #[inline]
+                        pub fn #fn_name(&self) -> &str {
+                            unsafe { std::ffi::CStr::from_ptr(self.#fn_name).to_str().unwrap() }
+                        }
+                    }
                 } else {
                     ReturnType::new(return_type.clone(), cwrappers.clone()).get_new_return_type()
                 };
