@@ -92,6 +92,16 @@ pub struct CWrapper {
 }
 
 impl CWrapper {
+
+    #[cfg(not(feature = "deref-methods"))]
+    fn generate_methods_for_t(
+        &self,
+        wrappers: &HashMap<String, CWrapper>,
+    ) -> Vec<proc_macro2::TokenStream> {
+        vec![]
+    }
+
+    #[cfg(feature = "deref-methods")]
     fn generate_methods_for_t(
         &self,
         wrappers: &HashMap<String, CWrapper>,
@@ -451,7 +461,7 @@ pub fn generate_rust_code(
     let type_name = syn::Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
     let methods = wrapper.generate_methods(wrappers);
-    let methods_t = wrapper.generate_methods_for_t(wrappers);
+    let methods_t: Vec<TokenStream> = wrapper.generate_methods_for_t(wrappers);
     let constructor = wrapper.generate_constructor();
 
     let common_code = if !include_common_code {

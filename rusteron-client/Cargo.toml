@@ -25,3 +25,4 @@ ctrlc = { workspace = true }
 
 [features]
 static = []
+deref-methods = []

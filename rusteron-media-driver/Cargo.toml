@@ -27,6 +27,7 @@ rusteron-code-gen = {path = "../rusteron-code-gen"}
 
 [features]
 static = []
+deref-methods = []
 
 [[bin]]
 name = "media_driver"

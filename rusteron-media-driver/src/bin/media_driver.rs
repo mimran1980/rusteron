@@ -1,6 +1,7 @@
 use rusteron_media_driver::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use rusteron_media_driver::bindings::aeron_context;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Flag to indicate when the application should stop (set on Ctrl+C)
