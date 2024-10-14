@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 pub const COMMON_CODE: &str = include_str!("common.rs");
 pub const CLIENT_BINDINGS: &str = include_str!("../bindings/client.rs");
+pub const ARCHIVE_BINDINGS: &str = include_str!("../bindings/archive.rs");
 pub const MEDIA_DRIVER_BINDINGS: &str = include_str!("../bindings/media-driver.rs");
 
 #[derive(Debug, Clone, Default)]
@@ -308,7 +309,7 @@ impl CWrapper {
                     );
 
                     quote! {
-                        pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronError> {
+                        pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronCError> {
                             let resource = ManagedCResource::new(
                                 move |ctx| unsafe { #init_fn(#(#init_args),*) },
                                 move |ctx| unsafe { #close_fn(#(#close_args),*) },

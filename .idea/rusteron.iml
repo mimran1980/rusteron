@@ -6,6 +6,8 @@
       <sourceFolder url="file://$MODULE_DIR$/rusteron-common/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rusteron-media-driver/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rusteron-archive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rusteron-code-gen/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -1,24 +1,22 @@
-use libaeron_driver_sys::*;
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+#![allow(clippy::all)]
 
-pub mod media_driver;
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 
-pub enum AeronError {
-    DriverTimeout,
-    ClientTimeout,
-    ConductorServiceTimeout,
-    BufferFull,
-    Other(i32),
-}
+#[cfg(test)]
+mod tests {
 
-impl From<i32> for AeronError {
-    fn from(code: i32) -> Self {
-        match code {
-            c if c == AERON_CLIENT_ERROR_DRIVER_TIMEOUT => AeronError::DriverTimeout,
-            c if c == AERON_CLIENT_ERROR_CLIENT_TIMEOUT => AeronError::ClientTimeout,
-            c if c == AERON_CLIENT_ERROR_CONDUCTOR_SERVICE_TIMEOUT => AeronError::ConductorServiceTimeout,
-            c if c == AERON_CLIENT_ERROR_BUFFER_FULL => AeronError::BufferFull,
-            c => AeronError::Other(c),
-        }
+    #[test]
+    fn version_check() {
+        let major = unsafe { crate::aeron_version_major() };
+        let minor = unsafe { crate::aeron_version_minor() };
+        let patch = unsafe { crate::aeron_version_patch() };
+
+        let aeron_version = format!("{}.{}.{}", major, minor, patch);
+        let cargo_version = env!("CARGO_PKG_VERSION");
+        assert_eq!(aeron_version, cargo_version);
     }
 }
-

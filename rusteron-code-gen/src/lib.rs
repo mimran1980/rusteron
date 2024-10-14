@@ -7,10 +7,6 @@ mod common;
 mod generator;
 mod parser;
 
-// include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-// include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
-//
-
 pub use common::*;
 pub use generator::*;
 pub use parser::*;
@@ -22,35 +18,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::{fs, panic};
-
-pub enum LinkType {
-    Dynamic,
-    Static,
-}
-
-impl LinkType {
-    fn detect() -> LinkType {
-        if cfg!(feature = "static") {
-            LinkType::Static
-        } else {
-            LinkType::Dynamic
-        }
-    }
-
-    fn link_lib(&self) -> &'static str {
-        match self {
-            LinkType::Dynamic => "dylib=",
-            LinkType::Static => "static=",
-        }
-    }
-
-    fn target_name(&self) -> &'static str {
-        match self {
-            LinkType::Dynamic => "aeron_driver",
-            LinkType::Static => "aeron_driver_static",
-        }
-    }
-}
 
 fn generate_wrapper(out: PathBuf) {
     let bindings = parser::parse_bindings(&out);
@@ -133,7 +100,7 @@ fn format_token_stream(tokens: TokenStream) -> String {
 mod tests {
     use crate::generator::MEDIA_DRIVER_BINDINGS;
     use crate::parser::parse_bindings;
-    use crate::{append_to_file, format_token_stream, CLIENT_BINDINGS};
+    use crate::{append_to_file, format_token_stream, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
     use itertools::Itertools;
     use proc_macro2::TokenStream;
     use std::fs;
@@ -194,6 +161,33 @@ mod tests {
         append_to_file(&file, "\npub fn main() {}\n").unwrap();
         t.pass(file)
     }
+
+    #[test]
+    fn archive() {
+        let bindings = parse_bindings(&"../rusteron-code-gen/bindings/archive.rs".into());
+        assert_eq!(
+            "AeronImageFragmentAssembler",
+            bindings
+                .wrappers
+                .get("aeron_image_fragment_assembler_t")
+                .unwrap()
+                .class_name
+        );
+
+        // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
+
+        let file = write_to_file(TokenStream::new(), true, "archive.rs");
+        for (p, w) in bindings.wrappers.values().enumerate() {
+            let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true);
+            write_to_file(code, false, "archive.rs");
+        }
+
+        let t = trybuild::TestCases::new();
+        append_to_file(&file, ARCHIVE_BINDINGS).unwrap();
+        append_to_file(&file, "\npub fn main() {}\n").unwrap();
+        t.pass(file)
+    }
+
 
     fn write_to_file(rust_code: TokenStream, delete: bool, name: &str) -> String {
         let src = format_token_stream(rust_code);

@@ -6,13 +6,24 @@ authors = ["Mo Imran <mimran1980@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/mimran1980/rusteron"
 homepage = "https://github.com/mimran1980/rusteron"
-keywords = ["aeron", "low-latency", "client", "bindings", "networking"]
+keywords = ["aeron", "low-latency", "media-driver", "bindings", "networking"]
 categories = ["network-programming"]
 documentation = "https://github.com/mimran1980/rusteron"
+#readme = "README.md"
 
 [dependencies]
-rusteron-code-gen = { path = "../rusteron-code-gen" }
 ctrlc = { workspace = true }
+
+[build-dependencies]
+bindgen = {  workspace = true }
+cmake = {  workspace = true }
+dunce = {  workspace = true }
+pkg-config = {  workspace = true }
+syn = {  workspace = true }
+proc-macro2 = {  workspace = true }
+quote = {  workspace = true }
+itertools = {  workspace = true }
+rusteron-code-gen = {path = "../rusteron-code-gen"}
 
 [[bin]]
 name = "media_driver"

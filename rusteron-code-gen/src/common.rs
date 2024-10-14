@@ -28,11 +28,11 @@ impl<T> ManagedCResource<T> {
     pub fn new(
         init: impl FnOnce(*mut *mut T) -> i32,
         cleanup: impl FnMut(*mut *mut T) -> i32 + 'static,
-    ) -> Result<Self, AeronError> {
+    ) -> Result<Self, AeronCError> {
         let mut resource: *mut T = ptr::null_mut();
         let result = init(&mut resource);
         if result < 0 {
-            return Err(AeronError::from_code(result));
+            return Err(AeronCError::from_code(result));
         }
 
         Ok(Self {
@@ -49,11 +49,11 @@ impl<T> ManagedCResource<T> {
     /// Closes the resource by calling the cleanup function.
     ///
     /// If cleanup fails, it returns an `AeronError`.
-    pub fn close(&mut self) -> Result<(), AeronError> {
+    pub fn close(&mut self) -> Result<(), AeronCError> {
         if !self.resource.is_null() {
             let result = (self.cleanup)(&mut self.resource);
             if result < 0 {
-                return Err(AeronError::from_code(result));
+                return Err(AeronCError::from_code(result));
             }
             self.resource = std::ptr::null_mut();
         }
@@ -73,16 +73,16 @@ impl<T> Drop for ManagedCResource<T> {
 /// The error code is derived from Aeron C API calls.
 /// Use `get_message()` to retrieve a human-readable message, if available.
 #[derive(Debug)]
-pub struct AeronError {
+pub struct AeronCError {
     pub code: i32,
 }
 
-impl AeronError {
+impl AeronCError {
     /// Creates an AeronError from the error code returned by Aeron.
     ///
     /// Error codes below zero are considered failure.
     pub fn from_code(code: i32) -> Self {
-        AeronError { code }
+        AeronCError { code }
     }
 
     /// Retrieves the error message corresponding to the error code.
@@ -106,7 +106,7 @@ impl AeronError {
     }
 }
 
-impl fmt::Display for AeronError {
+impl fmt::Display for AeronCError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.get_message() {
             Some(msg) => write!(f, "Aeron error {}: {}", self.code, msg),
@@ -115,4 +115,4 @@ impl fmt::Display for AeronError {
     }
 }
 
-impl std::error::Error for AeronError {}
+impl std::error::Error for AeronCError {}

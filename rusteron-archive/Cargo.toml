@@ -1,12 +1,12 @@
 [package]
-name = "rusteron-client"
+name = "rusteron-archive"
 version = "0.1.0"
 edition = "2021"
 authors = ["Mo Imran <mimran1980@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/mimran1980/rusteron"
 homepage = "https://github.com/mimran1980/rusteron"
-keywords = ["aeron", "low-latency", "client", "bindings", "networking"]
+keywords = ["aeron", "low-latency", "archive", "bindings", "networking"]
 categories = ["network-programming"]
 documentation = "https://github.com/mimran1980/rusteron"
 #readme = "README.md"
