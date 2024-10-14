@@ -279,7 +279,7 @@ impl CWrapper {
     fn generate_fields(&self, cwrappers: &HashMap<String, CWrapper>) -> Vec<proc_macro2::TokenStream> {
         self.fields
             .iter()
-            .filter( |(name, _)| !self.methods.iter().any(|m|m.struct_method_name.as_str() == name))
+            .filter( |(name, _)| !name.starts_with("_") && !self.methods.iter().any(|m|m.struct_method_name.as_str() == name))
             .map(|(field_name, return_type)| {
                 let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
 

@@ -2,7 +2,11 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(clippy::all)]
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+pub mod bindings {
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+use bindings::*;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 
 #[cfg(test)]
