@@ -347,9 +347,9 @@ pub fn generate_rust_code(
     include_common_code: bool,
     include_clippy: bool,
 ) -> proc_macro2::TokenStream {
-    // if wrapper.type_name.ends_with("_funct_t") {
-    //     return quote! {};
-    // }
+    if wrapper.type_name == "aeron_thread_t" {
+        return quote! {};
+    }
 
     let class_name = syn::Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
     let type_name = syn::Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
