@@ -24,7 +24,6 @@ pub fn append_to_file(file_path: &str, code: &str) -> std::io::Result<()> {
         .append(true)
         .open(file_path)?;
 
-    use std::io::Write;
     // Write the generated code to the file
     writeln!(file, "\n{}", code)?;
 
