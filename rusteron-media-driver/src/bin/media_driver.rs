@@ -1,6 +1,4 @@
 use rusteron_media_driver::*;
-use std::ffi::{CStr, CString};
-use std::mem::ManuallyDrop;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -20,7 +18,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let x = std::ffi::CString::new("target/test")?.into_raw();
     aeron_context.set_dir(x);
     aeron_context.aeron_driver_context_get_dir_delete_on_start();
-
 
     // Create Aeron driver
     let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;

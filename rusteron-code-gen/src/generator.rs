@@ -106,7 +106,7 @@ impl CWrapper {
                         } else {
                             "notfound"
                         };
-                        if let Some(matching_wrapper) = wrappers.get(t) {
+                        if let Some(_matching_wrapper) = wrappers.get(t) {
                             let field_name = syn::Ident::new(name, proc_macro2::Span::call_site());
                             let t = syn::Ident::new(t, proc_macro2::Span::call_site());
                             if ty.ends_with(self.type_name.as_str()) {
@@ -195,7 +195,7 @@ impl CWrapper {
                         } else {
                             "notfound"
                         };
-                        if let Some(matching_wrapper) = wrappers.get(t) {
+                        if let Some(_matching_wrapper) = wrappers.get(t) {
                             let field_name = syn::Ident::new(name, proc_macro2::Span::call_site());
                             if ty.ends_with(self.type_name.as_str()) {
                                 Some(quote! { self.get_inner() })
@@ -326,7 +326,7 @@ impl CWrapper {
     }
 }
 
-fn get_docs(docs: &HashSet<String>, wrappers: &HashMap<String, CWrapper>) -> Vec<TokenStream> {
+fn get_docs(docs: &HashSet<String>, _wrappers: &HashMap<String, CWrapper>) -> Vec<TokenStream> {
     docs.iter()
         .flat_map(|d| d.lines())
         .map(|doc| {

@@ -11,45 +11,10 @@ pub use common::*;
 pub use generator::*;
 pub use parser::*;
 
-use itertools::Itertools;
 use proc_macro2::TokenStream;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{fs, panic};
-
-fn generate_wrapper(out: PathBuf) {
-    let bindings = parser::parse_bindings(&out);
-    let copy = bindings.wrappers.clone();
-
-    let bindings = bindings
-        .wrappers
-        .iter()
-        .sorted_by_key(|(_, wrapper)| &wrapper.class_name)
-        .filter(|(_, r)| r.methods.iter().any(|m| m.fn_name.contains("_init")))
-        .collect_vec();
-
-    let binding = out.to_str().unwrap().replace("bindings.rs", "aeron.rs");
-    let file = binding.as_str();
-    let _ = fs::remove_file(file);
-
-    panic!("{:#?}", &copy);
-
-    for (key, wrapper) in bindings.iter() {
-        append_to_file(
-            file,
-            generator::generate_rust_code(*wrapper, &copy, true, true)
-                .to_string()
-                .as_str(),
-        )
-        .unwrap();
-        // break;
-    }
-    // panic!("Unable to generate bindings! {:#?}", bindings);
-    println!("{}", file);
-    // panic!("Unable to generate bindings! {}", bindings);
-}
 
 pub fn append_to_file(file_path: &str, code: &str) -> std::io::Result<()> {
     // Open the file in append mode
@@ -66,7 +31,8 @@ pub fn append_to_file(file_path: &str, code: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-fn format_with_rustfmt(code: &str) -> Result<String, std::io::Error> {
+#[allow(dead_code)]
+pub fn format_with_rustfmt(code: &str) -> Result<String, std::io::Error> {
     // Spawn a rustfmt process
     let mut rustfmt = Command::new("rustfmt")
         .stdin(Stdio::piped())
@@ -85,7 +51,8 @@ fn format_with_rustfmt(code: &str) -> Result<String, std::io::Error> {
     Ok(formatted_code)
 }
 
-fn format_token_stream(tokens: TokenStream) -> String {
+#[allow(dead_code)]
+pub fn format_token_stream(tokens: TokenStream) -> String {
     // Convert TokenStream to a string
     let code = tokens.to_string();
 
@@ -101,7 +68,6 @@ mod tests {
     use crate::generator::MEDIA_DRIVER_BINDINGS;
     use crate::parser::parse_bindings;
     use crate::{append_to_file, format_token_stream, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
-    use itertools::Itertools;
     use proc_macro2::TokenStream;
     use std::fs;
 
@@ -187,7 +153,6 @@ mod tests {
         append_to_file(&file, "\npub fn main() {}\n").unwrap();
         t.pass(file)
     }
-
 
     fn write_to_file(rust_code: TokenStream, delete: bool, name: &str) -> String {
         let src = format_token_stream(rust_code);

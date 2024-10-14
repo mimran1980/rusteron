@@ -92,7 +92,7 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                             let args = extract_function_arguments(&f.sig.inputs);
                             let ret = extract_return_type(&f.sig.output);
 
-                            let option = if let Some((name, ty)) = args.first() {
+                            let option = if let Some((_name, ty)) = args.first() {
                                 let ty = ty.split(' ').last().map(|t| t.to_string()).unwrap();
 
                                 if wrappers.contains_key(&ty) {
