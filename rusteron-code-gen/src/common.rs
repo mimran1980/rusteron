@@ -90,7 +90,8 @@ impl AeronCError {
     /// The message is fetched from the Aeron C API using `aeron_driver_last_error()`.
     /// If the conversion of the C string to UTF-8 fails, this returns `None`.
     pub fn get_message(&self) -> Option<&'static str> {
-        unsafe {
+        todo!()
+        // unsafe {
             // let err_ptr = aeron_driver_last_error();
             // if !err_ptr.is_null() {
             //     // Try to convert the C string to a Rust &str, handle any UTF-8 errors gracefully
@@ -101,8 +102,7 @@ impl AeronCError {
             // } else {
             //     None
             // }
-            todo!()
-        }
+        // }
     }
 }
 
