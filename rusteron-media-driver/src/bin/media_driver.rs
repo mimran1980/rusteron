@@ -24,14 +24,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the Aeron driver
     println!("Aeron media driver started successfully. Press Ctrl+C to stop.");
 
-    unsafe {
-        aeron_driver
-            .conductor()
-            .context
-            .as_ref()
-            .unwrap()
-            .aeron_driver_context_print_configuration();
-    }
+    aeron_driver
+        .conductor()
+        .context()
+        .print_configuration();
     aeron_driver.main_do_work()?;
 
     println!("aeron dir: {:?}", aeron_context.get_dir());

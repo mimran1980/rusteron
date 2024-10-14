@@ -48,6 +48,11 @@ impl ReturnType {
                 return quote! { #new_type };
             }
         }
+        if let Some(wrapper) = self.wrappers.get(&self.original) {
+            let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
+                .expect("Invalid class name in wrapper");
+            return quote! { #new_type };
+        }
         if self.original == C_INT_RETURN_TYPE_STR {
             return quote! { Result<i32, AeronCError> };
         }
@@ -533,6 +538,15 @@ pub fn generate_rust_code(
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
                     inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
+                }
+            }
+        }
+
+        impl From<#type_name> for #class_name {
+            #[inline]
+            fn from(mut value: #type_name) -> Self {
+                #class_name {
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(&mut value as *mut #type_name))
                 }
             }
         }
