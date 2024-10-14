@@ -2,7 +2,7 @@
 check:
   cargo check
   cargo fmt --all -- --check
-  cargo clippy --all-targets --all-features
+  cargo clippy --all-targets --all-features --deny warnings
 
 # automatically fromat and fix simple clippy warnings
 fix:

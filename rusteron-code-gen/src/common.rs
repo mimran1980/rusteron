@@ -92,16 +92,16 @@ impl AeronCError {
     pub fn get_message(&self) -> Option<&'static str> {
         todo!()
         // unsafe {
-            // let err_ptr = aeron_driver_last_error();
-            // if !err_ptr.is_null() {
-            //     // Try to convert the C string to a Rust &str, handle any UTF-8 errors gracefully
-            //     match CStr::from_ptr(err_ptr).to_str() {
-            //         Ok(message) => Some(message),
-            //         Err(_) => None, // Return None if the conversion fails
-            //     }
-            // } else {
-            //     None
-            // }
+        // let err_ptr = aeron_driver_last_error();
+        // if !err_ptr.is_null() {
+        //     // Try to convert the C string to a Rust &str, handle any UTF-8 errors gracefully
+        //     match CStr::from_ptr(err_ptr).to_str() {
+        //         Ok(message) => Some(message),
+        //         Err(_) => None, // Return None if the conversion fails
+        //     }
+        // } else {
+        //     None
+        // }
         // }
     }
 }
