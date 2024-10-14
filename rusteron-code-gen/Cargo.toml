@@ -1,0 +1,22 @@
+[package]
+name = "rusteron-code-gen"
+version = "1.46.5"
+authors = ["Mohammed Imran <mimran1980@gmail.com>"]
+repository = "https://github.com/mimran1980/libaeron-sys"
+documentation = "https://docs.rs/libaeron_driver-sys"
+description = "Rust bindings for the Aeron Media Driver"
+license = "Apache-2.0"
+edition = "2021"
+readme = "README.md"
+
+[dependencies]
+syn = { version = "2.0", features = ["full"] }
+proc-macro2 = "1.0.86"
+quote = "1.0"
+itertools = "0.13"
+
+[dev-dependencies]
+trybuild = "1.0"
+
+[features]
+static = []

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "rusteron-common",
+    "rusteron-code-gen",
     "rusteron-client",
     "rusteron-media-driver",
 ]
@@ -8,7 +8,3 @@ resolver = "2"
 
 [workspace.dependencies]
 ctrlc = "3.4.5"
-
-[patch.crates-io]
-libaeron-sys = { git = "https://github.com/mimran1980/libaeron-sys", branch = "master", package = "libaeron-sys" }
-libaeron_driver-sys = { git = "https://github.com/mimran1980/libaeron-sys", branch = "master", package = "libaeron_driver-sys" }

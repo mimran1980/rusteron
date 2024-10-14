@@ -11,6 +11,5 @@ categories = ["network-programming"]
 documentation = "https://github.com/mimran1980/rusteron"
 
 [dependencies]
-rusteron-common = { path = "../rusteron-common" }
-libaeron-sys = "1.46.5"
+rusteron-code-gen = { path = "../rusteron-code-gen" }
 ctrlc = { workspace = true }
