@@ -8,6 +8,7 @@ pub mod bindings {
 }
 use bindings::*;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
+include!("../../rusteron-client/src/aeron.rs");
 
 #[cfg(test)]
 mod tests {

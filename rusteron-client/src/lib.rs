@@ -7,9 +7,11 @@ pub mod bindings {
 }
 use bindings::*;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
+include!("aeron.rs");
 
 #[cfg(test)]
 mod tests {
+    use crate::{Aeron, AeronAsyncAddPublication, AeronContext};
 
     #[test]
     fn version_check() {
@@ -20,5 +22,10 @@ mod tests {
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
         let cargo_version = "1.47.0"; // env!("CARGO_PKG_VERSION");
         assert_eq!(aeron_version, cargo_version);
+
+        let client = Aeron::new(AeronContext::new().unwrap().get_inner()).unwrap();
+        assert!(client.epoch_clock() > 0);
+        assert!(client.nano_clock() > 0);
+        AeronAsyncAddPublication::new(client.clone(), "asdsadas", 32).unwrap();
     }
 }

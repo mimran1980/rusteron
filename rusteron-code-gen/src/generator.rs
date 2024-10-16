@@ -329,8 +329,8 @@ impl CWrapper {
     }
 
     /// Generate the constructor for the struct
-    fn generate_constructor(&self) -> Vec<proc_macro2::TokenStream> {
-        self.methods
+    fn generate_constructor(&self, wrappers: &HashMap<String, CWrapper> ) -> Vec<proc_macro2::TokenStream> {
+        let constructors = self.methods
             .iter()
             .filter(|m| {
                 m.arguments
@@ -355,6 +355,7 @@ impl CWrapper {
                     && close_method.is_some()
                     && close_method.unwrap().return_type == C_INT_RETURN_TYPE_STR;
                 if found_close {
+                    let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
                     let init_args: Vec<proc_macro2::TokenStream> = method
                         .arguments
                         .iter()
@@ -415,6 +416,7 @@ impl CWrapper {
                     );
 
                     quote! {
+                        #(#method_docs)*
                         pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronCError> {
                             let resource = ManagedCResource::new(
                                 move |ctx| unsafe { #init_fn(#(#init_args),*) },
@@ -428,7 +430,31 @@ impl CWrapper {
                     quote! {}
                 }
             })
-            .collect_vec()
+            .collect_vec();
+
+        if constructors.is_empty() && self.methods
+            .iter()
+            .any(|m| {
+                !m.arguments
+                    .iter()
+                    .any(|(_, ty)| ty.starts_with("* mut * mut"))
+            }) {
+
+            vec![quote! {
+                        #[inline]
+                        pub fn new() -> Result<Self, AeronCError> {
+                            let resource = ManagedCResource::new(
+                                move |ctx| { 0 },
+                                move |ctx| { 0 },
+                            )?;
+
+                            Ok(Self { inner: std::rc::Rc::new(resource) })
+                        }
+                    }
+            ]
+        } else {
+            constructors
+        }
     }
 }
 
@@ -462,7 +488,7 @@ pub fn generate_rust_code(
 
     let methods = wrapper.generate_methods(wrappers);
     let methods_t: Vec<TokenStream> = wrapper.generate_methods_for_t(wrappers);
-    let constructor = wrapper.generate_constructor();
+    let constructor = wrapper.generate_constructor(wrappers);
 
     let common_code = if !include_common_code {
         quote! {}

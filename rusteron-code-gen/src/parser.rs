@@ -98,10 +98,44 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                                 if wrappers.contains_key(&ty) {
                                     Some(ty)
                                 } else {
-                                    None
+                                    let type_names = fn_name.split('_').collect::<Vec<&str>>().iter().rev().scan(String::new(), |acc, &s| {
+                                        if acc.is_empty() {
+                                            *acc = s.to_string();
+                                        } else {
+                                            *acc = s.to_string() + "_" + &acc;
+                                        }
+                                        Some(s.to_string() + "_t")
+                                    }).collect_vec();
+
+                                    let mut value = None;
+                                    for ty in type_names {
+                                        if wrappers.contains_key(&ty) {
+                                            value = Some(ty);
+                                            break;
+                                        }
+                                    }
+
+                                    value
                                 }
                             } else {
-                                None
+                                let type_names = fn_name.split('_').collect::<Vec<&str>>().iter().rev().scan(String::new(), |acc, &s| {
+                                    if acc.is_empty() {
+                                        *acc = s.to_string();
+                                    } else {
+                                        *acc = s.to_string() + "_" + &acc;
+                                    }
+                                    Some(s.to_string() + "_t")
+                                }).collect_vec();
+
+                                let mut value = None;
+                                for ty in type_names {
+                                    if wrappers.contains_key(&ty) {
+                                        value = Some(ty);
+                                        break;
+                                    }
+                                }
+
+                                value
                             };
 
                             // let option = wrappers

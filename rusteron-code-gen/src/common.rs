@@ -31,7 +31,7 @@ impl<T> ManagedCResource<T> {
     ) -> Result<Self, AeronCError> {
         let mut resource: *mut T = ptr::null_mut();
         let result = init(&mut resource);
-        if result < 0 {
+        if result < 0 || resource.is_null() {
             return Err(AeronCError::from_code(result));
         }
 
@@ -75,6 +75,10 @@ impl<T> Drop for ManagedCResource<T> {
     fn drop(&mut self) {
         // Ensure the clean-up function is called when the resource is dropped.
         let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
+
+        if !self.resource.is_null() {
+            unsafe { let _ = Box::from_raw(self.resource); }
+        }
     }
 }
 

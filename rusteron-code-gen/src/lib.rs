@@ -114,6 +114,8 @@ mod tests {
                 .unwrap()
                 .class_name
         );
+        println!("{:#?}", bindings.methods);
+        assert_eq!(0, bindings.methods.len());
 
         // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
 
