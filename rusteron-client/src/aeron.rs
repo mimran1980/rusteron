@@ -4,10 +4,11 @@ impl AeronPublication {
             move |ctx| unsafe {
                 aeron_async_add_publication_poll(ctx, client.get_inner())
             },
-            move |ctx| {
+            move |_ctx| {
                 // TODO is there any cleanup to do
                 0
             },
+            false
         )?;
         Ok(Self {
             inner: std::rc::Rc::new(resource),
@@ -22,10 +23,11 @@ impl AeronAsyncAddPublication {
                 aeron_async_add_publication(ctx, client.get_inner(),
                                             std::ffi::CString::new(uri).unwrap().into_raw(), stream_id)
             },
-            move |ctx| {
+            move |_ctx| {
                 // TODO is there any cleanup to do
                 0
             },
+            false
         )?;
         Ok(Self {
             inner: std::rc::Rc::new(resource),

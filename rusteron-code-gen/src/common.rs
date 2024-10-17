@@ -8,6 +8,7 @@ use std::{any, fmt, ptr};
 pub struct ManagedCResource<T> {
     resource: *mut T,
     cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
+    cleanup_struct: bool,
 }
 
 impl<T> Debug for ManagedCResource<T> {
@@ -25,9 +26,11 @@ impl<T> ManagedCResource<T> {
     /// The initializer is a closure that attempts to initialize the resource.
     /// If initialization fails, the initializer should return an error code.
     /// The cleanup function is used to release the resource when it's no longer needed.
+    /// `cleanup_struct` where it should clean up the struct in rust
     pub fn new(
         init: impl FnOnce(*mut *mut T) -> i32,
         cleanup: impl FnMut(*mut *mut T) -> i32 + 'static,
+        cleanup_struct: bool,
     ) -> Result<Self, AeronCError> {
         let mut resource: *mut T = ptr::null_mut();
         let result = init(&mut resource);
@@ -38,6 +41,7 @@ impl<T> ManagedCResource<T> {
         Ok(Self {
             resource,
             cleanup: Some(Box::new(cleanup)),
+            cleanup_struct,
         })
     }
 
@@ -45,6 +49,7 @@ impl<T> ManagedCResource<T> {
         Self {
             resource: value,
             cleanup: None,
+            cleanup_struct: false
         }
     }
 
@@ -73,11 +78,15 @@ impl<T> ManagedCResource<T> {
 
 impl<T> Drop for ManagedCResource<T> {
     fn drop(&mut self) {
-        // Ensure the clean-up function is called when the resource is dropped.
-        let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
 
         if !self.resource.is_null() {
-            unsafe { let _ = Box::from_raw(self.resource); }
+            let resource = self.resource.clone();
+            // Ensure the clean-up function is called when the resource is dropped.
+            let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
+
+            if self.cleanup_struct {
+                unsafe { let _ = Box::from_raw(resource); }
+            }
         }
     }
 }

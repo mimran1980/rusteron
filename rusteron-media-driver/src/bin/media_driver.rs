@@ -58,9 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("publication stream_id: {:?}", publication.stream_id());
                 println!("publication status: {:?}", publication.channel_status());
 
-                let claim = AeronBufferClaim::new().unwrap();
+                let claim = AeronBufferClaim::default();
                 assert!(publication.try_claim(100, &claim) > 0);
 
+                println!("send message");
                 break;
             }
             println!("waiting for publication to get set up");

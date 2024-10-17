@@ -74,7 +74,7 @@ impl ReturnType {
                 }
             }
         } else if self.original == C_CHAR_STR {
-            return quote! { unsafe { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
+            return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
         } else {
             quote! { #result.into() }
         }
@@ -96,7 +96,7 @@ impl CWrapper {
     #[cfg(not(feature = "deref-methods"))]
     fn generate_methods_for_t(
         &self,
-        wrappers: &HashMap<String, CWrapper>,
+        _wrappers: &HashMap<String, CWrapper>,
     ) -> Vec<proc_macro2::TokenStream> {
         vec![]
     }
@@ -421,6 +421,7 @@ impl CWrapper {
                             let resource = ManagedCResource::new(
                                 move |ctx| unsafe { #init_fn(#(#init_args),*) },
                                 move |ctx| unsafe { #close_fn(#(#close_args),*) },
+                                false
                             )?;
 
                             Ok(Self { inner: std::rc::Rc::new(resource) })
@@ -432,20 +433,55 @@ impl CWrapper {
             })
             .collect_vec();
 
-        if constructors.is_empty() && self.methods
-            .iter()
-            .any(|m| {
-                !m.arguments
-                    .iter()
-                    .any(|(_, ty)| ty.starts_with("* mut * mut"))
-            }) {
+        if constructors.iter().map(|x| x.to_string()).join("").trim().is_empty() && self.has_default_method() {
+            let type_name = format_ident!("{}", self.type_name);
+            let new_args: Vec<proc_macro2::TokenStream> = self.fields
+                .iter()
+                .map(|(name, ty)| {
+                        let arg_name =
+                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_type: syn::Type =
+                            syn::parse_str(ty).expect("Invalid argument type");
+                   quote! { #arg_name: #arg_type }
+                })
+                .collect();
+            let init_args: Vec<proc_macro2::TokenStream> = self.fields
+                .iter()
+                .map(|(name, _ty)| {
+                    let arg_name =
+                        syn::Ident::new(name, proc_macro2::Span::call_site());
+                    quote! { #arg_name: #arg_name.clone() }
+                })
+                .collect();
 
             vec![quote! {
                         #[inline]
-                        pub fn new() -> Result<Self, AeronCError> {
+                        pub fn new(#(#new_args),*) -> Result<Self, AeronCError> {
                             let resource = ManagedCResource::new(
-                                move |ctx| { 0 },
-                                move |ctx| { 0 },
+                                move |ctx| {
+                                    let inst = #type_name { #(#init_args),* };
+                                    let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
+                                    unsafe { *ctx = inner_ptr };
+                                    0
+                                },
+                                move |_ctx| { 0 },
+                                true
+                            )?;
+
+                            Ok(Self { inner: std::rc::Rc::new(resource) })
+                        }
+
+                        #[inline]
+                        pub fn new_zeroed() -> Result<Self, AeronCError> {
+                            let resource = ManagedCResource::new(
+                                move |ctx| {
+                                    let inst: #type_name = unsafe { std::mem::zeroed() };
+                                    let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
+                                    unsafe { *ctx = inner_ptr };
+                                    0
+                                },
+                                move |_ctx| { 0 },
+                                true
                             )?;
 
                             Ok(Self { inner: std::rc::Rc::new(resource) })
@@ -455,6 +491,17 @@ impl CWrapper {
         } else {
             constructors
         }
+    }
+
+    fn has_default_method(&self) -> bool {
+        !self.methods
+            .iter()
+            .any(|m| {
+                m.arguments
+                    .iter()
+                    .any(|(_, ty)| ty.starts_with("* mut * mut"))})
+            && !self.fields.iter().any(|(name, _)| name.starts_with("_"))
+            && !self.fields.is_empty()
     }
 }
 
@@ -540,6 +587,19 @@ pub fn generate_rust_code(
         quote! {}
     };
 
+    let default_impl = if wrapper.has_default_method() && !constructor.iter().map(|x| x.to_string()).join("").trim().is_empty() {
+        quote! {
+            /// This will create an instance where the struct is zeroed, use with care
+            impl Default for #class_name {
+                fn default() -> Self {
+                    #class_name::new_zeroed().unwrap()
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         #warning_code
 
@@ -596,6 +656,7 @@ pub fn generate_rust_code(
         //     }
         // }
 
+        #default_impl
        #common_code
     }
 }
