@@ -96,6 +96,12 @@ mod tests {
             write_to_file(code, false, "md.rs");
         }
 
+        for handler in &bindings.handlers {
+            let code = crate::generate_handlers(handler, &bindings);
+            append_to_file(&file, &code.to_string()).unwrap();
+        }
+
+
         let t = trybuild::TestCases::new();
         append_to_file(&file, MEDIA_DRIVER_BINDINGS).unwrap();
         append_to_file(&file, "\npub fn main() {}\n").unwrap();
@@ -125,6 +131,11 @@ mod tests {
             write_to_file(code, false, "client.rs");
         }
 
+        for handler in &bindings.handlers {
+            let code = crate::generate_handlers(handler, &bindings);
+            append_to_file(&file, &code.to_string()).unwrap();
+        }
+
         let t = trybuild::TestCases::new();
         append_to_file(&file, CLIENT_BINDINGS).unwrap();
         append_to_file(&file, "\npub fn main() {}\n").unwrap();
@@ -150,6 +161,11 @@ mod tests {
         for (p, w) in bindings.wrappers.values().enumerate() {
             let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true);
             write_to_file(code, false, "archive.rs");
+        }
+
+        for handler in &bindings.handlers {
+            let code = crate::generate_handlers(handler, &bindings);
+            append_to_file(&file, &code.to_string()).unwrap();
         }
 
         let t = trybuild::TestCases::new();

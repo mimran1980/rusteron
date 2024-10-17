@@ -56,7 +56,17 @@ mod tests {
 
         let publication = result.poll_blocking(Duration::from_secs(10))?;
 
-        let sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed();
+        let sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed()?;
+
+        aeron_async_add_subscription_with_closure(
+            client.get_inner(),
+            CString::new(topic).unwrap().as_c_str().as_ptr(),
+            stream_id,
+            Box::new(move |subscription, image| {
+                println!("subscription: {:?}", subscription);
+                println!("image: {:?}", image);
+            })
+        ).unwrap();
 
         println!("publication channel: {:?}", publication.channel());
         println!("publication stream_id: {:?}", publication.stream_id());
@@ -68,3 +78,46 @@ mod tests {
         Ok(())
     }
 }
+
+
+// generated code
+
+
+fn aeron_async_add_subscription_with_closure<F>(
+    client: *mut aeron_t,
+    uri: *const ::std::os::raw::c_char,
+    stream_id: i32,
+    on_available_image_closure: F, // Generic closure
+) -> Result<(), std::os::raw::c_int>
+where
+    F: FnMut(AeronSubscription, AeronImage),
+{
+    let mut async_ptr: *mut aeron_async_add_subscription_t = std::ptr::null_mut();
+
+    // Box the closure and turn it into a raw pointer
+    let boxed_closure: *mut F = Box::into_raw(Box::new(on_available_image_closure));
+
+    let result = unsafe {
+        aeron_async_add_subscription(
+            &mut async_ptr,
+            client,
+            uri,
+            stream_id,
+            Some(aeron_on_available_image_t_callback::<F>),  // Pass the callback function
+            boxed_closure as *mut ::std::os::raw::c_void, // Pass the boxed closure as the clientd
+            None, // on_unavailable_image_handler
+            std::ptr::null_mut(), // on_unavailable_image_clientd
+        )
+    };
+
+    if result == 0 {
+        Ok(())
+    } else {
+        // If there's an error, clean up the boxed closure
+        unsafe { Box::from_raw(boxed_closure); } // Clean up the box to avoid a leak
+        Err(result)
+    }
+}
+// genera
+
+

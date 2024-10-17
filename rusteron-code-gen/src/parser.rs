@@ -5,12 +5,14 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use syn::{Attribute, Item, Lit, Meta, MetaNameValue};
+use crate::Handler;
 
 pub fn parse_bindings(out: &PathBuf) -> Bindings {
     let file_content = fs::read_to_string(out.clone()).expect("Unable to read file");
     let syntax_tree = syn::parse_file(&file_content).expect("Unable to parse file");
     let mut wrappers = HashMap::new();
     let mut methods = Vec::new();
+    let mut handlers = Vec::new();
 
     // Iterate through the items in the file
     for item in syntax_tree.items {
@@ -78,6 +80,37 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                         })
                         .docs
                         .extend(docs);
+                    } else {
+                        // Parse the function pointer type
+                        if let syn::Type::Path(type_path) = &*ty.ty {
+                            if let Some(segment) = type_path.path.segments.last() {
+                                if segment.ident.to_string() == "Option" {
+                                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                                        if let Some(syn::GenericArgument::Type(syn::Type::BareFn(bare_fn))) = args.args.first() {
+                                            let args: Vec<(String, String)> = bare_fn.inputs.iter()
+                                                .map(|arg| {
+                                                    let arg_name = match &arg.name {
+                                                        Some((ident, _)) => ident.to_string(),
+                                                        None => "".to_string(),
+                                                    };
+                                                    let arg_type = arg.ty.to_token_stream().to_string();
+                                                    (arg_name, arg_type)
+                                                })
+                                                .collect();
+                                            if let Some((name, cvoid)) = args.first() {
+                                                if cvoid.ends_with("c_void") {
+                                                    handlers.push(Handler {
+                                                        type_name: ty.ident.to_string(),
+                                                        args,
+                                                        docs: docs.clone(),
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                 }
             }
             Item::ForeignMod(fm) => {
@@ -183,7 +216,7 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
         }
     }
 
-    let bindings = Bindings { wrappers, methods };
+    let bindings = Bindings { wrappers, methods, handlers };
 
     let mismatched_types = bindings
         .wrappers
@@ -292,5 +325,6 @@ mod tests {
                 .unwrap()
                 .class_name
         );
+        assert!(bindings.handlers.len() > 1);
     }
 }

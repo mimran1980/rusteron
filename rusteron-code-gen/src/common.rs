@@ -45,9 +45,9 @@ impl<T> ManagedCResource<T> {
         })
     }
 
-    pub fn new_borrowed(value: *mut T) -> Self {
+    pub fn new_borrowed(value: *const T) -> Self {
         Self {
-            resource: value,
+            resource: value as *mut _,
             cleanup: None,
             cleanup_struct: false
         }
@@ -139,3 +139,13 @@ impl fmt::Display for AeronCError {
 }
 
 impl std::error::Error for AeronCError {}
+
+fn cleanup_closure<T>(clientd: *mut ::std::os::raw::c_void) {
+    if !clientd.is_null() {
+        unsafe {
+            // Convert the raw pointer back into a Box and drop it.
+            Box::from_raw(clientd as *mut T);
+            // The Box is dropped when it goes out of scope, automatically calling the destructor (drop).
+        }
+    }
+}

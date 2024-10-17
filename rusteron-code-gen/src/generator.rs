@@ -14,6 +14,7 @@ pub const MEDIA_DRIVER_BINDINGS: &str = include_str!("../bindings/media-driver.r
 pub struct Bindings {
     pub wrappers: HashMap<String, CWrapper>,
     pub methods: Vec<Method>,
+    pub handlers: Vec<Handler>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -22,6 +23,13 @@ pub struct Method {
     pub struct_method_name: String,
     pub return_type: String,
     pub arguments: Vec<(String, String)>,
+    pub docs: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Handler {
+    pub type_name: String,
+    pub args: Vec<(String, String)>,
     pub docs: HashSet<String>,
 }
 
@@ -39,8 +47,8 @@ impl ReturnType {
         ReturnType { original, wrappers }
     }
 
-    pub fn get_new_return_type(&self) -> proc_macro2::TokenStream {
-        if self.original.starts_with("* mut ") {
+    pub fn get_new_return_type(&self, convert_errors: bool) -> proc_macro2::TokenStream {
+        if self.original.starts_with("* mut ") && !self.original.starts_with("* mut * mut"){
             let type_name = self.original.split(" ").last().unwrap();
             if let Some(wrapper) = self.wrappers.get(type_name) {
                 let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
@@ -53,7 +61,7 @@ impl ReturnType {
                 .expect("Invalid class name in wrapper");
             return quote! { #new_type };
         }
-        if self.original == C_INT_RETURN_TYPE_STR {
+        if convert_errors && self.original == C_INT_RETURN_TYPE_STR {
             return quote! { Result<i32, AeronCError> };
         }
         if self.original == C_CHAR_STR {
@@ -64,8 +72,8 @@ impl ReturnType {
         quote! { #return_type }
     }
 
-    pub fn handle_return(&self, result: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        if self.original == C_INT_RETURN_TYPE_STR {
+    pub fn handle_return(&self, result: proc_macro2::TokenStream, convert_errors: bool) -> proc_macro2::TokenStream {
+        if convert_errors && self.original == C_INT_RETURN_TYPE_STR {
             quote! {
                 if result < 0 {
                     return Err(AeronCError::from_code(result));
@@ -221,7 +229,7 @@ impl CWrapper {
                 let fn_name =
                     syn::Ident::new(&method.struct_method_name, proc_macro2::Span::call_site());
                 let return_type_helper = ReturnType::new(method.return_type.clone(), wrappers.clone());
-                let return_type = return_type_helper.get_new_return_type();
+                let return_type = return_type_helper.get_new_return_type(true);
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
@@ -280,7 +288,7 @@ impl CWrapper {
                     })
                     .collect();
 
-                let converter = return_type_helper.handle_return(quote! { result });
+                let converter = return_type_helper.handle_return(quote! { result }, true);
 
                 quote! {
                     #[inline]
@@ -315,7 +323,7 @@ impl CWrapper {
                         }
                     }
                 } else {
-                    ReturnType::new(return_type.clone(), cwrappers.clone()).get_new_return_type()
+                    ReturnType::new(return_type.clone(), cwrappers.clone()).get_new_return_type(true)
                 };
 
                 quote! {
@@ -529,6 +537,71 @@ fn get_docs(docs: &HashSet<String>, _wrappers: &HashMap<String, CWrapper>) -> Ve
         .collect()
 }
 
+pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream {
+    let fn_name = format_ident!("{}_callback", handler.type_name);
+    let doc_comments: Vec<proc_macro2::TokenStream> = handler.docs
+        .iter()
+        .flat_map(|doc| doc.lines())
+        .map(|line| quote! { #[doc = #line] })
+        .collect();
+
+    let closure = handler.args[0].0.clone();
+    let closure_name = format_ident!("{}", closure);
+
+    let args: Vec<proc_macro2::TokenStream> = handler.args
+        .iter()
+        .map(|(name, ty)| {
+            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+            let arg_type: syn::Type = syn::parse_str(ty).expect("Invalid argument type");
+            quote! { #arg_name: #arg_type }
+        })
+        .collect();
+
+    let converted_args: Vec<proc_macro2::TokenStream> = handler.args
+        .iter()
+        .filter_map(|(name, ty)| {
+            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+            if name != &closure {
+                let return_type = ReturnType::new(ty.clone(), bindings.wrappers.clone());
+                Some(return_type.handle_return(quote! {#arg_name}, false))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+
+    let closure_args: Vec<proc_macro2::TokenStream> = handler.args
+        .iter()
+        .filter_map(|(name, ty)| {
+            if name == &closure {
+                return None;
+            }
+
+            let return_type = ReturnType::new(ty.clone(), bindings.wrappers.clone());
+            let type_name = return_type.get_new_return_type(false);
+            Some(quote! {
+                #type_name
+            })
+        })
+        .collect();
+
+    quote! {
+        #(#doc_comments)*
+        unsafe extern "C" fn #fn_name<F>(
+            #(#args),*
+        )
+        where
+            F: FnMut(#(#closure_args),*),
+        {
+            if !#closure_name.is_null() {
+                let closure: &mut F = &mut *(#closure_name as *mut F);
+                closure(#(#converted_args),*);
+            }
+        }
+    }
+}
+
 pub fn generate_rust_code(
     wrapper: &CWrapper,
     wrappers: &HashMap<String, CWrapper>,
@@ -641,6 +714,15 @@ pub fn generate_rust_code(
         impl From<*mut #type_name> for #class_name {
             #[inline]
             fn from(value: *mut #type_name) -> Self {
+                #class_name {
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
+                }
+            }
+        }
+
+        impl From<*const #type_name> for #class_name {
+            #[inline]
+            fn from(value: *const #type_name) -> Self {
                 #class_name {
                     inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
                 }
