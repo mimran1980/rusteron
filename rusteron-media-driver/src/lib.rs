@@ -56,6 +56,8 @@ mod tests {
 
         let publication = result.poll_blocking(Duration::from_secs(10))?;
 
+        let sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed();
+
         println!("publication channel: {:?}", publication.channel());
         println!("publication stream_id: {:?}", publication.stream_id());
         println!("publication status: {:?}", publication.channel_status());

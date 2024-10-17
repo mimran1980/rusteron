@@ -433,61 +433,70 @@ impl CWrapper {
             })
             .collect_vec();
 
-        if constructors.iter().map(|x| x.to_string()).join("").trim().is_empty() && self.has_default_method() {
+        let no_constructor = constructors.iter().map(|x| x.to_string()).join("").trim().is_empty();
+        if no_constructor {
             let type_name = format_ident!("{}", self.type_name);
-            let new_args: Vec<proc_macro2::TokenStream> = self.fields
-                .iter()
-                .map(|(name, ty)| {
+            let zeroed_impl = quote! {
+                #[inline]
+                pub fn new_zeroed() -> Result<Self, AeronCError> {
+                    let resource = ManagedCResource::new(
+                        move |ctx| {
+                            let inst: #type_name = unsafe { std::mem::zeroed() };
+                            let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
+                            unsafe { *ctx = inner_ptr };
+                            0
+                        },
+                        move |_ctx| { 0 },
+                        true
+                    )?;
+
+                    Ok(Self { inner: std::rc::Rc::new(resource) })
+                }
+            };
+            if self.has_default_method() {
+                let type_name = format_ident!("{}", self.type_name);
+                let new_args: Vec<proc_macro2::TokenStream> = self.fields
+                    .iter()
+                    .map(|(name, ty)| {
                         let arg_name =
                             syn::Ident::new(name, proc_macro2::Span::call_site());
                         let arg_type: syn::Type =
                             syn::parse_str(ty).expect("Invalid argument type");
-                   quote! { #arg_name: #arg_type }
-                })
-                .collect();
-            let init_args: Vec<proc_macro2::TokenStream> = self.fields
-                .iter()
-                .map(|(name, _ty)| {
-                    let arg_name =
-                        syn::Ident::new(name, proc_macro2::Span::call_site());
-                    quote! { #arg_name: #arg_name.clone() }
-                })
-                .collect();
+                        quote! { #arg_name: #arg_type }
+                    })
+                    .collect();
+                let init_args: Vec<proc_macro2::TokenStream> = self.fields
+                    .iter()
+                    .map(|(name, _ty)| {
+                        let arg_name =
+                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                        quote! { #arg_name: #arg_name.clone() }
+                    })
+                    .collect();
 
-            vec![quote! {
-                        #[inline]
-                        pub fn new(#(#new_args),*) -> Result<Self, AeronCError> {
-                            let resource = ManagedCResource::new(
-                                move |ctx| {
-                                    let inst = #type_name { #(#init_args),* };
-                                    let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
-                                    unsafe { *ctx = inner_ptr };
-                                    0
-                                },
-                                move |_ctx| { 0 },
-                                true
-                            )?;
+                vec![quote! {
+                            #[inline]
+                            pub fn new(#(#new_args),*) -> Result<Self, AeronCError> {
+                                let resource = ManagedCResource::new(
+                                    move |ctx| {
+                                        let inst = #type_name { #(#init_args),* };
+                                        let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
+                                        unsafe { *ctx = inner_ptr };
+                                        0
+                                    },
+                                    move |_ctx| { 0 },
+                                    true
+                                )?;
 
-                            Ok(Self { inner: std::rc::Rc::new(resource) })
+                                Ok(Self { inner: std::rc::Rc::new(resource) })
+                            }
+
+                            #zeroed_impl
                         }
-
-                        #[inline]
-                        pub fn new_zeroed() -> Result<Self, AeronCError> {
-                            let resource = ManagedCResource::new(
-                                move |ctx| {
-                                    let inst: #type_name = unsafe { std::mem::zeroed() };
-                                    let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
-                                    unsafe { *ctx = inner_ptr };
-                                    0
-                                },
-                                move |_ctx| { 0 },
-                                true
-                            )?;
-
-                            Ok(Self { inner: std::rc::Rc::new(resource) })
-                        }
-                    }
-            ]
+                ]
+            } else {
+                vec![zeroed_impl]
+            }
         } else {
             constructors
         }
