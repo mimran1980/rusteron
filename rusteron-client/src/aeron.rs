@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 impl AeronPublication {
     pub fn new(client: AeronAsyncAddPublication) -> Result<Self, AeronCError> {
         let resource = ManagedCResource::new(
@@ -40,5 +42,20 @@ impl AeronAsyncAddPublication {
         } else {
             None
         }
+    }
+
+    pub fn poll_blocking(&self, timeout: Duration) -> Result<AeronPublication, AeronCError> {
+        if let Some(publication) = self.poll() {
+            return Ok(publication);
+        }
+
+        let time = Instant::now();
+        while time.elapsed() < timeout {
+            if let Some(publication) = self.poll() {
+                return Ok(publication);
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        Err(AeronCError::from_code(-255))
     }
 }
