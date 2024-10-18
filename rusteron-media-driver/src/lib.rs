@@ -68,8 +68,8 @@ mod tests {
             let boxed_handler = Box::into_raw(b) as *mut _;
             println!("after into raw {:p}", boxed_handler);
             println!("Setting Aeron callback...");
-            let result = aeron_context_set_on_available_counter(
-                ctx.get_inner(),
+            // AeronAvailableCounterHandler aeron_on_available_counter_t
+            ctx.set_on_available_counter(
                 Some(aeron_on_available_counter_t_callback::<A>),
                 boxed_handler as *mut ::std::os::raw::c_void,
             );
@@ -77,6 +77,8 @@ mod tests {
         }
 
         let client = Aeron::new(ctx.get_inner())?;
+
+
         client.start()?;
         println!("aeron driver started");
         assert!(client.epoch_clock() > 0);

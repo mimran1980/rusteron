@@ -46,8 +46,8 @@ pub const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
 pub const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
 
 impl ReturnType {
-    pub fn new(original: String, wrappers: HashMap<String, CWrapper>) -> Self {
-        ReturnType { original, wrappers }
+    pub fn new(original_c_type: String, wrappers: HashMap<String, CWrapper>) -> Self {
+        ReturnType { original: original_c_type, wrappers }
     }
 
     pub fn get_new_return_type(&self, convert_errors: bool) -> proc_macro2::TokenStream {
