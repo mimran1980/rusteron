@@ -63,14 +63,14 @@ mod tests {
             }
 
             // // Now use the trait object
-            let b: Box<Box<dyn AeronAvailableCounterHandler>> = Box::new(Box::new(A { a: 123 }));
+            let b= Box::new(Box::new(A { a: 123 }));
             println!("before into raw {:p}", std::ptr::from_ref(&*b));
             let boxed_handler = Box::into_raw(b) as *mut _;
             println!("after into raw {:p}", boxed_handler);
             println!("Setting Aeron callback...");
             let result = aeron_context_set_on_available_counter(
                 ctx.get_inner(),
-                Some(aeron_on_available_counter_t_callback),
+                Some(aeron_on_available_counter_t_callback::<A>),
                 boxed_handler as *mut ::std::os::raw::c_void,
             );
             // panic!("result {}", result);

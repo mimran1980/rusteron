@@ -607,19 +607,15 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
             fn handle(&mut self, #(#closure_args),*);
         }
 
-        #[no_mangle]
+        // #[no_mangle]
         #(#doc_comments)*
-        unsafe extern "C" fn #fn_name(
+        unsafe extern "C" fn #fn_name<F: #closure_type_name>(
             #(#args),*
         )
         {
-                println!("closure");
             if !#closure_name.is_null() {
-                println!("closure {:p}", #closure_name);
-                let closure: &mut Box<dyn #closure_type_name> = &mut *(#closure_name as *mut Box<dyn #closure_type_name>);
-                println!("casting {:p}", &*#closure_name);
+                let closure: &mut F = &mut *(#closure_name as *mut F);
                 closure.handle(#(#converted_args),*);
-                           println!("called");
             }
         }
     }
