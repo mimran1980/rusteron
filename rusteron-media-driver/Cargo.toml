@@ -11,6 +11,7 @@ categories = ["network-programming"]
 documentation = "https://github.com/mimran1980/rusteron"
 #readme = "README.md"
 
+
 [dependencies]
 ctrlc = { workspace = true }
 
@@ -24,6 +25,9 @@ proc-macro2 = {  workspace = true }
 quote = {  workspace = true }
 itertools = {  workspace = true }
 rusteron-code-gen = {path = "../rusteron-code-gen"}
+
+#[dev-dependencies]
+#rusteron-client = {path = "../rusteron-client"}
 
 [features]
 static = []

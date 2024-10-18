@@ -69,6 +69,7 @@ mod tests {
     use crate::{append_to_file, format_token_stream, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
     use proc_macro2::TokenStream;
     use std::fs;
+    use itertools::Itertools;
 
     #[test]
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
@@ -120,7 +121,7 @@ mod tests {
                 .unwrap()
                 .class_name
         );
-        println!("{:#?}", bindings.methods);
+        // dbg!(bindings.wrappers.iter().filter(|(_,w)|w.methods.iter().any(|m|m.fn_name.ends_with("_poll")) ).next());
         assert_eq!(0, bindings.methods.len());
 
         // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());

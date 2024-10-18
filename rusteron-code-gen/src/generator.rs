@@ -4,6 +4,9 @@ use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use syn::Type;
+use log::debug;
+use quote::__private::ext::RepToTokensExt;
+use crate::{format_token_stream, snake_to_pascal_case};
 
 pub const COMMON_CODE: &str = include_str!("common.rs");
 pub const CLIENT_BINDINGS: &str = include_str!("../bindings/client.rs");
@@ -72,7 +75,7 @@ impl ReturnType {
         quote! { #return_type }
     }
 
-    pub fn handle_return(&self, result: proc_macro2::TokenStream, convert_errors: bool) -> proc_macro2::TokenStream {
+    pub fn handle_c_to_rs_return(&self, result: proc_macro2::TokenStream, convert_errors: bool) -> proc_macro2::TokenStream {
         if convert_errors && self.original == C_INT_RETURN_TYPE_STR {
             quote! {
                 if result < 0 {
@@ -82,7 +85,18 @@ impl ReturnType {
                 }
             }
         } else if self.original == C_CHAR_STR {
+            // return quote! { if #result.is_null() { panic!(stringify!(#result)) } else { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
             return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
+        } else {
+            quote! { #result.into() }
+        }
+    }
+
+    pub fn handle_rs_to_c_return(&self, result: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+        if self.original == C_CHAR_STR {
+            quote! {
+                std::ffi::CString::new(#result).unwrap().into_raw()
+            }
         } else {
             quote! { #result.into() }
         }
@@ -198,7 +212,7 @@ impl CWrapper {
                     })
                     .collect();
 
-                let converter = return_type_helper.handle_return(quote! { result });
+                let converter = return_type_helper.handle_c_to_rs_return(quote! { result });
                 quote! {
                     #[inline]
                     #(#method_docs)*
@@ -288,7 +302,7 @@ impl CWrapper {
                     })
                     .collect();
 
-                let converter = return_type_helper.handle_return(quote! { result }, true);
+                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, true);
 
                 quote! {
                     #[inline]
@@ -547,6 +561,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
 
     let closure = handler.args[0].0.clone();
     let closure_name = format_ident!("{}", closure);
+    let closure_type_name = format_ident!("{}Handler", snake_to_pascal_case(&handler.type_name));
 
     let args: Vec<proc_macro2::TokenStream> = handler.args
         .iter()
@@ -563,7 +578,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
             let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
             if name != &closure {
                 let return_type = ReturnType::new(ty.clone(), bindings.wrappers.clone());
-                Some(return_type.handle_return(quote! {#arg_name}, false))
+                Some(return_type.handle_c_to_rs_return(quote! {#arg_name}, false))
             } else {
                 None
             }
@@ -580,23 +595,31 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
 
             let return_type = ReturnType::new(ty.clone(), bindings.wrappers.clone());
             let type_name = return_type.get_new_return_type(false);
+            let field_name = format_ident!("{}", name);
             Some(quote! {
-                #type_name
+                #field_name: #type_name
             })
         })
         .collect();
-
     quote! {
         #(#doc_comments)*
-        unsafe extern "C" fn #fn_name<F>(
+        pub trait #closure_type_name {
+            fn handle(&mut self, #(#closure_args),*);
+        }
+
+        #[no_mangle]
+        #(#doc_comments)*
+        unsafe extern "C" fn #fn_name(
             #(#args),*
         )
-        where
-            F: FnMut(#(#closure_args),*),
         {
+                println!("closure");
             if !#closure_name.is_null() {
-                let closure: &mut F = &mut *(#closure_name as *mut F);
-                closure(#(#converted_args),*);
+                println!("closure {:p}", #closure_name);
+                let closure: &mut Box<dyn #closure_type_name> = &mut *(#closure_name as *mut Box<dyn #closure_type_name>);
+                println!("casting {:p}", &*#closure_name);
+                closure.handle(#(#converted_args),*);
+                           println!("called");
             }
         }
     }
@@ -618,6 +641,155 @@ pub fn generate_rust_code(
     let methods = wrapper.generate_methods(wrappers);
     let methods_t: Vec<TokenStream> = wrapper.generate_methods_for_t(wrappers);
     let constructor = wrapper.generate_constructor(wrappers);
+
+    let async_impls = if wrapper.type_name.starts_with("aeron_async_") {
+        let new_method = wrapper.methods.iter()
+            .find(|m| m.fn_name == wrapper.without_name);
+
+        if let Some(new_method) = new_method {
+            let main_type = &wrapper.type_name.replace("_async_", "_").replace("_add_", "_");
+            let main = wrappers.get(main_type).unwrap();
+
+            let poll_method = main.methods.iter().find(|m| m.fn_name == format!("{}_poll", wrapper.without_name)).unwrap();
+
+            let main_class_name = format_ident!("{}", main.class_name);
+            let async_class_name = format_ident!("{}", wrapper.class_name);
+            let poll_method_name = format_ident!("{}_poll", wrapper.without_name);
+            let new_method_name = format_ident!("{}", new_method.fn_name);
+
+            let init_args: Vec<proc_macro2::TokenStream> = poll_method
+                .arguments
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, (name, ty))| {
+                    if idx == 0 {
+                        Some(quote! { ctx })
+                    } else {
+                        let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_name = ReturnType::new(ty.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
+                        Some(quote! { #arg_name })
+                    }
+                })
+                .collect();
+
+            let new_args: Vec<proc_macro2::TokenStream> = poll_method
+                .arguments
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, (name, ty))| {
+                    if idx == 0 {
+                        None
+                    } else {
+                        let arg_name =
+                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_type = ReturnType::new(ty.clone(), wrappers.clone()).get_new_return_type(false);
+                        Some(quote! { #arg_name: #arg_type })
+                    }
+                })
+                .collect();
+
+            let async_init_args: Vec<proc_macro2::TokenStream> = new_method
+                .arguments
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, (name, ty))| {
+                    if idx == 0 {
+                        Some(quote! { ctx })
+                    } else {
+                        let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_name = ReturnType::new(ty.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
+                        Some(quote! { #arg_name })
+                    }
+                })
+                .collect();
+
+            let async_new_args: Vec<proc_macro2::TokenStream> = new_method
+                .arguments
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, (name, ty))| {
+                    if idx == 0 {
+                        None
+                    } else {
+                        let arg_name =
+                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_type = ReturnType::new(ty.clone(), wrappers.clone()).get_new_return_type(false);
+                        Some(quote! { #arg_name: #arg_type })
+                    }
+                })
+                .collect();
+
+
+            quote! {
+impl #main_class_name {
+    pub fn new(#(#new_args),*) -> Result<Self, AeronCError> {
+        let resource = ManagedCResource::new(
+            move |ctx| unsafe {
+                #poll_method_name(#(#init_args),*)
+            },
+            move |_ctx| {
+                // TODO is there any cleanup to do
+                0
+            },
+            false
+        )?;
+        Ok(Self {
+            inner: std::rc::Rc::new(resource),
+        })
+    }
+}
+
+impl #async_class_name {
+    pub fn new(#(#async_new_args),*) -> Result<Self, AeronCError> {
+        let resource = ManagedCResource::new(
+            move |ctx| unsafe {
+                #new_method_name(#(#async_init_args),*)
+            },
+            move |_ctx| {
+                // TODO is there any cleanup to do
+                0
+            },
+            false
+        )?;
+        Ok(Self {
+            inner: std::rc::Rc::new(resource),
+        })
+    }
+
+    pub fn poll(&self) -> Option<#main_class_name> {
+        if let Ok(publication) = #main_class_name::new(self.clone()) {
+            Some(publication)
+        } else {
+            None
+        }
+    }
+
+    pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+        if let Some(publication) = self.poll() {
+            return Ok(publication);
+        }
+
+        let time = std::time::Instant::now();
+        while time.elapsed() < timeout {
+            if let Some(publication) = self.poll() {
+                return Ok(publication);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        Err(AeronCError::from_code(-255))
+    }
+}
+            }
+        } else {
+            quote! {}
+        }
+    } else {
+        quote! {}
+    };
+
+    // if async_impls.to_string().trim().len() > 1 {
+    //     panic!("{}", format_token_stream(async_impls));
+    // }
 
     let common_code = if !include_common_code {
         quote! {}
@@ -720,6 +892,13 @@ pub fn generate_rust_code(
             }
         }
 
+        impl From<#class_name> for *mut #type_name {
+            #[inline]
+            fn from(value: #class_name) -> Self {
+                value.get_inner()
+            }
+        }
+
         impl From<*const #type_name> for #class_name {
             #[inline]
             fn from(value: *const #type_name) -> Self {
@@ -747,6 +926,7 @@ pub fn generate_rust_code(
         //     }
         // }
 
+        #async_impls
         #default_impl
        #common_code
     }

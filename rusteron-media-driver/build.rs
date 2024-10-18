@@ -101,7 +101,7 @@ pub fn main() {
     println!("cargo:include={}", header_path.display());
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", header_path.display()))
-        // We need to include some of the headers from `libaeron`, so update the include path here
+        // We need to include some of the headers from `rusteron`, so update the include path here
         .clang_arg(format!(
             "-I{}",
             aeron_path.join("aeron-client/src/main/c").display()

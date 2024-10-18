@@ -127,7 +127,6 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
 
                             let option = if let Some((_name, ty)) = args.first() {
                                 let ty = ty.split(' ').last().map(|t| t.to_string()).unwrap();
-
                                 if wrappers.contains_key(&ty) {
                                     Some(ty)
                                 } else {
@@ -208,6 +207,7 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                                     docs: docs.clone(),
                                 }),
                             }
+
                         }
                     }
                 }
@@ -253,7 +253,7 @@ fn get_doc_comments(attrs: &[Attribute]) -> HashSet<String> {
         .collect()
 }
 
-fn snake_to_pascal_case(mut snake: &str) -> String {
+pub fn snake_to_pascal_case(mut snake: &str) -> String {
     if snake.ends_with("_t") {
         snake = &snake[..snake.len() - 2];
     }
