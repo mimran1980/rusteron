@@ -52,17 +52,30 @@ mod tests {
         let ctx = AeronContext::new()?;
         ctx.set_dir(CString::new(dir).unwrap().into_raw())?;
 
+        let client = Aeron::new(ctx.get_inner())?;
+
         unsafe {
             struct A {
+                client: Aeron
             }
             impl AeronAvailableCounterHandler for A {
                 fn handle(&mut self, counters_reader: AeronCountersReader, registration_id: i64, counter_id: i32) {
-                    println!("Aeron available counters: {:?}, registration_id: {registration_id}, counter_id: {counter_id}", counters_reader);
+                    println!("Aeron available counters: {registration_id} {counter_id}");
+                    // unsafe {
+                    //     if counters_reader.metadata_length > 100 {
+                    //         println!("aeron available counters reader {}", counters_reader.metadata_length);
+                    //         println!("aeron available value reader {}", counters_reader.values_length);
+                    //         return;
+                    //     }
+                    //     // let slice = std::slice::from_raw_parts(counters_reader.metadata, counters_reader.metadata_length as usize);
+                    //     // println!("Aeron available counters: {:?}, registration_id: {registration_id}, counter_id: {counter_id}",
+                    //     //          std::str::from_utf8_unchecked(slice).trim());
+                    // }
                 }
             }
 
             // // Now use the trait object
-            let b= Box::new(Box::new(A {}));
+            let b= Box::new(Box::new(A { client: client.clone() }));
             println!("before into raw {:p}", std::ptr::from_ref(&*b));
             let boxed_handler = Box::into_raw(b) as *mut _;
             println!("after into raw {:p}", boxed_handler);
@@ -74,9 +87,6 @@ mod tests {
             );
             // panic!("result {}", result);
         }
-
-        let client = Aeron::new(ctx.get_inner())?;
-
 
         client.start()?;
         println!("aeron driver started");
