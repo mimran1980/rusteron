@@ -54,7 +54,6 @@ mod tests {
 
         unsafe {
             struct A {
-                a: i32
             }
             impl AeronAvailableCounterHandler for A {
                 fn handle(&mut self, counters_reader: AeronCountersReader, registration_id: i64, counter_id: i32) {
@@ -63,7 +62,7 @@ mod tests {
             }
 
             // // Now use the trait object
-            let b= Box::new(Box::new(A { a: 123 }));
+            let b= Box::new(Box::new(A {}));
             println!("before into raw {:p}", std::ptr::from_ref(&*b));
             let boxed_handler = Box::into_raw(b) as *mut _;
             println!("after into raw {:p}", boxed_handler);
