@@ -41,6 +41,19 @@ pub struct Arg {
     pub processing: ArgProcessing,
 }
 
+impl Arg {
+    const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
+    const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
+
+    pub fn is_c_string(&self) -> bool {
+        self.c_type == Self::C_CHAR_STR
+    }
+
+    pub fn is_c_raw_int(&self) -> bool {
+        self.c_type == Self::C_INT_RETURN_TYPE_STR
+    }
+}
+
 impl Deref for Arg {
     type Target = str;
 
@@ -72,9 +85,6 @@ pub struct ReturnType {
     wrappers: HashMap<String, CWrapper>,
 }
 
-pub const C_INT_RETURN_TYPE_STR: &str = ":: std :: os :: raw :: c_int";
-pub const C_CHAR_STR: &str = "* const :: std :: os :: raw :: c_char";
-
 impl ReturnType {
     pub fn new(original_c_type: Arg, wrappers: HashMap<String, CWrapper>) -> Self {
         ReturnType { original: original_c_type, wrappers }
@@ -94,10 +104,10 @@ impl ReturnType {
                 .expect("Invalid class name in wrapper");
             return quote! { #new_type };
         }
-        if convert_errors && self.original.c_type == C_INT_RETURN_TYPE_STR {
+        if convert_errors && self.original.is_c_raw_int() {
             return quote! { Result<i32, AeronCError> };
         }
-        if self.original.c_type == C_CHAR_STR {
+        if self.original.is_c_string() {
             return quote! { &str };
         }
         let return_type: syn::Type =
@@ -106,7 +116,7 @@ impl ReturnType {
     }
 
     pub fn handle_c_to_rs_return(&self, result: proc_macro2::TokenStream, convert_errors: bool) -> proc_macro2::TokenStream {
-        if convert_errors && self.original.c_type == C_INT_RETURN_TYPE_STR {
+        if convert_errors && self.original.is_c_raw_int() {
             quote! {
                 if result < 0 {
                     return Err(AeronCError::from_code(result));
@@ -114,7 +124,7 @@ impl ReturnType {
                     return Ok(result)
                 }
             }
-        } else if self.original.c_type == C_CHAR_STR {
+        } else if self.original.is_c_string() {
             // return quote! { if #result.is_null() { panic!(stringify!(#result)) } else { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
             return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
         } else {
@@ -123,7 +133,7 @@ impl ReturnType {
     }
 
     pub fn handle_rs_to_c_return(&self, result: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        if self.original.c_type == C_CHAR_STR {
+        if self.original.is_c_string() {
             quote! {
                 std::ffi::CString::new(#result).unwrap().into_raw()
             }
@@ -360,10 +370,10 @@ impl CWrapper {
                 let return_type = &arg.c_type;
                 let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
 
-                let return_type = if return_type == C_INT_RETURN_TYPE_STR {
+                let return_type = if arg.is_c_raw_int() {
                     let r_type: Type = syn::parse_str(return_type).unwrap();
                     quote! { #r_type }
-                } else if return_type == C_CHAR_STR {
+                } else if arg.is_c_string() {
                     return quote! {
                         #[inline]
                         pub fn #fn_name(&self) -> &str {
@@ -409,7 +419,7 @@ impl CWrapper {
                     .find(|m| close_fn.to_string().contains(&m.fn_name));
                 let found_close = init_fn != close_fn
                     && close_method.is_some()
-                    && close_method.unwrap().return_type.c_type == C_INT_RETURN_TYPE_STR;
+                    && close_method.unwrap().return_type.is_c_raw_int();
                 if found_close {
                     let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
                     let init_args: Vec<proc_macro2::TokenStream> = method
