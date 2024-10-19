@@ -33,7 +33,6 @@ pub struct Method {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ArgProcessing {
-    Ignore,
     Default,
 }
 
@@ -49,6 +48,16 @@ impl Deref for Arg {
 
     fn deref(&self) -> &Self::Target {
         &self.c_type
+    }
+}
+
+impl Arg {
+    pub fn as_ident(&self) -> syn::Ident {
+        syn::Ident::new(&self.name, proc_macro2::Span::call_site())
+    }
+
+    pub fn as_type(&self) -> syn::Type {
+        syn::parse_str(&self.c_type).expect("Invalid argument type")
     }
 }
 
@@ -197,16 +206,14 @@ impl CWrapper {
                             if matching_wrapper.type_name == self.type_name {
                                 None
                             } else {
-                                let arg_name =
-                                    syn::Ident::new(name, proc_macro2::Span::call_site());
-                                let arg_type: syn::Type =
-                                    syn::parse_str(ty).expect("Invalid argument type");
+                                let arg_name = arg.as_ident();
+                                let arg_type: syn::Type = arg.as_type();
                                 Some(quote! { #arg_name: #arg_type })
                             }
                         } else {
-                            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                            let arg_name = arg.as_ident();
                             let arg_type: syn::Type =
-                                syn::parse_str(ty).expect("Invalid argument type");
+                                arg.as_type();
                             Some(quote! { #arg_name: #arg_type })
                         }
                     })
@@ -225,7 +232,7 @@ impl CWrapper {
                             "notfound"
                         };
                         if let Some(_matching_wrapper) = wrappers.get(t) {
-                            let field_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                            let field_name = arg.as_ident();
                             let t = syn::Ident::new(t, proc_macro2::Span::call_site());
                             if ty.ends_with(self.type_name.as_str()) {
                                 Some(quote! {  (self as *const #t) as *mut #t })
@@ -233,13 +240,13 @@ impl CWrapper {
                                 Some(quote! { #field_name })
                             }
                         } else {
-                            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                            let arg_name = arg.as_ident();
                             Some(quote! { #arg_name })
                         }
                     })
                     .collect();
 
-                let converter = return_type_helper.handle_c_to_rs_return(quote! { result });
+                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, false);
                 quote! {
                     #[inline]
                     #(#method_docs)*
@@ -292,16 +299,16 @@ impl CWrapper {
                                 None
                             } else {
                                 let arg_name =
-                                    syn::Ident::new(name, proc_macro2::Span::call_site());
+                                    arg.as_ident();
                                 let arg_type: syn::Type =
                                     syn::parse_str(&matching_wrapper.class_name)
                                         .expect("Invalid argument type");
                                 Some(quote! { #arg_name: &#arg_type })
                             }
                         } else {
-                            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                            let arg_name = arg.as_ident();
                             let arg_type: syn::Type =
-                                syn::parse_str(ty).expect("Invalid argument type");
+                                arg.as_type();
                             Some(quote! { #arg_name: #arg_type })
                         }
                     })
@@ -320,14 +327,14 @@ impl CWrapper {
                             "notfound"
                         };
                         if let Some(_matching_wrapper) = wrappers.get(t) {
-                            let field_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                            let field_name = arg.as_ident();
                             if ty.ends_with(self.type_name.as_str()) {
                                 Some(quote! { self.get_inner() })
                             } else {
                                 Some(quote! { #field_name.get_inner() })
                             }
                         } else {
-                            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                            let arg_name = arg.as_ident();
                             Some(quote! { #arg_name })
                         }
                     })
@@ -422,7 +429,7 @@ impl CWrapper {
                                 Some(quote! { ctx })
                             } else {
                                 let arg_name =
-                                    syn::Ident::new(name, proc_macro2::Span::call_site());
+                                    arg.as_ident();
                                 Some(quote! { #arg_name.clone() })
                             }
                         })
@@ -443,7 +450,7 @@ impl CWrapper {
                                 }
                             } else {
                                 let arg_name =
-                                    syn::Ident::new(name, proc_macro2::Span::call_site());
+                                    arg.as_ident();
                                 Some(quote! { #arg_name.clone() })
                             }
                         })
@@ -460,9 +467,9 @@ impl CWrapper {
                                 None
                             } else {
                                 let arg_name =
-                                    syn::Ident::new(name, proc_macro2::Span::call_site());
+                                    arg.as_ident();
                                 let arg_type: syn::Type =
-                                    syn::parse_str(ty).expect("Invalid argument type");
+                                    arg.as_type();
                                 Some(quote! { #arg_name: #arg_type })
                             }
                         })
@@ -522,9 +529,9 @@ impl CWrapper {
                         let name = &arg.name;
                         let ty = &arg.c_type;
                         let arg_name =
-                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                            arg.as_ident();
                         let arg_type: syn::Type =
-                            syn::parse_str(ty).expect("Invalid argument type");
+                            arg.as_type();
                         quote! { #arg_name: #arg_type }
                     })
                     .collect();
@@ -534,7 +541,7 @@ impl CWrapper {
                         let name = &arg.name;
                         let ty = &arg.c_type;
                         let arg_name =
-                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                            arg.as_ident();
                         quote! { #arg_name: #arg_name.clone() }
                     })
                     .collect();
@@ -611,8 +618,8 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
         .map(|arg| {
             let name = &arg.name;
             let ty = &arg.c_type;
-            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
-            let arg_type: syn::Type = syn::parse_str(ty).expect("Invalid argument type");
+            let arg_name = arg.as_ident();
+            let arg_type: syn::Type = arg.as_type();
             quote! { #arg_name: #arg_type }
         })
         .collect();
@@ -622,7 +629,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
         .filter_map(|arg| {
             let name = &arg.name;
             let ty = &arg.c_type;
-            let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+            let arg_name = arg.as_ident();
             if name != &closure {
                 let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
                 Some(return_type.handle_c_to_rs_return(quote! {#arg_name}, false))
@@ -712,7 +719,7 @@ pub fn generate_rust_code(
                     if idx == 0 {
                         Some(quote! { ctx })
                     } else {
-                        let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_name = arg.as_ident();
                         let arg_name = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
                         Some(quote! { #arg_name })
                     }
@@ -730,7 +737,7 @@ pub fn generate_rust_code(
                         None
                     } else {
                         let arg_name =
-                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                            arg.as_ident();
                         let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
                         Some(quote! { #arg_name: #arg_type })
                     }
@@ -747,7 +754,7 @@ pub fn generate_rust_code(
                     if idx == 0 {
                         Some(quote! { ctx })
                     } else {
-                        let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
+                        let arg_name = arg.as_ident();
                         let arg_name = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
                         Some(quote! { #arg_name })
                     }
@@ -765,7 +772,7 @@ pub fn generate_rust_code(
                         None
                     } else {
                         let arg_name =
-                            syn::Ident::new(name, proc_macro2::Span::call_site());
+                            arg.as_ident();
                         let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
                         Some(quote! { #arg_name: #arg_type })
                     }
