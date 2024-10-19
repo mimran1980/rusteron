@@ -44,6 +44,8 @@ pub struct Arg {
 impl Arg {
     const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
     const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
+    const STAR_MUT: &'static str = "* mut";
+    const DOUBLE_STAR_MUT: &'static str = "* mut * mut";
 
     pub fn is_c_string(&self) -> bool {
         self.c_type == Self::C_CHAR_STR
@@ -51,6 +53,18 @@ impl Arg {
 
     pub fn is_c_raw_int(&self) -> bool {
         self.c_type == Self::C_INT_RETURN_TYPE_STR
+    }
+
+    pub fn is_mut_pointer(&self) -> bool {
+        self.c_type.starts_with(Self::STAR_MUT)
+    }
+
+    pub fn is_double_mut_pointer(&self) -> bool {
+        self.c_type.starts_with(Self::DOUBLE_STAR_MUT)
+    }
+
+    pub fn is_single_mut_pointer(&self) -> bool {
+        self.is_mut_pointer() && !self.is_double_mut_pointer()
     }
 }
 
@@ -91,7 +105,7 @@ impl ReturnType {
     }
 
     pub fn get_new_return_type(&self, convert_errors: bool) -> proc_macro2::TokenStream {
-        if self.original.starts_with("* mut ") && !self.original.starts_with("* mut * mut"){
+        if self.original.is_single_mut_pointer() {
             let type_name = self.original.split(" ").last().unwrap();
             if let Some(wrapper) = self.wrappers.get(type_name) {
                 let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
@@ -173,7 +187,7 @@ impl CWrapper {
             .filter(|m| {
                 !m.arguments
                     .iter()
-                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
+                    .any(|arg| arg.is_double_mut_pointer())
             })
             .map(|method| {
                 let unique = wrappers
@@ -204,7 +218,7 @@ impl CWrapper {
                     .iter()
                     .filter_map(|arg| {
                         let ty = &arg.c_type;
-                        let t = if ty.starts_with("* mut") {
+                        let t = if arg.is_single_mut_pointer() {
                             ty.split(" ").last().unwrap()
                         } else {
                             "notfound"
@@ -232,7 +246,7 @@ impl CWrapper {
                     .iter()
                     .filter_map(|arg| {
                         let ty = &arg.c_type;
-                        let t = if ty.starts_with("* mut") {
+                        let t = if arg.is_single_mut_pointer() {
                             ty.split(" ").last().unwrap()
                         } else {
                             "notfound"
@@ -277,7 +291,7 @@ impl CWrapper {
             .filter(|m| {
                 !m.arguments
                     .iter()
-                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
+                    .any(|arg| arg.is_double_mut_pointer())
             })
             .map(|method| {
                 let fn_name =
@@ -294,7 +308,7 @@ impl CWrapper {
                     .iter()
                     .filter_map(|arg| {
                         let ty = &arg.c_type;
-                        let t = if ty.starts_with("* mut") {
+                        let t = if arg.is_single_mut_pointer() {
                             ty.split(" ").last().unwrap()
                         } else {
                             "notfound"
@@ -325,7 +339,7 @@ impl CWrapper {
                     .iter()
                     .filter_map(|arg| {
                         let ty = &arg.c_type;
-                        let t = if ty.starts_with("* mut") {
+                        let t = if arg.is_single_mut_pointer() {
                             ty.split(" ").last().unwrap()
                         } else {
                             "notfound"
@@ -401,7 +415,7 @@ impl CWrapper {
             .filter(|m| {
                 m.arguments
                     .iter()
-                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
+                    .any(|arg| arg.is_double_mut_pointer())
             })
             .map(|method| {
                 let init_fn = format_ident!("{}", method.fn_name);
@@ -444,7 +458,7 @@ impl CWrapper {
                         .filter_map(|(idx, arg)| {
                             let ty = &arg.c_type;
                             if idx == 0 {
-                                if ty.starts_with("* mut * mut") {
+                                if arg.is_double_mut_pointer() {
                                     Some(quote! { ctx })
                                 } else {
                                     Some(quote! { *ctx })
@@ -575,7 +589,7 @@ impl CWrapper {
             .any(|m| {
                 m.arguments
                     .iter()
-                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
+                    .any(|arg| arg.is_double_mut_pointer())
             });
 
         has_init_method
