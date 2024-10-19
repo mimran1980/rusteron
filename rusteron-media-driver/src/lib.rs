@@ -16,7 +16,7 @@ include!("../../rusteron-client/src/aeron.rs");
 unsafe impl Send for AeronDriverContext {}
 
 impl AeronDriver {
-    pub fn launchEmbedded(aeron_context: &AeronDriverContext) -> Arc<AtomicBool> {
+    pub fn launch_embedded(aeron_context: &AeronDriverContext) -> Arc<AtomicBool> {
         let mut stop = Arc::new(AtomicBool::new(false));
         let mut stop_copy = stop.clone();
         let mut stop_copy2 = stop.clone();
@@ -73,7 +73,7 @@ mod tests {
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
 
-        let stop = AeronDriver::launchEmbedded(&aeron_context);
+        let stop = AeronDriver::launch_embedded(&aeron_context);
 
         // aeron_driver
         //     .conductor()

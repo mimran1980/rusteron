@@ -1,3 +1,4 @@
+use crate::snake_to_pascal_case;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -6,9 +7,6 @@ use std::io::BufRead;
 use std::ops::Deref;
 use std::str::FromStr;
 use syn::Type;
-use log::debug;
-use quote::__private::ext::RepToTokensExt;
-use crate::{format_token_stream, snake_to_pascal_case};
 
 pub const COMMON_CODE: &str = include_str!("common.rs");
 pub const CLIENT_BINDINGS: &str = include_str!("../bindings/client.rs");
@@ -16,7 +14,7 @@ pub const ARCHIVE_BINDINGS: &str = include_str!("../bindings/archive.rs");
 pub const MEDIA_DRIVER_BINDINGS: &str = include_str!("../bindings/media-driver.rs");
 
 #[derive(Debug, Clone, Default)]
-pub struct Bindings {
+pub struct CBinding {
     pub wrappers: HashMap<String, CWrapper>,
     pub methods: Vec<Method>,
     pub handlers: Vec<Handler>,
@@ -74,8 +72,8 @@ pub struct ReturnType {
     wrappers: HashMap<String, CWrapper>,
 }
 
-pub const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
-pub const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
+pub const C_INT_RETURN_TYPE_STR: &str = ":: std :: os :: raw :: c_int";
+pub const C_CHAR_STR: &str = "* const :: std :: os :: raw :: c_char";
 
 impl ReturnType {
     pub fn new(original_c_type: Arg, wrappers: HashMap<String, CWrapper>) -> Self {
@@ -165,7 +163,7 @@ impl CWrapper {
             .filter(|m| {
                 !m.arguments
                     .iter()
-                    .any(|(_, ty)| ty.starts_with("* mut * mut"))
+                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
             })
             .map(|method| {
                 let unique = wrappers
@@ -195,7 +193,6 @@ impl CWrapper {
                     .arguments
                     .iter()
                     .filter_map(|arg| {
-                        let name = &arg.name;
                         let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
@@ -224,7 +221,6 @@ impl CWrapper {
                     .arguments
                     .iter()
                     .filter_map(|arg| {
-                        let name = &arg.name;
                         let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
@@ -246,7 +242,7 @@ impl CWrapper {
                     })
                     .collect();
 
-                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, false);
+                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, true);
                 quote! {
                     #[inline]
                     #(#method_docs)*
@@ -287,7 +283,6 @@ impl CWrapper {
                     .arguments
                     .iter()
                     .filter_map(|arg| {
-                        let name = &arg.name;
                         let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
@@ -319,7 +314,6 @@ impl CWrapper {
                     .arguments
                     .iter()
                     .filter_map(|arg| {
-                        let name = &arg.name;
                         let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
@@ -423,8 +417,6 @@ impl CWrapper {
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, arg)| {
-                            let name = &arg.name;
-                            let ty = &arg.c_type;
                             if idx == 0 {
                                 Some(quote! { ctx })
                             } else {
@@ -440,7 +432,6 @@ impl CWrapper {
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, arg)| {
-                            let name = &arg.name;
                             let ty = &arg.c_type;
                             if idx == 0 {
                                 if ty.starts_with("* mut * mut") {
@@ -461,8 +452,6 @@ impl CWrapper {
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, arg)| {
-                            let name = &arg.name;
-                            let ty = &arg.c_type;
                             if idx == 0 {
                                 None
                             } else {
@@ -526,8 +515,6 @@ impl CWrapper {
                 let new_args: Vec<proc_macro2::TokenStream> = self.fields
                     .iter()
                     .map(|arg| {
-                        let name = &arg.name;
-                        let ty = &arg.c_type;
                         let arg_name =
                             arg.as_ident();
                         let arg_type: syn::Type =
@@ -538,8 +525,6 @@ impl CWrapper {
                 let init_args: Vec<proc_macro2::TokenStream> = self.fields
                     .iter()
                     .map(|arg| {
-                        let name = &arg.name;
-                        let ty = &arg.c_type;
                         let arg_name =
                             arg.as_ident();
                         quote! { #arg_name: #arg_name.clone() }
@@ -575,12 +560,15 @@ impl CWrapper {
     }
 
     fn has_default_method(&self) -> bool {
-        !self.methods
+        let has_init_method = !self.methods
             .iter()
             .any(|m| {
                 m.arguments
                     .iter()
-                    .any(|arg| arg.c_type.starts_with("* mut * mut"))})
+                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
+            });
+
+        has_init_method
             && !self.fields.iter().any(|arg| arg.name.starts_with("_"))
             && !self.fields.is_empty()
     }
@@ -601,7 +589,7 @@ fn get_docs(docs: &HashSet<String>, _wrappers: &HashMap<String, CWrapper>) -> Ve
         .collect()
 }
 
-pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream {
+pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream {
     let fn_name = format_ident!("{}_callback", handler.type_name);
     let doc_comments: Vec<proc_macro2::TokenStream> = handler.docs
         .iter()
@@ -616,8 +604,6 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
     let args: Vec<proc_macro2::TokenStream> = handler.args
         .iter()
         .map(|arg| {
-            let name = &arg.name;
-            let ty = &arg.c_type;
             let arg_name = arg.as_ident();
             let arg_type: syn::Type = arg.as_type();
             quote! { #arg_name: #arg_type }
@@ -628,7 +614,6 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
         .iter()
         .filter_map(|arg| {
             let name = &arg.name;
-            let ty = &arg.c_type;
             let arg_name = arg.as_ident();
             if name != &closure {
                 let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
@@ -644,7 +629,6 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
         .iter()
         .filter_map(|arg| {
             let name = &arg.name;
-            let ty = &arg.c_type;
             if name == &closure {
                 return None;
             }
@@ -714,8 +698,6 @@ pub fn generate_rust_code(
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, arg)| {
-                    let name = &arg.name;
-                    let ty = &arg.c_type;
                     if idx == 0 {
                         Some(quote! { ctx })
                     } else {
@@ -731,8 +713,6 @@ pub fn generate_rust_code(
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, arg)| {
-                    let name = &arg.name;
-                    let ty = &arg.c_type;
                     if idx == 0 {
                         None
                     } else {
@@ -749,8 +729,6 @@ pub fn generate_rust_code(
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, arg)| {
-                    let name = &arg.name;
-                    let ty = &arg.c_type;
                     if idx == 0 {
                         Some(quote! { ctx })
                     } else {
@@ -766,8 +744,6 @@ pub fn generate_rust_code(
                 .iter()
                 .enumerate()
                 .filter_map(|(idx, arg)| {
-                    let name = &arg.name;
-                    let ty = &arg.c_type;
                     if idx == 0 {
                         None
                     } else {

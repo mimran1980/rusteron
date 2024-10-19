@@ -1,4 +1,4 @@
-use crate::generator::{Bindings, CWrapper, Method};
+use crate::generator::{CBinding, CWrapper, Method};
 use itertools::Itertools;
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use syn::{Attribute, Item, Lit, Meta, MetaNameValue};
 use crate::{Arg, ArgProcessing, Handler};
 
-pub fn parse_bindings(out: &PathBuf) -> Bindings {
+pub fn parse_bindings(out: &PathBuf) -> CBinding {
     let file_content = fs::read_to_string(out.clone()).expect("Unable to read file");
     let syntax_tree = syn::parse_file(&file_content).expect("Unable to parse file");
     let mut wrappers = HashMap::new();
@@ -224,7 +224,7 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
         }
     }
 
-    let bindings = Bindings { wrappers, methods, handlers };
+    let bindings = CBinding { wrappers, methods, handlers };
 
     let mismatched_types = bindings
         .wrappers
