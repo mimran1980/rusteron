@@ -1,9 +1,10 @@
-use std::ffi::CString;
+use rusteron_media_driver::bindings::{
+    aeron_threading_mode_enum,
+};
 use rusteron_media_driver::*;
+use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use rusteron_media_driver::bindings::{aeron_async_add_publication, aeron_context, aeron_threading_mode_enum};
-use rusteron_media_driver::bindings::aeron_threading_mode_enum::AERON_THREADING_MODE_SHARED_NETWORK;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Flag to indicate when the application should stop (set on Ctrl+C)
@@ -29,10 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the Aeron driver
     println!("Aeron media driver started successfully. Press Ctrl+C to stop.");
 
-    aeron_driver
-        .conductor()
-        .context()
-        .print_configuration();
+    aeron_driver.conductor().context().print_configuration();
     aeron_driver.main_do_work()?;
 
     println!("aeron dir: {:?}", aeron_context.get_dir());
@@ -76,7 +74,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         aeron_driver.main_do_work()?;
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-
 
     println!("Received signal to stop the media driver.");
     println!("Aeron media driver stopped successfully.");

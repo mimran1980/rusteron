@@ -7,9 +7,9 @@ pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use bindings::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!("../../rusteron-client/src/aeron.rs");
 
@@ -17,14 +17,15 @@ unsafe impl Send for AeronDriverContext {}
 
 impl AeronDriver {
     pub fn launch_embedded(aeron_context: &AeronDriverContext) -> Arc<AtomicBool> {
-        let mut stop = Arc::new(AtomicBool::new(false));
-        let mut stop_copy = stop.clone();
-        let mut stop_copy2 = stop.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_copy = stop.clone();
+        let stop_copy2 = stop.clone();
         let aeron_context = aeron_context.clone();
         // Register signal handler for SIGINT (Ctrl+C)
         ctrlc::set_handler(move || {
             stop_copy2.store(true, Ordering::SeqCst);
-        }).expect("Error setting Ctrl-C handler");
+        })
+        .expect("Error setting Ctrl-C handler");
 
         std::thread::spawn(move || {
             let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;
@@ -41,16 +42,15 @@ impl AeronDriver {
         });
         stop_copy
     }
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::ffi::CString;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::thread::sleep;
+    use std::sync::atomic::{Ordering};
+    
+    
     use std::time::Duration;
 
     #[test]
@@ -90,10 +90,15 @@ mod tests {
 
         unsafe {
             struct A {
-                client: Aeron
+                client: Aeron,
             }
             impl AeronAvailableCounterHandler for A {
-                fn handle(&mut self, counters_reader: AeronCountersReader, registration_id: i64, counter_id: i32) {
+                fn handle(
+                    &mut self,
+                    counters_reader: AeronCountersReader,
+                    registration_id: i64,
+                    counter_id: i32,
+                ) {
                     println!("Aeron available counters: {registration_id} {counter_id}");
                     // unsafe {
                     //     if counters_reader.metadata_length > 100 {
@@ -109,7 +114,9 @@ mod tests {
             }
 
             // // Now use the trait object
-            let b= Box::new(Box::new(A { client: client.clone() }));
+            let b = Box::new(Box::new(A {
+                client: client.clone(),
+            }));
             println!("before into raw {:p}", std::ptr::from_ref(&*b));
             let boxed_handler = Box::into_raw(b) as *mut _;
             println!("after into raw {:p}", boxed_handler);
@@ -127,11 +134,19 @@ mod tests {
         assert!(client.epoch_clock() > 0);
         assert!(client.nano_clock() > 0);
 
-        let counter_async = AeronAsyncAddCounter::new(client.clone(), 2543543, "12312312".as_ptr(), "12312312".len(),
-        "abcd", 4)?;
+        let counter_async = AeronAsyncAddCounter::new(
+            client.clone(),
+            2543543,
+            "12312312".as_ptr(),
+            "12312312".len(),
+            "abcd",
+            4,
+        )?;
 
         let counter = counter_async.poll_blocking(Duration::from_secs(15))?;
-        unsafe { *counter.addr() += 1; }
+        unsafe {
+            *counter.addr() += 1;
+        }
 
         let result = AeronAsyncAddPublication::new(client.clone(), topic, stream_id)?;
 
@@ -146,8 +161,9 @@ mod tests {
             Box::new(move |subscription, image| {
                 println!("subscription: {:?}", subscription);
                 println!("image: {:?}", image);
-            })
-        ).unwrap();
+            }),
+        )
+        .unwrap();
 
         println!("publication channel: {:?}", publication.channel());
         println!("publication stream_id: {:?}", publication.stream_id());
@@ -162,7 +178,6 @@ mod tests {
         Ok(())
     }
 }
-
 
 // generated code
 // pub trait TestER: FnMut(&str) {}
@@ -227,7 +242,8 @@ fn aeron_async_add_subscription_with_closure(
     let mut async_ptr: *mut aeron_async_add_subscription_t = std::ptr::null_mut();
 
     // Box the closure and turn it into a raw pointer
-    let boxed_closure: *mut OnAvailableImageClosure = Box::into_raw(Box::new(on_available_image_closure));
+    let boxed_closure: *mut OnAvailableImageClosure =
+        Box::into_raw(Box::new(on_available_image_closure));
 
     let result = unsafe {
         aeron_async_add_subscription(
@@ -235,10 +251,10 @@ fn aeron_async_add_subscription_with_closure(
             client,
             uri,
             stream_id,
-            Some(on_available_image_callback),  // Pass the callback function
+            Some(on_available_image_callback), // Pass the callback function
             boxed_closure as *mut ::std::os::raw::c_void, // Pass the boxed closure as the clientd
-            None, // on_unavailable_image_handler
-            std::ptr::null_mut(), // on_unavailable_image_clientd
+            None,                              // on_unavailable_image_handler
+            std::ptr::null_mut(),              // on_unavailable_image_clientd
         )
     };
 
@@ -246,7 +262,9 @@ fn aeron_async_add_subscription_with_closure(
         Ok(())
     } else {
         // If there's an error, clean up the boxed closure
-        unsafe { Box::from_raw(boxed_closure); } // Clean up the box to avoid a leak
+        unsafe {
+            Box::from_raw(boxed_closure);
+        } // Clean up the box to avoid a leak
         Err(result)
     }
 }

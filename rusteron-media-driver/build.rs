@@ -123,7 +123,14 @@ pub fn main() {
         .expect("Couldn't write bindings!");
 
     let bindings = rusteron_code_gen::parse_bindings(&out);
-    assert_eq!("aeron_driver_conductor_t", bindings.wrappers.get("aeron_driver_conductor_t").unwrap().type_name);
+    assert_eq!(
+        "aeron_driver_conductor_t",
+        bindings
+            .wrappers
+            .get("aeron_driver_conductor_t")
+            .unwrap()
+            .type_name
+    );
     let aeron = out_path.join("aeron.rs");
     let _ = fs::remove_file(aeron.clone());
     for (p, w) in bindings

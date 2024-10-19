@@ -38,8 +38,6 @@ impl<T> ManagedCResource<T> {
             return Err(AeronCError::from_code(result));
         }
 
-
-
         let result = Self {
             resource,
             cleanup: Some(Box::new(cleanup)),
@@ -53,7 +51,7 @@ impl<T> ManagedCResource<T> {
         Self {
             resource: value as *mut _,
             cleanup: None,
-            cleanup_struct: false
+            cleanup_struct: false,
         }
     }
 
@@ -82,7 +80,6 @@ impl<T> ManagedCResource<T> {
 
 impl<T> Drop for ManagedCResource<T> {
     fn drop(&mut self) {
-
         if !self.resource.is_null() {
             let resource = self.resource.clone();
             // Ensure the clean-up function is called when the resource is dropped.
@@ -91,7 +88,9 @@ impl<T> Drop for ManagedCResource<T> {
 
             if self.cleanup_struct {
                 println!("closing rust struct resource: {:?}", self);
-                unsafe { let _ = Box::from_raw(resource); }
+                unsafe {
+                    let _ = Box::from_raw(resource);
+                }
             }
         }
     }

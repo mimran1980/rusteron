@@ -1,11 +1,11 @@
 use crate::generator::{CBinding, CWrapper, Method};
+use crate::{Arg, ArgProcessing, Handler};
 use itertools::Itertools;
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use syn::{Attribute, Item, Lit, Meta, MetaNameValue};
-use crate::{Arg, ArgProcessing, Handler};
 
 pub fn parse_bindings(out: &PathBuf) -> CBinding {
     let file_content = fs::read_to_string(out.clone()).expect("Unable to read file");
@@ -80,37 +80,43 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                         })
                         .docs
                         .extend(docs);
-                    } else {
-                        // Parse the function pointer type
-                        if let syn::Type::Path(type_path) = &*ty.ty {
-                            if let Some(segment) = type_path.path.segments.last() {
-                                if segment.ident.to_string() == "Option" {
-                                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                                        if let Some(syn::GenericArgument::Type(syn::Type::BareFn(bare_fn))) = args.args.first() {
-                                            let args: Vec<(String, String)> = bare_fn.inputs.iter()
-                                                .map(|arg| {
-                                                    let arg_name = match &arg.name {
-                                                        Some((ident, _)) => ident.to_string(),
-                                                        None => "".to_string(),
-                                                    };
-                                                    let arg_type = arg.ty.to_token_stream().to_string();
-                                                    (arg_name, arg_type)
-                                                })
-                                                .collect();
-                                            if let Some((name, cvoid)) = args.first() {
-                                                if cvoid.ends_with("c_void") {
-                                                    handlers.push(Handler {
-                                                        type_name: ty.ident.to_string(),
-                                                        args: process_types(args),
-                                                        docs: docs.clone(),
-                                                    });
-                                                }
+                } else {
+                    // Parse the function pointer type
+                    if let syn::Type::Path(type_path) = &*ty.ty {
+                        if let Some(segment) = type_path.path.segments.last() {
+                            if segment.ident.to_string() == "Option" {
+                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                                {
+                                    if let Some(syn::GenericArgument::Type(syn::Type::BareFn(
+                                        bare_fn,
+                                    ))) = args.args.first()
+                                    {
+                                        let args: Vec<(String, String)> = bare_fn
+                                            .inputs
+                                            .iter()
+                                            .map(|arg| {
+                                                let arg_name = match &arg.name {
+                                                    Some((ident, _)) => ident.to_string(),
+                                                    None => "".to_string(),
+                                                };
+                                                let arg_type = arg.ty.to_token_stream().to_string();
+                                                (arg_name, arg_type)
+                                            })
+                                            .collect();
+                                        if let Some((name, cvoid)) = args.first() {
+                                            if cvoid.ends_with("c_void") {
+                                                handlers.push(Handler {
+                                                    type_name: ty.ident.to_string(),
+                                                    args: process_types(args),
+                                                    docs: docs.clone(),
+                                                });
                                             }
                                         }
                                     }
                                 }
                             }
                         }
+                    }
                 }
             }
             Item::ForeignMod(fm) => {
@@ -130,14 +136,20 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                 if wrappers.contains_key(&ty) {
                                     Some(ty)
                                 } else {
-                                    let type_names = fn_name.split('_').collect::<Vec<&str>>().iter().rev().scan(String::new(), |acc, &s| {
-                                        if acc.is_empty() {
-                                            *acc = s.to_string();
-                                        } else {
-                                            *acc = s.to_string() + "_" + &acc;
-                                        }
-                                        Some(s.to_string() + "_t")
-                                    }).collect_vec();
+                                    let type_names = fn_name
+                                        .split('_')
+                                        .collect::<Vec<&str>>()
+                                        .iter()
+                                        .rev()
+                                        .scan(String::new(), |acc, &s| {
+                                            if acc.is_empty() {
+                                                *acc = s.to_string();
+                                            } else {
+                                                *acc = s.to_string() + "_" + &acc;
+                                            }
+                                            Some(s.to_string() + "_t")
+                                        })
+                                        .collect_vec();
 
                                     let mut value = None;
                                     for ty in type_names {
@@ -150,14 +162,20 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                     value
                                 }
                             } else {
-                                let type_names = fn_name.split('_').collect::<Vec<&str>>().iter().rev().scan(String::new(), |acc, &s| {
-                                    if acc.is_empty() {
-                                        *acc = s.to_string();
-                                    } else {
-                                        *acc = s.to_string() + "_" + &acc;
-                                    }
-                                    Some(s.to_string() + "_t")
-                                }).collect_vec();
+                                let type_names = fn_name
+                                    .split('_')
+                                    .collect::<Vec<&str>>()
+                                    .iter()
+                                    .rev()
+                                    .scan(String::new(), |acc, &s| {
+                                        if acc.is_empty() {
+                                            *acc = s.to_string();
+                                        } else {
+                                            *acc = s.to_string() + "_" + &acc;
+                                        }
+                                        Some(s.to_string() + "_t")
+                                    })
+                                    .collect_vec();
 
                                 let mut value = None;
                                 for ty in type_names {
@@ -215,7 +233,6 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                     docs: docs.clone(),
                                 }),
                             }
-
                         }
                     }
                 }
@@ -224,7 +241,11 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
         }
     }
 
-    let bindings = CBinding { wrappers, methods, handlers };
+    let bindings = CBinding {
+        wrappers,
+        methods,
+        handlers,
+    };
 
     let mismatched_types = bindings
         .wrappers
@@ -237,12 +258,14 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
 }
 
 fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
-    name_and_type.into_iter()
+    name_and_type
+        .into_iter()
         .map(|(name, ty)| Arg {
             name,
             c_type: ty,
             processing: ArgProcessing::Default,
-        }).collect_vec()
+        })
+        .collect_vec()
 }
 
 // Helper function to extract doc comments

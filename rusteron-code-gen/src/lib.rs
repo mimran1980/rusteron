@@ -67,9 +67,9 @@ mod tests {
     use crate::generator::MEDIA_DRIVER_BINDINGS;
     use crate::parser::parse_bindings;
     use crate::{append_to_file, format_token_stream, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
+    use itertools::Itertools;
     use proc_macro2::TokenStream;
     use std::fs;
-    use itertools::Itertools;
 
     #[test]
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
@@ -101,7 +101,6 @@ mod tests {
             let code = crate::generate_handlers(handler, &bindings);
             append_to_file(&file, &code.to_string()).unwrap();
         }
-
 
         let t = trybuild::TestCases::new();
         append_to_file(&file, MEDIA_DRIVER_BINDINGS).unwrap();
