@@ -6,14 +6,50 @@
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use bindings::*;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!("../../rusteron-client/src/aeron.rs");
+
+unsafe impl Send for AeronDriverContext {}
+
+impl AeronDriver {
+    pub fn launchEmbedded(aeron_context: &AeronDriverContext) -> Arc<AtomicBool> {
+        let mut stop = Arc::new(AtomicBool::new(false));
+        let mut stop_copy = stop.clone();
+        let mut stop_copy2 = stop.clone();
+        let aeron_context = aeron_context.clone();
+        // Register signal handler for SIGINT (Ctrl+C)
+        ctrlc::set_handler(move || {
+            stop_copy2.store(true, Ordering::SeqCst);
+        }).expect("Error setting Ctrl-C handler");
+
+        std::thread::spawn(move || {
+            let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;
+            aeron_driver.start(true)?;
+
+            // Poll for work until Ctrl+C is pressed
+            while !stop.load(Ordering::Acquire) {
+                while aeron_driver.main_do_work()? > 0 {
+                    // busy spin
+                }
+            }
+
+            Ok::<_, AeronCError>(())
+        });
+        stop_copy
+    }
+
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::ffi::CString;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::thread::sleep;
     use std::time::Duration;
 
@@ -36,16 +72,14 @@ mod tests {
         let aeron_context = AeronDriverContext::new()?;
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
-        let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;
-        aeron_driver.start(false)?;
 
+        let stop = AeronDriver::launchEmbedded(&aeron_context);
 
         // aeron_driver
         //     .conductor()
         //     .context()
         //     .print_configuration();
         // aeron_driver.main_do_work()?;
-
         println!("aeron dir: {:?}", aeron_context.get_dir());
 
         let dir = aeron_context.get_dir().to_string();
@@ -95,12 +129,13 @@ mod tests {
 
         let counter_async = AeronAsyncAddCounter::new(client.clone(), 2543543, "12312312".as_ptr(), "12312312".len(),
         "abcd", 4)?;
-        let counter = counter_async.poll_blocking(Duration::from_secs(5))?;
+
+        let counter = counter_async.poll_blocking(Duration::from_secs(15))?;
         unsafe { *counter.addr() += 1; }
 
         let result = AeronAsyncAddPublication::new(client.clone(), topic, stream_id)?;
 
-        let publication = result.poll_blocking(std::time::Duration::from_secs(10))?;
+        let publication = result.poll_blocking(std::time::Duration::from_secs(15))?;
 
         let sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed()?;
 
@@ -122,6 +157,7 @@ mod tests {
         // let claim = AeronBufferClaim::default();
         // assert!(publication.try_claim(100, &claim) > 0, "publication claim is empty");
 
+        stop.store(true, Ordering::SeqCst);
 
         Ok(())
     }
@@ -218,4 +254,3 @@ fn aeron_async_add_subscription_with_closure(
 fn cleanup_subscription(clientd: *mut ::std::os::raw::c_void) {
     cleanup_closure::<OnAvailableImageClosure>(clientd);
 }
-

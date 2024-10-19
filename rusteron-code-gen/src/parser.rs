@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use syn::{Attribute, Item, Lit, Meta, MetaNameValue};
-use crate::Handler;
+use crate::{Arg, ArgProcessing, Handler};
 
 pub fn parse_bindings(out: &PathBuf) -> Bindings {
     let file_content = fs::read_to_string(out.clone()).expect("Unable to read file");
@@ -42,7 +42,7 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                     ..Default::default()
                 });
                 w.docs.extend(docs);
-                w.fields = fields;
+                w.fields = process_types(fields);
             }
             // Item::Fn(f) => {
             //     // Extract Rust functions (if any)
@@ -101,7 +101,7 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                                                 if cvoid.ends_with("c_void") {
                                                     handlers.push(Handler {
                                                         type_name: ty.ident.to_string(),
-                                                        args,
+                                                        args: process_types(args),
                                                         docs: docs.clone(),
                                                     });
                                                 }
@@ -194,16 +194,24 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
                                                 "",
                                             )
                                             .to_string(),
-                                        return_type: ret.clone(),
-                                        arguments: args.clone(),
+                                        return_type: Arg {
+                                            name: "".to_string(),
+                                            c_type: ret.clone(),
+                                            processing: ArgProcessing::Default,
+                                        },
+                                        arguments: process_types(args.clone()),
                                         docs: docs.clone(),
                                     });
                                 }
                                 None => methods.push(Method {
                                     fn_name: fn_name.clone(),
                                     struct_method_name: "".to_string(),
-                                    return_type: ret.clone(),
-                                    arguments: args.clone(),
+                                    return_type: Arg {
+                                        name: "".to_string(),
+                                        c_type: ret.clone(),
+                                        processing: ArgProcessing::Default,
+                                    },
+                                    arguments: process_types(args.clone()),
                                     docs: docs.clone(),
                                 }),
                             }
@@ -226,6 +234,15 @@ pub fn parse_bindings(out: &PathBuf) -> Bindings {
         .collect_vec();
     assert_eq!(Vec::<(String, CWrapper)>::new(), mismatched_types);
     bindings
+}
+
+fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
+    name_and_type.into_iter()
+        .map(|(name, ty)| Arg {
+            name,
+            c_type: ty,
+            processing: ArgProcessing::Default,
+        }).collect_vec()
 }
 
 // Helper function to extract doc comments

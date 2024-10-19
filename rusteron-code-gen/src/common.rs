@@ -38,11 +38,15 @@ impl<T> ManagedCResource<T> {
             return Err(AeronCError::from_code(result));
         }
 
-        Ok(Self {
+
+
+        let result = Self {
             resource,
             cleanup: Some(Box::new(cleanup)),
             cleanup_struct,
-        })
+        };
+        println!("created c resource: {:?}", result);
+        Ok(result)
     }
 
     pub fn new_borrowed(value: *const T) -> Self {
@@ -82,9 +86,11 @@ impl<T> Drop for ManagedCResource<T> {
         if !self.resource.is_null() {
             let resource = self.resource.clone();
             // Ensure the clean-up function is called when the resource is dropped.
+            println!("closing c resource: {:?}", self);
             let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
 
             if self.cleanup_struct {
+                println!("closing rust struct resource: {:?}", self);
                 unsafe { let _ = Box::from_raw(resource); }
             }
         }

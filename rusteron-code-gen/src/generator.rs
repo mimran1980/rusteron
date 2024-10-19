@@ -2,6 +2,8 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::{HashMap, HashSet};
+use std::io::BufRead;
+use std::ops::Deref;
 use std::str::FromStr;
 use syn::Type;
 use log::debug;
@@ -24,21 +26,42 @@ pub struct Bindings {
 pub struct Method {
     pub fn_name: String,
     pub struct_method_name: String,
-    pub return_type: String,
-    pub arguments: Vec<(String, String)>,
+    pub return_type: Arg,
+    pub arguments: Vec<Arg>,
     pub docs: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ArgProcessing {
+    Ignore,
+    Default,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Arg {
+    pub name: String,
+    pub c_type: String,
+    pub processing: ArgProcessing,
+}
+
+impl Deref for Arg {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.c_type
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Handler {
     pub type_name: String,
-    pub args: Vec<(String, String)>,
+    pub args: Vec<Arg>,
     pub docs: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ReturnType {
-    original: String,
+    original: Arg,
     wrappers: HashMap<String, CWrapper>,
 }
 
@@ -46,7 +69,7 @@ pub const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
 pub const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
 
 impl ReturnType {
-    pub fn new(original_c_type: String, wrappers: HashMap<String, CWrapper>) -> Self {
+    pub fn new(original_c_type: Arg, wrappers: HashMap<String, CWrapper>) -> Self {
         ReturnType { original: original_c_type, wrappers }
     }
 
@@ -59,15 +82,15 @@ impl ReturnType {
                 return quote! { #new_type };
             }
         }
-        if let Some(wrapper) = self.wrappers.get(&self.original) {
+        if let Some(wrapper) = self.wrappers.get(&self.original.c_type) {
             let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
                 .expect("Invalid class name in wrapper");
             return quote! { #new_type };
         }
-        if convert_errors && self.original == C_INT_RETURN_TYPE_STR {
+        if convert_errors && self.original.c_type == C_INT_RETURN_TYPE_STR {
             return quote! { Result<i32, AeronCError> };
         }
-        if self.original == C_CHAR_STR {
+        if self.original.c_type == C_CHAR_STR {
             return quote! { &str };
         }
         let return_type: syn::Type =
@@ -76,7 +99,7 @@ impl ReturnType {
     }
 
     pub fn handle_c_to_rs_return(&self, result: proc_macro2::TokenStream, convert_errors: bool) -> proc_macro2::TokenStream {
-        if convert_errors && self.original == C_INT_RETURN_TYPE_STR {
+        if convert_errors && self.original.c_type == C_INT_RETURN_TYPE_STR {
             quote! {
                 if result < 0 {
                     return Err(AeronCError::from_code(result));
@@ -84,7 +107,7 @@ impl ReturnType {
                     return Ok(result)
                 }
             }
-        } else if self.original == C_CHAR_STR {
+        } else if self.original.c_type == C_CHAR_STR {
             // return quote! { if #result.is_null() { panic!(stringify!(#result)) } else { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
             return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
         } else {
@@ -93,7 +116,7 @@ impl ReturnType {
     }
 
     pub fn handle_rs_to_c_return(&self, result: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        if self.original == C_CHAR_STR {
+        if self.original.c_type == C_CHAR_STR {
             quote! {
                 std::ffi::CString::new(#result).unwrap().into_raw()
             }
@@ -108,7 +131,7 @@ pub struct CWrapper {
     pub class_name: String,
     pub type_name: String,
     pub without_name: String,
-    pub fields: Vec<(String, String)>,
+    pub fields: Vec<Arg>,
     pub methods: Vec<Method>,
     pub docs: HashSet<String>,
 }
@@ -153,7 +176,7 @@ impl CWrapper {
 
 
                 let return_type_helper = ReturnType::new(method.return_type.clone(), wrappers.clone());
-                let return_type = return_type_helper.get_new_return_type();
+                let return_type = return_type_helper.get_new_return_type(true);
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
@@ -162,7 +185,9 @@ impl CWrapper {
                 let fn_arguments: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
-                    .filter_map(|(name, ty)| {
+                    .filter_map(|arg| {
+                        let name = &arg.name;
+                        let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
                         } else {
@@ -191,7 +216,9 @@ impl CWrapper {
                 let arg_names: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
-                    .filter_map(|(name, ty)| {
+                    .filter_map(|arg| {
+                        let name = &arg.name;
+                        let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
                         } else {
@@ -237,7 +264,7 @@ impl CWrapper {
             .filter(|m| {
                 !m.arguments
                     .iter()
-                    .any(|(_, ty)| ty.starts_with("* mut * mut"))
+                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
             })
             .map(|method| {
                 let fn_name =
@@ -252,7 +279,9 @@ impl CWrapper {
                 let fn_arguments: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
-                    .filter_map(|(name, ty)| {
+                    .filter_map(|arg| {
+                        let name = &arg.name;
+                        let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
                         } else {
@@ -282,7 +311,9 @@ impl CWrapper {
                 let arg_names: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
-                    .filter_map(|(name, ty)| {
+                    .filter_map(|arg| {
+                        let name = &arg.name;
+                        let ty = &arg.c_type;
                         let t = if ty.starts_with("* mut") {
                             ty.split(" ").last().unwrap()
                         } else {
@@ -322,8 +353,10 @@ impl CWrapper {
     fn generate_fields(&self, cwrappers: &HashMap<String, CWrapper>) -> Vec<proc_macro2::TokenStream> {
         self.fields
             .iter()
-            .filter( |(name, _)| !name.starts_with("_") && !self.methods.iter().any(|m|m.struct_method_name.as_str() == name))
-            .map(|(field_name, return_type)| {
+            .filter( |arg| !arg.name.starts_with("_") && !self.methods.iter().any(|m|m.struct_method_name.as_str() == arg.name))
+            .map(|arg| {
+                let field_name = &arg.name;
+                let return_type = &arg.c_type;
                 let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
 
                 let return_type = if return_type == C_INT_RETURN_TYPE_STR {
@@ -337,7 +370,7 @@ impl CWrapper {
                         }
                     }
                 } else {
-                    ReturnType::new(return_type.clone(), cwrappers.clone()).get_new_return_type(true)
+                    ReturnType::new(arg.clone(), cwrappers.clone()).get_new_return_type(true)
                 };
 
                 quote! {
@@ -357,7 +390,7 @@ impl CWrapper {
             .filter(|m| {
                 m.arguments
                     .iter()
-                    .any(|(_, ty)| ty.starts_with("* mut * mut"))
+                    .any(|arg| arg.c_type.starts_with("* mut * mut"))
             })
             .map(|method| {
                 let init_fn = format_ident!("{}", method.fn_name);
@@ -375,14 +408,16 @@ impl CWrapper {
                     .find(|m| close_fn.to_string().contains(&m.fn_name));
                 let found_close = init_fn != close_fn
                     && close_method.is_some()
-                    && close_method.unwrap().return_type == C_INT_RETURN_TYPE_STR;
+                    && close_method.unwrap().return_type.c_type == C_INT_RETURN_TYPE_STR;
                 if found_close {
                     let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
                     let init_args: Vec<proc_macro2::TokenStream> = method
                         .arguments
                         .iter()
                         .enumerate()
-                        .filter_map(|(idx, (name, _ty))| {
+                        .filter_map(|(idx, arg)| {
+                            let name = &arg.name;
+                            let ty = &arg.c_type;
                             if idx == 0 {
                                 Some(quote! { ctx })
                             } else {
@@ -397,7 +432,9 @@ impl CWrapper {
                         .arguments
                         .iter()
                         .enumerate()
-                        .filter_map(|(idx, (name, ty))| {
+                        .filter_map(|(idx, arg)| {
+                            let name = &arg.name;
+                            let ty = &arg.c_type;
                             if idx == 0 {
                                 if ty.starts_with("* mut * mut") {
                                     Some(quote! { ctx })
@@ -416,7 +453,9 @@ impl CWrapper {
                         .arguments
                         .iter()
                         .enumerate()
-                        .filter_map(|(idx, (name, ty))| {
+                        .filter_map(|(idx, arg)| {
+                            let name = &arg.name;
+                            let ty = &arg.c_type;
                             if idx == 0 {
                                 None
                             } else {
@@ -479,7 +518,9 @@ impl CWrapper {
                 let type_name = format_ident!("{}", self.type_name);
                 let new_args: Vec<proc_macro2::TokenStream> = self.fields
                     .iter()
-                    .map(|(name, ty)| {
+                    .map(|arg| {
+                        let name = &arg.name;
+                        let ty = &arg.c_type;
                         let arg_name =
                             syn::Ident::new(name, proc_macro2::Span::call_site());
                         let arg_type: syn::Type =
@@ -489,7 +530,9 @@ impl CWrapper {
                     .collect();
                 let init_args: Vec<proc_macro2::TokenStream> = self.fields
                     .iter()
-                    .map(|(name, _ty)| {
+                    .map(|arg| {
+                        let name = &arg.name;
+                        let ty = &arg.c_type;
                         let arg_name =
                             syn::Ident::new(name, proc_macro2::Span::call_site());
                         quote! { #arg_name: #arg_name.clone() }
@@ -530,8 +573,8 @@ impl CWrapper {
             .any(|m| {
                 m.arguments
                     .iter()
-                    .any(|(_, ty)| ty.starts_with("* mut * mut"))})
-            && !self.fields.iter().any(|(name, _)| name.starts_with("_"))
+                    .any(|arg| arg.c_type.starts_with("* mut * mut"))})
+            && !self.fields.iter().any(|arg| arg.name.starts_with("_"))
             && !self.fields.is_empty()
     }
 }
@@ -559,13 +602,15 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
         .map(|line| quote! { #[doc = #line] })
         .collect();
 
-    let closure = handler.args[0].0.clone();
+    let closure = handler.args[0].name.clone();
     let closure_name = format_ident!("{}", closure);
     let closure_type_name = format_ident!("{}Handler", snake_to_pascal_case(&handler.type_name));
 
     let args: Vec<proc_macro2::TokenStream> = handler.args
         .iter()
-        .map(|(name, ty)| {
+        .map(|arg| {
+            let name = &arg.name;
+            let ty = &arg.c_type;
             let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
             let arg_type: syn::Type = syn::parse_str(ty).expect("Invalid argument type");
             quote! { #arg_name: #arg_type }
@@ -574,10 +619,12 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
 
     let converted_args: Vec<proc_macro2::TokenStream> = handler.args
         .iter()
-        .filter_map(|(name, ty)| {
+        .filter_map(|arg| {
+            let name = &arg.name;
+            let ty = &arg.c_type;
             let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
             if name != &closure {
-                let return_type = ReturnType::new(ty.clone(), bindings.wrappers.clone());
+                let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
                 Some(return_type.handle_c_to_rs_return(quote! {#arg_name}, false))
             } else {
                 None
@@ -588,12 +635,14 @@ pub fn generate_handlers(handler: &Handler, bindings: &Bindings) -> TokenStream 
 
     let closure_args: Vec<proc_macro2::TokenStream> = handler.args
         .iter()
-        .filter_map(|(name, ty)| {
+        .filter_map(|arg| {
+            let name = &arg.name;
+            let ty = &arg.c_type;
             if name == &closure {
                 return None;
             }
 
-            let return_type = ReturnType::new(ty.clone(), bindings.wrappers.clone());
+            let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
             let type_name = return_type.get_new_return_type(false);
             let field_name = format_ident!("{}", name);
             Some(quote! {
@@ -657,12 +706,14 @@ pub fn generate_rust_code(
                 .arguments
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, (name, ty))| {
+                .filter_map(|(idx, arg)| {
+                    let name = &arg.name;
+                    let ty = &arg.c_type;
                     if idx == 0 {
                         Some(quote! { ctx })
                     } else {
                         let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
-                        let arg_name = ReturnType::new(ty.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
+                        let arg_name = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
                         Some(quote! { #arg_name })
                     }
                 })
@@ -672,13 +723,15 @@ pub fn generate_rust_code(
                 .arguments
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, (name, ty))| {
+                .filter_map(|(idx, arg)| {
+                    let name = &arg.name;
+                    let ty = &arg.c_type;
                     if idx == 0 {
                         None
                     } else {
                         let arg_name =
                             syn::Ident::new(name, proc_macro2::Span::call_site());
-                        let arg_type = ReturnType::new(ty.clone(), wrappers.clone()).get_new_return_type(false);
+                        let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
                         Some(quote! { #arg_name: #arg_type })
                     }
                 })
@@ -688,12 +741,14 @@ pub fn generate_rust_code(
                 .arguments
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, (name, ty))| {
+                .filter_map(|(idx, arg)| {
+                    let name = &arg.name;
+                    let ty = &arg.c_type;
                     if idx == 0 {
                         Some(quote! { ctx })
                     } else {
                         let arg_name = syn::Ident::new(name, proc_macro2::Span::call_site());
-                        let arg_name = ReturnType::new(ty.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
+                        let arg_name = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name });
                         Some(quote! { #arg_name })
                     }
                 })
@@ -703,13 +758,15 @@ pub fn generate_rust_code(
                 .arguments
                 .iter()
                 .enumerate()
-                .filter_map(|(idx, (name, ty))| {
+                .filter_map(|(idx, arg)| {
+                    let name = &arg.name;
+                    let ty = &arg.c_type;
                     if idx == 0 {
                         None
                     } else {
                         let arg_name =
                             syn::Ident::new(name, proc_macro2::Span::call_site());
-                        let arg_type = ReturnType::new(ty.clone(), wrappers.clone()).get_new_return_type(false);
+                        let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
                         Some(quote! { #arg_name: #arg_type })
                     }
                 })
@@ -770,8 +827,9 @@ impl #async_class_name {
             if let Some(publication) = self.poll() {
                 return Ok(publication);
             }
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
+        println!("failed async poll for {:?}", self);
         Err(AeronCError::from_code(-255))
     }
 }
