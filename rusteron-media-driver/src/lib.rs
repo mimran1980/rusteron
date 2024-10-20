@@ -47,9 +47,7 @@ impl AeronDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
     use std::sync::atomic::Ordering;
-
     use std::time::Duration;
 
     #[test]
