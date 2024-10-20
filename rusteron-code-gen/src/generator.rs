@@ -119,8 +119,11 @@ impl ReturnType {
         if let ArgProcessing::Handler(_) = self.original.processing {
             if self.original.name.len() > 0 {
                 if !self.original.is_mut_pointer() {
-                    let new_type = syn::parse_str::<syn::Type>(&format!("{}HandlerImpl", snake_to_pascal_case(&self.original.c_type)))
-                        .expect("Invalid class name in wrapper");
+                    let new_type = syn::parse_str::<syn::Type>(&format!(
+                        "{}HandlerImpl",
+                        snake_to_pascal_case(&self.original.c_type)
+                    ))
+                    .expect("Invalid class name in wrapper");
                     return quote! { Option<&#new_type> };
                 } else {
                     return quote! {};
@@ -176,10 +179,16 @@ impl ReturnType {
         if let ArgProcessing::Handler(handler_client) = &self.original.processing {
             if !self.original.is_mut_pointer() {
                 let handler = handler_client.get(0).unwrap();
-                let new_type = syn::parse_str::<syn::Type>(&format!("{}HandlerImpl", snake_to_pascal_case(&handler.c_type)))
-                    .expect("Invalid class name in wrapper");
-                let new_handler = syn::parse_str::<syn::Type>(&format!("{}Handler", snake_to_pascal_case(&handler.c_type)))
-                    .expect("Invalid class name in wrapper");
+                let new_type = syn::parse_str::<syn::Type>(&format!(
+                    "{}HandlerImpl",
+                    snake_to_pascal_case(&handler.c_type)
+                ))
+                .expect("Invalid class name in wrapper");
+                let new_handler = syn::parse_str::<syn::Type>(&format!(
+                    "{}Handler",
+                    snake_to_pascal_case(&handler.c_type)
+                ))
+                .expect("Invalid class name in wrapper");
                 return Some(quote! {
                     #new_type: #new_handler
                 });
@@ -192,8 +201,11 @@ impl ReturnType {
         if let ArgProcessing::Handler(handler_client) = &self.original.processing {
             if !self.original.is_mut_pointer() {
                 let handler = handler_client.get(0).unwrap();
-                let new_type = syn::parse_str::<syn::Type>(&format!("{}HandlerImpl", snake_to_pascal_case(&handler.c_type)))
-                    .expect("Invalid class name in wrapper");
+                let new_type = syn::parse_str::<syn::Type>(&format!(
+                    "{}HandlerImpl",
+                    snake_to_pascal_case(&handler.c_type)
+                ))
+                .expect("Invalid class name in wrapper");
                 return Some(quote! {
                     #new_type
                 });
@@ -213,8 +225,11 @@ impl ReturnType {
                 let handler_name = handler.as_ident();
                 let clientd_name = handler_client.get(1).unwrap().as_ident();
                 let method_name = format_ident!("{}_callback", handler.c_type);
-                let new_type = syn::parse_str::<syn::Type>(&format!("{}HandlerImpl", snake_to_pascal_case(&self.original.c_type)))
-                    .expect("Invalid class name in wrapper");
+                let new_type = syn::parse_str::<syn::Type>(&format!(
+                    "{}HandlerImpl",
+                    snake_to_pascal_case(&self.original.c_type)
+                ))
+                .expect("Invalid class name in wrapper");
                 if include_field_name {
                     return quote! {
                     #handler_name: if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
@@ -241,8 +256,8 @@ impl ReturnType {
             let arg_name = self.original.as_ident();
             return if self.original.is_c_string() {
                 quote! {
-                #arg_name: std::ffi::CString::new(#result).unwrap().into_raw()
-            }
+                    #arg_name: std::ffi::CString::new(#result).unwrap().into_raw()
+                }
             } else {
                 quote! { #arg_name: #result.into() }
             };
@@ -324,7 +339,8 @@ impl CWrapper {
                                 None
                             } else {
                                 let arg_name = arg.as_ident();
-                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
+                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                                    .get_new_return_type(false);
                                 if arg_type.clone().into_token_stream().is_empty() {
                                     None
                                 } else {
@@ -333,7 +349,8 @@ impl CWrapper {
                             }
                         } else {
                             let arg_name = arg.as_ident();
-                            let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
+                            let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                                .get_new_return_type(false);
                             if arg_type.clone().into_token_stream().is_empty() {
                                 None
                             } else {
@@ -408,7 +425,11 @@ impl CWrapper {
                 let generic_types: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
-                    .flat_map(|arg| ReturnType::new(arg.clone(), wrappers.clone()).method_generics_for_where().into_iter())
+                    .flat_map(|arg| {
+                        ReturnType::new(arg.clone(), wrappers.clone())
+                            .method_generics_for_where()
+                            .into_iter()
+                    })
                     .collect_vec();
                 let where_clause = if generic_types.is_empty() {
                     quote! {}
@@ -431,7 +452,8 @@ impl CWrapper {
                                 None
                             } else {
                                 let arg_name = arg.as_ident();
-                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
+                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                                    .get_new_return_type(false);
                                 if arg_type.is_empty() {
                                     None
                                 } else {
@@ -440,7 +462,8 @@ impl CWrapper {
                             }
                         } else {
                             let arg_name = arg.as_ident();
-                            let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
+                            let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                                .get_new_return_type(false);
                             if arg_type.is_empty() {
                                 None
                             } else {
@@ -472,7 +495,8 @@ impl CWrapper {
                         } else {
                             let arg_name = arg.as_ident();
                             let arg_name = quote! { #arg_name };
-                            let arg_name = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(arg_name, false);
+                            let arg_name = ReturnType::new(arg.clone(), wrappers.clone())
+                                .handle_rs_to_c_return(arg_name, false);
                             Some(quote! { #arg_name })
                         }
                     })
@@ -505,9 +529,9 @@ impl CWrapper {
             .filter(|arg| {
                 !arg.name.starts_with("_")
                     && !self
-                    .methods
-                    .iter()
-                    .any(|m| m.struct_method_name.as_str() == arg.name)
+                        .methods
+                        .iter()
+                        .any(|m| m.struct_method_name.as_str() == arg.name)
             })
             .map(|arg| {
                 let field_name = &arg.name;
@@ -525,10 +549,14 @@ impl CWrapper {
                         }
                     };
                 } else {
-                    ReturnType::new(Arg {
-                        processing: ArgProcessing::Default,
-                        ..arg.clone()
-                    }, cwrappers.clone()).get_new_return_type(true)
+                    ReturnType::new(
+                        Arg {
+                            processing: ArgProcessing::Default,
+                            ..arg.clone()
+                        },
+                        cwrappers.clone(),
+                    )
+                    .get_new_return_type(true)
                 };
 
                 quote! {
@@ -580,12 +608,13 @@ impl CWrapper {
                                 quote! { ctx }
                             } else {
                                 let arg_name = arg.as_ident();
-                                quote! { #arg_name.into() }
+                                quote! { #arg_name }
                             }
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
-                    let close_args: Vec<proc_macro2::TokenStream> = close_method.unwrap_or(method)
+                    let close_args: Vec<proc_macro2::TokenStream> = close_method
+                        .unwrap_or(method)
                         .arguments
                         .iter()
                         .enumerate()
@@ -603,8 +632,7 @@ impl CWrapper {
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
-                    let lets: Vec<proc_macro2::TokenStream> = close_method
-                        .unwrap()
+                    let lets: Vec<proc_macro2::TokenStream> = method
                         .arguments
                         .iter()
                         .enumerate()
@@ -614,7 +642,8 @@ impl CWrapper {
                             } else {
                                 let arg_name = arg.as_ident();
                                 let rtype = arg.as_type();
-                                let value = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name.clone() }, false);
+                                let value = ReturnType::new(arg.clone(), wrappers.clone())
+                                    .handle_rs_to_c_return(quote! { #arg_name.clone() }, false);
                                 Some(quote! { let #arg_name: #rtype = #value; })
                             }
                         })
@@ -630,7 +659,8 @@ impl CWrapper {
                                 None
                             } else {
                                 let arg_name = arg.as_ident();
-                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
+                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                                    .get_new_return_type(false);
                                 if arg_type.clone().into_token_stream().is_empty() {
                                     None
                                 } else {
@@ -655,13 +685,13 @@ impl CWrapper {
                         #(#method_docs)*
                         pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronCError> {
                             #(#lets)*
-                            let resource = ManagedCResource::new(
+                            let resource_constructor = ManagedCResource::new(
                                 move |ctx| unsafe { #init_fn(#(#init_args),*) },
                                 move |ctx| unsafe { #close_fn(#(#close_args),*) },
                                 false
                             )?;
 
-                            Ok(Self { inner: std::rc::Rc::new(resource) })
+                            Ok(Self { inner: std::rc::Rc::new(resource_constructor) })
                         }
                     }
                 } else {
@@ -702,7 +732,8 @@ impl CWrapper {
                     .iter()
                     .filter_map(|arg| {
                         let arg_name = arg.as_ident();
-                        let arg_type = ReturnType::new(arg.clone(), wrappers.clone()).get_new_return_type(false);
+                        let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                            .get_new_return_type(false);
                         if arg_type.is_empty() {
                             None
                         } else {
@@ -716,7 +747,8 @@ impl CWrapper {
                     .iter()
                     .map(|arg| {
                         let arg_name = arg.as_ident();
-                        let value = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name.clone() }, true);
+                        let value = ReturnType::new(arg.clone(), wrappers.clone())
+                            .handle_rs_to_c_return(quote! { #arg_name.clone() }, true);
                         quote! { #value }
                     })
                     .filter(|t| !t.is_empty())
@@ -725,7 +757,11 @@ impl CWrapper {
                 let generic_types: Vec<proc_macro2::TokenStream> = self
                     .fields
                     .iter()
-                    .flat_map(|arg| ReturnType::new(arg.clone(), wrappers.clone()).method_generics_for_where().into_iter())
+                    .flat_map(|arg| {
+                        ReturnType::new(arg.clone(), wrappers.clone())
+                            .method_generics_for_where()
+                            .into_iter()
+                    })
                     .collect_vec();
                 let where_clause = if generic_types.is_empty() {
                     quote! {}
@@ -736,7 +772,7 @@ impl CWrapper {
                 vec![quote! {
                     #[inline]
                     pub fn new #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
-                        let resource = ManagedCResource::new(
+                        let r_constructor = ManagedCResource::new(
                             move |ctx| {
                                 let inst = #type_name { #(#init_args),* };
                                 let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
@@ -747,7 +783,7 @@ impl CWrapper {
                             true
                         )?;
 
-                        Ok(Self { inner: std::rc::Rc::new(resource) })
+                        Ok(Self { inner: std::rc::Rc::new(r_constructor) })
                     }
 
                     #zeroed_impl
@@ -962,7 +998,11 @@ pub fn generate_rust_code(
             let generic_types: Vec<proc_macro2::TokenStream> = new_method
                 .arguments
                 .iter()
-                .flat_map(|arg| ReturnType::new(arg.clone(), wrappers.clone()).method_generics_for_where().into_iter())
+                .flat_map(|arg| {
+                    ReturnType::new(arg.clone(), wrappers.clone())
+                        .method_generics_for_where()
+                        .into_iter()
+                })
                 .collect_vec();
             let where_clause_async = if generic_types.is_empty() {
                 quote! {}
@@ -972,7 +1012,11 @@ pub fn generate_rust_code(
             let generic_types: Vec<proc_macro2::TokenStream> = poll_method
                 .arguments
                 .iter()
-                .flat_map(|arg| ReturnType::new(arg.clone(), wrappers.clone()).method_generics_for_where().into_iter())
+                .flat_map(|arg| {
+                    ReturnType::new(arg.clone(), wrappers.clone())
+                        .method_generics_for_where()
+                        .into_iter()
+                })
                 .collect_vec();
             let where_clause_main = if generic_types.is_empty() {
                 quote! {}
@@ -1021,7 +1065,7 @@ pub fn generate_rust_code(
 
             impl #async_class_name {
                 pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
-                    let resource = ManagedCResource::new(
+                    let resource_async = ManagedCResource::new(
                         move |ctx| unsafe {
                             #new_method_name(#(#async_init_args),*)
                         },
@@ -1032,7 +1076,7 @@ pub fn generate_rust_code(
                         false
                     )?;
                     Ok(Self {
-                        inner: std::rc::Rc::new(resource),
+                        inner: std::rc::Rc::new(resource_async),
                     })
                 }
 
@@ -1120,11 +1164,11 @@ pub fn generate_rust_code(
 
     let default_impl = if wrapper.has_default_method()
         && !constructor
-        .iter()
-        .map(|x| x.to_string())
-        .join("")
-        .trim()
-        .is_empty()
+            .iter()
+            .map(|x| x.to_string())
+            .join("")
+            .trim()
+            .is_empty()
     {
         quote! {
             /// This will create an instance where the struct is zeroed, use with care

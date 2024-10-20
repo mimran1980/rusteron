@@ -1,8 +1,5 @@
-use rusteron_media_driver::bindings::{
-    aeron_threading_mode_enum,
-};
+use rusteron_media_driver::bindings::aeron_threading_mode_enum;
 use rusteron_media_driver::*;
-use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -19,13 +16,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create Aeron context
     let aeron_context = AeronDriverContext::new()?;
 
-    let x = std::ffi::CString::new("target/test")?.into_raw();
-    aeron_context.set_dir(x)?;
+    aeron_context.set_dir("target/test")?;
     aeron_context.set_threading_mode(aeron_threading_mode_enum::AERON_THREADING_MODE_INVOKER)?;
     // aeron_context.set_shared_idle_strategy_init_args(std::ffi::CString::new("busy_spin")?.into_raw())?;
 
     // Create Aeron driver
-    let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;
+    let aeron_driver = AeronDriver::new(aeron_context.clone())?;
     aeron_driver.start(true)?;
     // Start the Aeron driver
     println!("Aeron media driver started successfully. Press Ctrl+C to stop.");
@@ -39,8 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::thread::spawn(move || {
         let ctx = AeronContext::new()?;
         ctx.set_idle_sleep_duration_ns(0)?;
-        ctx.set_dir(CString::new(dir).unwrap().into_raw())?;
-        let client = Aeron::new(ctx.get_inner())?;
+        ctx.set_dir(&dir)?;
+        let client = Aeron::new(ctx)?;
         client.start()?;
 
         assert!(client.epoch_clock() > 0);

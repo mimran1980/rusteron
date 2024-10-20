@@ -1,6 +1,6 @@
 use cmake::Config;
 use dunce::canonicalize;
-use rusteron_code_gen::{append_to_file};
+use rusteron_code_gen::append_to_file;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 

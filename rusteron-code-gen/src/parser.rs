@@ -88,8 +88,8 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
                                 {
                                     if let Some(syn::GenericArgument::Type(syn::Type::BareFn(
-                                                                               bare_fn,
-                                                                           ))) = args.args.first()
+                                        bare_fn,
+                                    ))) = args.args.first()
                                     {
                                         let args: Vec<(String, String)> = bare_fn
                                             .inputs
@@ -272,19 +272,23 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
     }
 
     let bindings = CBinding {
-        wrappers: wrappers.into_iter().filter(|(_, wrapper)| {
-            // these are from media driver and do not follow convention
-            ![
-                "aeron_thread",
-                "aeron_command",
-                "aeron_executor",
-                "aeron_name_resolver"
-            ].iter().any(|&filter| wrapper.type_name.starts_with(filter))
-        }).collect(),
+        wrappers: wrappers
+            .into_iter()
+            .filter(|(_, wrapper)| {
+                // these are from media driver and do not follow convention
+                ![
+                    "aeron_thread",
+                    "aeron_command",
+                    "aeron_executor",
+                    "aeron_name_resolver",
+                ]
+                .iter()
+                .any(|&filter| wrapper.type_name.starts_with(filter))
+            })
+            .collect(),
         methods,
         handlers,
     };
-
 
     let mismatched_types = bindings
         .wrappers
@@ -322,7 +326,6 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
         }
     }
 
-
     result
 }
 
@@ -333,10 +336,10 @@ fn get_doc_comments(attrs: &[Attribute]) -> HashSet<String> {
         .filter_map(|attr| {
             // Parse the attribute meta to check if it is a `Meta::NameValue`
             if let Meta::NameValue(MetaNameValue {
-                                       path,
-                                       value: syn::Expr::Lit(expr_lit),
-                                       ..
-                                   }) = &attr.meta
+                path,
+                value: syn::Expr::Lit(expr_lit),
+                ..
+            }) = &attr.meta
             {
                 // Check if the path is "doc"
                 if path.is_ident("doc") {
