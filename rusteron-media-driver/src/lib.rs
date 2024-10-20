@@ -84,6 +84,10 @@ mod tests {
         ctx.set_dir(&dir)?;
 
         let client = Aeron::new(ctx.clone())?;
+        ctx.set_error_handler(Some(AeronErrorHandlerClosure::from(|error_code, msg| {
+                println!("hello world")
+            }
+        )).as_ref());
 
         struct Test {}
         impl AeronAvailableCounterHandler for Test {

@@ -836,6 +836,9 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
     let closure_type_name = format_ident!("{}Handler", snake_to_pascal_case(&handler.type_name));
     let closure_return_type = handler.return_type.as_type();
 
+    let wrapper_closure_type_name = format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
+
+
     let args: Vec<proc_macro2::TokenStream> = handler
         .args
         .iter()
@@ -880,10 +883,62 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         })
         .filter(|t| !t.is_empty())
         .collect();
+
+    let fn_mut_args: Vec<proc_macro2::TokenStream> = handler
+        .args
+        .iter()
+        .filter_map(|arg| {
+            let name = &arg.name;
+            if name == &closure {
+                return None;
+            }
+
+            let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
+            let type_name = return_type.get_new_return_type(false);
+            Some(quote! {
+                #type_name
+            })
+        })
+        .filter(|t| !t.is_empty())
+        .collect();
+
+    let wrapper_closure_args: Vec<proc_macro2::TokenStream> = handler
+        .args
+        .iter()
+        .filter_map(|arg| {
+            let name = &arg.name;
+            if name == &closure {
+                return None;
+            }
+
+            let field_name = format_ident!("{}", name);
+            Some(quote! { #field_name })
+        })
+        .filter(|t| !t.is_empty())
+        .collect();
     quote! {
         #(#doc_comments)*
         pub trait #closure_type_name {
             fn handle(&mut self, #(#closure_args),*) -> #closure_return_type;
+        }
+
+        /// Uutility class designed to simplify the creation of handlers by allowing the use of closures.
+        pub struct #wrapper_closure_type_name<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> {
+            closure: F,
+        }
+
+        impl<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> #closure_type_name for #wrapper_closure_type_name<F> {
+            fn handle(&mut self, #(#closure_args),*) -> #closure_return_type {
+                (self.closure)(#(#wrapper_closure_args),*)
+            }
+        }
+
+        impl<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> From<F> for #wrapper_closure_type_name<F> {
+            fn from(value: F) -> Self {
+                Self {
+                    closure: value,
+                }
+            }
         }
 
         // #[no_mangle]
