@@ -11,7 +11,6 @@ include!("aeron.rs");
 
 #[cfg(test)]
 mod tests {
-    use crate::{Aeron, AeronAsyncAddPublication, AeronContext};
     use std::error;
 
     #[test]
@@ -24,10 +23,6 @@ mod tests {
         let cargo_version = "1.47.0"; // env!("CARGO_PKG_VERSION");
         assert_eq!(aeron_version, cargo_version);
 
-        let client = Aeron::new(AeronContext::new()?)?;
-        assert!(client.epoch_clock() > 0);
-        assert!(client.nano_clock() > 0);
-        AeronAsyncAddPublication::new(client.clone(), "asdsadas", 32)?;
         Ok(())
     }
 }

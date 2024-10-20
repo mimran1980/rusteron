@@ -324,6 +324,14 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
             result[i - 1].processing = processing.clone();
             result[i].processing = processing.clone();
         }
+
+        //     pub stripped_channel: *mut ::std::os::raw::c_char,
+        //     pub stripped_channel_length: usize,
+
+        //         key_buffer: *const u8,
+        //         key_buffer_length: usize,
+
+        //
     }
 
     result
