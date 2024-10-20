@@ -103,11 +103,26 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                                 (arg_name, arg_type)
                                             })
                                             .collect();
-                                        if let Some((name, cvoid)) = args.first() {
+                                        let string = bare_fn.output.to_token_stream().to_string();
+                                        let mut return_type = string.trim();
+
+                                        if return_type.starts_with("-> ") {
+                                            return_type = &return_type[3..];
+                                        }
+
+                                        if return_type.is_empty() {
+                                            return_type = "()";
+                                        }
+                                        if let Some((_name, cvoid)) = args.first() {
                                             if cvoid.ends_with("c_void") {
                                                 handlers.push(Handler {
                                                     type_name: ty.ident.to_string(),
                                                     args: process_types(args),
+                                                    return_type: Arg {
+                                                        name: "".to_string(),
+                                                        c_type: return_type.to_string(),
+                                                        processing: ArgProcessing::Default,
+                                                    },
                                                     docs: docs.clone(),
                                                 });
                                             }
@@ -241,11 +256,27 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
         }
     }
 
+    // need to filter out args which don't match
+    for wrapper in wrappers.values_mut() {
+        for method in wrapper.methods.iter_mut() {
+            for arg in method.arguments.iter_mut() {
+                if let ArgProcessing::Handler(args) = &arg.processing {
+                    let handler = args.get(0).unwrap();
+                    if !handlers.iter().any(|h| h.type_name == handler.c_type ) {
+                        arg.processing = ArgProcessing::Default;
+                    }
+                }
+            }
+        }
+    }
+
     let bindings = CBinding {
         wrappers,
         methods,
         handlers,
     };
+
+
 
     let mismatched_types = bindings
         .wrappers
@@ -258,14 +289,33 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
 }
 
 fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
-    name_and_type
+    let mut result = name_and_type
         .into_iter()
         .map(|(name, ty)| Arg {
             name,
             c_type: ty,
             processing: ArgProcessing::Default,
         })
-        .collect_vec()
+        .collect_vec();
+
+    // now mark arguments which can be reduced
+
+    // closures
+    //         handler: aeron_on_available_counter_t,
+    //         clientd: *mut ::std::os::raw::c_void,
+    for i in 1..result.len() {
+        let handler = &result[i-1];
+        let clientd = &result[i];
+
+        if clientd.is_c_void() && !handler.is_mut_pointer() && handler.c_type.ends_with("_t") {
+            let processing = ArgProcessing::Handler(vec![handler.clone(), clientd.clone()]);
+            result[i-1].processing = processing.clone();
+            result[i].processing = processing.clone();
+        }
+    }
+
+
+    result
 }
 
 // Helper function to extract doc comments

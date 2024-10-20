@@ -146,5 +146,4 @@ pub fn main() {
         let code = rusteron_code_gen::generate_handlers(handler, &bindings);
         append_to_file(aeron.to_str().unwrap(), &code.to_string()).unwrap();
     }
-    // panic!("{}", aeron.to_str().unwrap());
 }

@@ -57,8 +57,8 @@ pub fn format_token_stream(tokens: TokenStream) -> String {
 
     // Use rustfmt to format the code string
     match format_with_rustfmt(&code) {
-        Ok(formatted_code) => formatted_code,
-        Err(_) => code, // Fallback to unformatted code in case of error
+        Ok(formatted_code) if !formatted_code.trim().is_empty() => formatted_code,
+        _ => code.replace("{", "{\n"), // Fallback to unformatted code in case of error
     }
 }
 
@@ -128,6 +128,10 @@ mod tests {
         let file = write_to_file(TokenStream::new(), true, "client.rs");
         for (p, w) in bindings.wrappers.values().enumerate() {
             let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true);
+            if code.to_string().contains("ndler : Option < AeronCloseClientHandlerImpl > , clientd :) -> Result < Self , AeronCError > { let resource = Manage") {
+                panic!("{}", format_token_stream(code));
+            }
+
             write_to_file(code, false, "client.rs");
         }
 
