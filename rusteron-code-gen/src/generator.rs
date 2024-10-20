@@ -642,7 +642,7 @@ impl CWrapper {
                                 let arg_name = arg.as_ident();
                                 let rtype = arg.as_type();
                                 let value = ReturnType::new(arg.clone(), wrappers.clone())
-                                    .handle_rs_to_c_return(quote! { #arg_name.clone() }, false);
+                                    .handle_rs_to_c_return(quote! { #arg_name }, false);
                                 Some(quote! { let #arg_name: #rtype = #value; })
                             }
                         })
@@ -747,7 +747,7 @@ impl CWrapper {
                     .map(|arg| {
                         let arg_name = arg.as_ident();
                         let value = ReturnType::new(arg.clone(), wrappers.clone())
-                            .handle_rs_to_c_return(quote! { #arg_name.clone() }, true);
+                            .handle_rs_to_c_return(quote! { #arg_name }, true);
                         quote! { #value }
                     })
                     .filter(|t| !t.is_empty())
@@ -887,6 +887,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         }
 
         // #[no_mangle]
+        #[allow(dead_code)]
         #(#doc_comments)*
         unsafe extern "C" fn #fn_name<F: #closure_type_name>(
             #(#args),*

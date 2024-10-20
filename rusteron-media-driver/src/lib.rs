@@ -85,35 +85,33 @@ mod tests {
 
         let client = Aeron::new(ctx.clone())?;
 
-        unsafe {
-            struct Test {}
-            impl AeronAvailableCounterHandler for Test {
-                fn handle(
-                    &mut self,
-                    counters_reader: AeronCountersReader,
-                    registration_id: i64,
-                    counter_id: i32,
-                ) -> () {
-                    println!("new counter");
-                }
+        struct Test {}
+        impl AeronAvailableCounterHandler for Test {
+            fn handle(
+                &mut self,
+                counters_reader: AeronCountersReader,
+                registration_id: i64,
+                counter_id: i32,
+            ) -> () {
+                println!("new counter counters_reader={counters_reader:?} registration_id={registration_id} counter_id={counter_id}");
             }
-
-            impl AeronNewPublicationHandler for Test {
-                fn handle(
-                    &mut self,
-                    async_: AeronAsyncAddPublication,
-                    channel: &str,
-                    stream_id: i32,
-                    session_id: i32,
-                    correlation_id: i64,
-                ) -> () {
-                    println!("new publication");
-                }
-            }
-            let handler = Some(Test {});
-            ctx.set_on_available_counter(handler.as_ref())?;
-            ctx.set_on_new_publication(handler.as_ref())?;
         }
+
+        impl AeronNewPublicationHandler for Test {
+            fn handle(
+                &mut self,
+                async_: AeronAsyncAddPublication,
+                channel: &str,
+                stream_id: i32,
+                session_id: i32,
+                correlation_id: i64,
+            ) -> () {
+                println!("on new publication {async_:?} {channel} {stream_id} {session_id} {correlation_id}")
+            }
+        }
+        let handler = Some(Test {});
+        ctx.set_on_available_counter(handler.as_ref())?;
+        ctx.set_on_new_publication(handler.as_ref())?;
 
         client.start()?;
         println!("aeron driver started");
@@ -138,7 +136,7 @@ mod tests {
 
         let publication = result.poll_blocking(std::time::Duration::from_secs(15))?;
 
-        let sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed()?;
+        let _sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed()?;
 
         println!("publication channel: {:?}", publication.channel());
         println!("publication stream_id: {:?}", publication.stream_id());
