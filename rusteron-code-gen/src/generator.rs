@@ -4,7 +4,6 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use std::collections::{HashMap, HashSet};
-use std::io::BufRead;
 use std::ops::Deref;
 use std::str::FromStr;
 use syn::Type;

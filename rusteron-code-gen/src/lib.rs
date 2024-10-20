@@ -67,7 +67,6 @@ mod tests {
     use crate::generator::MEDIA_DRIVER_BINDINGS;
     use crate::parser::parse_bindings;
     use crate::{append_to_file, format_token_stream, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
-    use itertools::Itertools;
     use proc_macro2::TokenStream;
     use std::fs;
 
