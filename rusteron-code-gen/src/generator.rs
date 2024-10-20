@@ -575,34 +575,47 @@ impl CWrapper {
                         .arguments
                         .iter()
                         .enumerate()
-                        .filter_map(|(idx, arg)| {
+                        .map(|(idx, arg)| {
                             if idx == 0 {
-                                Some(quote! { ctx })
+                                quote! { ctx }
                             } else {
                                 let arg_name = arg.as_ident();
-
-                                let value = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name.clone() }, false);
-                                Some(value)
+                                quote! { #arg_name.into() }
                             }
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
-                    let close_args: Vec<proc_macro2::TokenStream> = close_method
+                    let close_args: Vec<proc_macro2::TokenStream> = close_method.unwrap_or(method)
+                        .arguments
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, arg)| {
+                            if idx == 0 {
+                                if arg.is_double_mut_pointer() {
+                                    quote! { ctx }
+                                } else {
+                                    quote! { *ctx }
+                                }
+                            } else {
+                                let arg_name = arg.as_ident();
+                                quote! { #arg_name.into() }
+                            }
+                        })
+                        .filter(|t| !t.is_empty())
+                        .collect();
+                    let lets: Vec<proc_macro2::TokenStream> = close_method
                         .unwrap()
                         .arguments
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, arg)| {
                             if idx == 0 {
-                                if arg.is_double_mut_pointer() {
-                                    Some(quote! { ctx })
-                                } else {
-                                    Some(quote! { *ctx })
-                                }
+                                None
                             } else {
                                 let arg_name = arg.as_ident();
+                                let rtype = arg.as_type();
                                 let value = ReturnType::new(arg.clone(), wrappers.clone()).handle_rs_to_c_return(quote! { #arg_name.clone() }, false);
-                                Some(value)
+                                Some(quote! { let #arg_name: #rtype = #value; })
                             }
                         })
                         .filter(|t| !t.is_empty())
@@ -636,9 +649,12 @@ impl CWrapper {
                             .replace("create", "new")
                     );
 
+                    // panic!("{}", lets.clone().iter().map(|s|s.to_string()).join("\n"));
+
                     quote! {
                         #(#method_docs)*
                         pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronCError> {
+                            #(#lets)*
                             let resource = ManagedCResource::new(
                                 move |ctx| unsafe { #init_fn(#(#init_args),*) },
                                 move |ctx| unsafe { #close_fn(#(#close_args),*) },
@@ -845,7 +861,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
                 let closure: &mut F = &mut *(#closure_name as *mut F);
                 closure.handle(#(#converted_args),*)
             } else {
-              Default::default()
+                unimplemented!("closure should not be null")
             }
         }
     }
@@ -857,10 +873,6 @@ pub fn generate_rust_code(
     include_common_code: bool,
     include_clippy: bool,
 ) -> proc_macro2::TokenStream {
-    if wrapper.type_name == "aeron_thread_t" {
-        return quote! {};
-    }
-
     let class_name = syn::Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
     let type_name = syn::Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 

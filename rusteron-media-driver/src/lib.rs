@@ -28,7 +28,7 @@ impl AeronDriver {
         .expect("Error setting Ctrl-C handler");
 
         std::thread::spawn(move || {
-            let aeron_driver = AeronDriver::new(aeron_context.get_inner())?;
+            let aeron_driver = AeronDriver::new(aeron_context)?;
             aeron_driver.start(true)?;
 
             // Poll for work until Ctrl+C is pressed
@@ -84,49 +84,27 @@ mod tests {
 
         let dir = aeron_context.get_dir().to_string();
         let ctx = AeronContext::new()?;
-        ctx.set_dir(CString::new(dir).unwrap().into_raw())?;
+        ctx.set_dir(&dir)?;
 
-        let client = Aeron::new(ctx.get_inner())?;
+        let client = Aeron::new(ctx.clone())?;
 
         unsafe {
-            struct A {
-                client: Aeron,
-            }
-            impl AeronAvailableCounterHandler for A {
-                fn handle(
-                    &mut self,
-                    counters_reader: AeronCountersReader,
-                    registration_id: i64,
-                    counter_id: i32,
-                ) {
-                    println!("Aeron available counters: {registration_id} {counter_id}");
-                    // unsafe {
-                    //     if counters_reader.metadata_length > 100 {
-                    //         println!("aeron available counters reader {}", counters_reader.metadata_length);
-                    //         println!("aeron available value reader {}", counters_reader.values_length);
-                    //         return;
-                    //     }
-                    //     // let slice = std::slice::from_raw_parts(counters_reader.metadata, counters_reader.metadata_length as usize);
-                    //     // println!("Aeron available counters: {:?}, registration_id: {registration_id}, counter_id: {counter_id}",
-                    //     //          std::str::from_utf8_unchecked(slice).trim());
-                    // }
+
+            struct Test {}
+            impl AeronAvailableCounterHandler for Test {
+                fn handle(&mut self, counters_reader: AeronCountersReader, registration_id: i64, counter_id: i32) -> () {
+                    println!("new counter");
                 }
             }
 
-            // // Now use the trait object
-            let b = Box::new(Box::new(A {
-                client: client.clone(),
-            }));
-            println!("before into raw {:p}", std::ptr::from_ref(&*b));
-            let boxed_handler = Box::into_raw(b) as *mut _;
-            println!("after into raw {:p}", boxed_handler);
-            println!("Setting Aeron callback...");
-            // AeronAvailableCounterHandler aeron_on_available_counter_t
-            ctx.set_on_available_counter(
-                Some(aeron_on_available_counter_t_callback::<A>),
-                boxed_handler as *mut ::std::os::raw::c_void,
-            );
-            // panic!("result {}", result);
+            impl AeronNewPublicationHandler for Test {
+                fn handle(&mut self, async_: AeronAsyncAddPublication, channel: &str, stream_id: i32, session_id: i32, correlation_id: i64) -> () {
+                    println!("new publication");
+                }
+            }
+            let handler = Some(Test{});
+            ctx.set_on_available_counter(handler.as_ref())?;
+            ctx.set_on_new_publication(handler.as_ref())?;
         }
 
         client.start()?;

@@ -88,8 +88,8 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
                                 {
                                     if let Some(syn::GenericArgument::Type(syn::Type::BareFn(
-                                        bare_fn,
-                                    ))) = args.args.first()
+                                                                               bare_fn,
+                                                                           ))) = args.args.first()
                                     {
                                         let args: Vec<(String, String)> = bare_fn
                                             .inputs
@@ -115,7 +115,7 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                         }
                                         if let Some((_name, cvoid)) = args.first() {
                                             if cvoid.ends_with("c_void") {
-                                                handlers.push(Handler {
+                                                let value = Handler {
                                                     type_name: ty.ident.to_string(),
                                                     args: process_types(args),
                                                     return_type: Arg {
@@ -124,7 +124,8 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                                         processing: ArgProcessing::Default,
                                                     },
                                                     docs: docs.clone(),
-                                                });
+                                                };
+                                                handlers.push(value);
                                             }
                                         }
                                     }
@@ -262,7 +263,7 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
             for arg in method.arguments.iter_mut() {
                 if let ArgProcessing::Handler(args) = &arg.processing {
                     let handler = args.get(0).unwrap();
-                    if !handlers.iter().any(|h| h.type_name == handler.c_type ) {
+                    if !handlers.iter().any(|h| h.type_name == handler.c_type) {
                         arg.processing = ArgProcessing::Default;
                     }
                 }
@@ -271,11 +272,18 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
     }
 
     let bindings = CBinding {
-        wrappers,
+        wrappers: wrappers.into_iter().filter(|(_, wrapper)| {
+            // these are from media driver and do not follow convention
+            ![
+                "aeron_thread",
+                "aeron_command",
+                "aeron_executor",
+                "aeron_name_resolver"
+            ].iter().any(|&filter| wrapper.type_name.starts_with(filter))
+        }).collect(),
         methods,
         handlers,
     };
-
 
 
     let mismatched_types = bindings
@@ -304,12 +312,12 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
     //         handler: aeron_on_available_counter_t,
     //         clientd: *mut ::std::os::raw::c_void,
     for i in 1..result.len() {
-        let handler = &result[i-1];
+        let handler = &result[i - 1];
         let clientd = &result[i];
 
         if clientd.is_c_void() && !handler.is_mut_pointer() && handler.c_type.ends_with("_t") {
             let processing = ArgProcessing::Handler(vec![handler.clone(), clientd.clone()]);
-            result[i-1].processing = processing.clone();
+            result[i - 1].processing = processing.clone();
             result[i].processing = processing.clone();
         }
     }
@@ -325,10 +333,10 @@ fn get_doc_comments(attrs: &[Attribute]) -> HashSet<String> {
         .filter_map(|attr| {
             // Parse the attribute meta to check if it is a `Meta::NameValue`
             if let Meta::NameValue(MetaNameValue {
-                path,
-                value: syn::Expr::Lit(expr_lit),
-                ..
-            }) = &attr.meta
+                                       path,
+                                       value: syn::Expr::Lit(expr_lit),
+                                       ..
+                                   }) = &attr.meta
             {
                 // Check if the path is "doc"
                 if path.is_ident("doc") {
