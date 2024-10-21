@@ -84,32 +84,23 @@ mod tests {
         ctx.set_dir(&dir)?;
 
         let client = Aeron::new(ctx.clone())?;
-        ctx.set_error_handler(Some(AeronErrorHandlerClosure::from(|error_code, msg| {
-                println!("hello world")
-            }
-        )).as_ref());
+        let mut error_count = 0;
+
+        let error_handler = Some(AeronErrorHandlerClosure::from(|error_code, msg| {
+            eprintln!("Aeron error {}: {}", error_code, msg);
+            error_count += 1;
+        }));
+        ctx.set_error_handler(error_handler.as_ref());
 
         struct Test {}
         impl AeronAvailableCounterHandler for Test {
-            fn handle(
-                &mut self,
-                counters_reader: AeronCountersReader,
-                registration_id: i64,
-                counter_id: i32,
-            ) -> () {
+            fn handle_aeron_on_available_counter(&mut self, counters_reader: AeronCountersReader, registration_id: i64, counter_id: i32) -> () {
                 println!("new counter counters_reader={counters_reader:?} registration_id={registration_id} counter_id={counter_id}");
             }
         }
 
         impl AeronNewPublicationHandler for Test {
-            fn handle(
-                &mut self,
-                async_: AeronAsyncAddPublication,
-                channel: &str,
-                stream_id: i32,
-                session_id: i32,
-                correlation_id: i64,
-            ) -> () {
+            fn handle_aeron_on_new_publication(&mut self, async_: AeronAsyncAddPublication, channel: &str, stream_id: i32, session_id: i32, correlation_id: i64) -> () {
                 println!("on new publication {async_:?} {channel} {stream_id} {session_id} {correlation_id}")
             }
         }

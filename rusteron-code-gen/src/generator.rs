@@ -896,9 +896,13 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
             let type_name = return_type.get_new_return_type(false);
-            Some(quote! {
-                #type_name
-            })
+            if arg.is_c_string() {
+                Some(quote! { String })
+            } else {
+                Some(quote! {
+                    #type_name
+                })
+            }
         })
         .filter(|t| !t.is_empty())
         .collect();
@@ -913,7 +917,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             }
 
             let field_name = format_ident!("{}", name);
-            Some(quote! { #field_name })
+            Some(quote! { #field_name.to_owned() })
         })
         .filter(|t| !t.is_empty())
         .collect();
@@ -923,7 +927,9 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type;
         }
 
-        /// Uutility class designed to simplify the creation of handlers by allowing the use of closures.
+        /// Utility class designed to simplify the creation of handlers by allowing the use of closures. 
+        /// Note due to lifetime issues with FnMut, all arguments will be owned i.e. performs allocation for strings 
+        /// This is not the case if you use the trait instead of closure
         pub struct #wrapper_closure_type_name<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> {
             closure: F,
         }
