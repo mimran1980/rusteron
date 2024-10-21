@@ -836,9 +836,12 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
     let closure_type_name = format_ident!("{}Handler", snake_to_pascal_case(&handler.type_name));
     let closure_return_type = handler.return_type.as_type();
 
-    let wrapper_closure_type_name = format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
-    let handle_method_name = format_ident!("handle_{}", &handler.type_name[..handler.type_name.len()-2]);
-
+    let wrapper_closure_type_name =
+        format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
+    let handle_method_name = format_ident!(
+        "handle_{}",
+        &handler.type_name[..handler.type_name.len() - 2]
+    );
 
     let args: Vec<proc_macro2::TokenStream> = handler
         .args
@@ -927,8 +930,8 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type;
         }
 
-        /// Utility class designed to simplify the creation of handlers by allowing the use of closures. 
-        /// Note due to lifetime issues with FnMut, all arguments will be owned i.e. performs allocation for strings 
+        /// Utility class designed to simplify the creation of handlers by allowing the use of closures.
+        /// Note due to lifetime issues with FnMut, all arguments will be owned i.e. performs allocation for strings
         /// This is not the case if you use the trait instead of closure
         pub struct #wrapper_closure_type_name<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> {
             closure: F,
