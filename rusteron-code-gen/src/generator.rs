@@ -837,6 +837,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
     let closure_return_type = handler.return_type.as_type();
 
     let wrapper_closure_type_name = format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
+    let handle_method_name = format_ident!("handle_{}", &handler.type_name[..handler.type_name.len()-2]);
 
 
     let args: Vec<proc_macro2::TokenStream> = handler
@@ -919,7 +920,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
     quote! {
         #(#doc_comments)*
         pub trait #closure_type_name {
-            fn handle(&mut self, #(#closure_args),*) -> #closure_return_type;
+            fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type;
         }
 
         /// Uutility class designed to simplify the creation of handlers by allowing the use of closures.
@@ -928,7 +929,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         }
 
         impl<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> #closure_type_name for #wrapper_closure_type_name<F> {
-            fn handle(&mut self, #(#closure_args),*) -> #closure_return_type {
+            fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type {
                 (self.closure)(#(#wrapper_closure_args),*)
             }
         }
@@ -950,7 +951,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         {
             if !#closure_name.is_null() {
                 let closure: &mut F = &mut *(#closure_name as *mut F);
-                closure.handle(#(#converted_args),*)
+                closure.#handle_method_name(#(#converted_args),*)
             } else {
                 unimplemented!("closure should not be null")
             }
