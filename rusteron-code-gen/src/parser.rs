@@ -311,25 +311,31 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
         .collect_vec();
 
     // now mark arguments which can be reduced
-
-    // closures
-    //         handler: aeron_on_available_counter_t,
-    //         clientd: *mut ::std::os::raw::c_void,
     for i in 1..result.len() {
-        let handler = &result[i - 1];
-        let clientd = &result[i];
+        let param1 = &result[i - 1];
+        let param2 = &result[i];
 
-        if clientd.is_c_void() && !handler.is_mut_pointer() && handler.c_type.ends_with("_t") {
-            let processing = ArgProcessing::Handler(vec![handler.clone(), clientd.clone()]);
+        if param2.is_c_void() && !param1.is_mut_pointer() && param1.c_type.ends_with("_t") {
+            // closures
+            //         handler: aeron_on_available_counter_t,
+            //         clientd: *mut ::std::os::raw::c_void,
+            let processing = ArgProcessing::Handler(vec![param1.clone(), param2.clone()]);
+            result[i - 1].processing = processing.clone();
+            result[i].processing = processing.clone();
+        } else if param1.is_c_string() && !param1.is_mut_pointer() && param2.c_type == "usize" && param2.name.contains("length") {
+            //     pub stripped_channel: *mut ::std::os::raw::c_char,
+            //     pub stripped_channel_length: usize,
+            let processing = ArgProcessing::StringWithLength(vec![param1.clone(), param2.clone()]);
+            result[i - 1].processing = processing.clone();
+            result[i].processing = processing.clone();
+        } else if param1.is_byte_array() && !param1.is_mut_pointer() && param2.c_type == "usize" && param2.name.contains("length") {
+            //         key_buffer: *const u8,
+            //         key_buffer_length: usize,
+            let processing = ArgProcessing::ByteArrayWithLength(vec![param1.clone(), param2.clone()]);
             result[i - 1].processing = processing.clone();
             result[i].processing = processing.clone();
         }
-
-        //     pub stripped_channel: *mut ::std::os::raw::c_char,
-        //     pub stripped_channel_length: usize,
-
-        //         key_buffer: *const u8,
-        //         key_buffer_length: usize,
+        
 
         //
     }

@@ -32,6 +32,8 @@ pub struct Method {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ArgProcessing {
     Handler(Vec<Arg>),
+    StringWithLength(Vec<Arg>),
+    ByteArrayWithLength(Vec<Arg>),
     Default,
 }
 
@@ -45,12 +47,17 @@ pub struct Arg {
 impl Arg {
     const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
     const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
+    const C_BYTE_ARRAY: &'static str = "* const u8";
     const STAR_MUT: &'static str = "* mut";
     const DOUBLE_STAR_MUT: &'static str = "* mut * mut";
     const C_VOID: &'static str = "* mut :: std :: os :: raw :: c_void";
 
     pub fn is_c_string(&self) -> bool {
         self.c_type == Self::C_CHAR_STR
+    }
+
+    pub fn is_byte_array(&self) -> bool {
+        self.c_type == Self::C_BYTE_ARRAY
     }
 
     pub fn is_c_raw_int(&self) -> bool {
@@ -128,6 +135,22 @@ impl ReturnType {
                     return quote! {};
                 }
             }
+        } else if let ArgProcessing::StringWithLength(_) = self.original.processing {
+            if self.original.name.len() > 0 {
+                if self.original.is_c_string() {
+                    return quote! { &str };
+                } else {
+                    return quote! {};
+                }
+            }
+        } else if let ArgProcessing::ByteArrayWithLength(_) = self.original.processing {
+            if self.original.name.len() > 0 {
+                if self.original.is_byte_array() {
+                    return quote! { &[u8] };
+                } else {
+                    return quote! {};
+                }
+            }
         }
 
         if self.original.is_single_mut_pointer() {
@@ -158,6 +181,23 @@ impl ReturnType {
         result: proc_macro2::TokenStream,
         convert_errors: bool,
     ) -> proc_macro2::TokenStream {
+        if let ArgProcessing::StringWithLength(_) = &self.original.processing {
+            if !self.original.is_c_string() {
+                return quote! {};
+            }
+        }
+        if let ArgProcessing::ByteArrayWithLength(args) = &self.original.processing {
+            if !self.original.is_byte_array() {
+                return quote! {};
+            } else {
+                let star_const = &args[0].as_ident();
+                let length = &args[1].as_ident();
+                return quote! {
+                    std::slice::from_raw_parts(#star_const, #length)
+                };
+            }
+        }
+
         if convert_errors && self.original.is_c_raw_int() {
             quote! {
                 if result < 0 {
@@ -250,6 +290,54 @@ impl ReturnType {
                 return quote! {};
             }
         }
+        if let ArgProcessing::StringWithLength(handler_client) = &self.original.processing {
+            if !self.original.is_c_string() {
+                let array = handler_client.get(0).unwrap();
+                let array_name = array.as_ident();
+                let length_name = handler_client.get(1).unwrap().as_ident();
+                if include_field_name {
+                    return quote! {
+                        #array_name: {
+                            let c_string = std::ffi::CString::new(#array_name).expect("CString::new failed");
+                            c_string.as_ptr()
+                        },
+                        #length_name: #array_name.len()
+                    };
+                } else {
+                    return quote! {
+                        {
+                            let c_string = std::ffi::CString::new(#array_name).expect("CString::new failed");
+                            c_string.as_ptr()
+                        },
+                        #array_name.len()
+                    };
+                }
+            } else {
+                return quote! {};
+            }
+        }
+        if let ArgProcessing::ByteArrayWithLength(handler_client) = &self.original.processing {
+            if !self.original.is_byte_array() {
+                let array = handler_client.get(0).unwrap();
+                let array_name = array.as_ident();
+                let length_name = handler_client.get(1).unwrap().as_ident();
+                if include_field_name {
+                    return quote! {
+                    #array_name: #array_name.as_ptr(),
+                    #length_name: #array_name.len()
+                    };
+                } else {
+                    return quote! {
+                        #array_name.as_ptr(),
+                        #array_name.len()
+                    };
+                }
+            } else {
+                return quote! {};
+            }
+        }
+
+
 
         if include_field_name {
             let arg_name = self.original.as_ident();
@@ -852,6 +940,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             let arg_type: syn::Type = arg.as_type();
             quote! { #arg_name: #arg_type }
         })
+        .filter(|t| !t.is_empty())
         .collect();
 
     let converted_args: Vec<proc_macro2::TokenStream> = handler
@@ -867,6 +956,7 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
                 None
             }
         })
+        .filter(|t| !t.is_empty())
         .collect();
 
     let closure_args: Vec<proc_macro2::TokenStream> = handler
@@ -881,9 +971,13 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
             let type_name = return_type.get_new_return_type(false);
             let field_name = format_ident!("{}", name);
-            Some(quote! {
-                #field_name: #type_name
-            })
+            if type_name.is_empty() {
+                None
+            } else {
+                Some(quote! {
+                    #field_name: #type_name
+                })
+            }
         })
         .filter(|t| !t.is_empty())
         .collect();
@@ -900,11 +994,17 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
             let type_name = return_type.get_new_return_type(false);
             if arg.is_c_string() {
-                Some(quote! { String })
+                return Some(quote! { String });
+            } else if let ArgProcessing::ByteArrayWithLength(_) = arg.processing {
+                return if arg.is_byte_array() {
+                    Some(quote! { Vec<u8> })
+                } else {
+                    None
+                };
             } else {
-                Some(quote! {
+                return Some(quote! {
                     #type_name
-                })
+                });
             }
         })
         .filter(|t| !t.is_empty())
@@ -920,7 +1020,12 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
             }
 
             let field_name = format_ident!("{}", name);
-            Some(quote! { #field_name.to_owned() })
+            let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone()).get_new_return_type(false);
+            if return_type.is_empty() {
+                None
+            } else {
+                Some(quote! { #field_name.to_owned() })
+            }
         })
         .filter(|t| !t.is_empty())
         .collect();

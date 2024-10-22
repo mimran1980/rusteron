@@ -128,10 +128,8 @@ mod tests {
         let counter_async = AeronAsyncAddCounter::new(
             client.clone(),
             2543543,
-            "12312312".as_ptr(),
-            "12312312".len(),
+            "12312312".as_bytes(),
             "abcd",
-            4,
         )?;
 
         let counter = counter_async.poll_blocking(Duration::from_secs(15))?;
