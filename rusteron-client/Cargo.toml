@@ -23,6 +23,9 @@ itertools = {  workspace = true }
 rusteron-code-gen = {path = "../rusteron-code-gen"}
 ctrlc = { workspace = true }
 
+[dev-dependencies]
+rusteron-media-driver = {path = "../rusteron-media-driver", features = ["static"]}
+
 [features]
 static = []
 deref-methods = []

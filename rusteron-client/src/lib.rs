@@ -11,9 +11,11 @@ include!("aeron.rs");
 
 #[cfg(test)]
 mod tests {
-    use crate::{AeronContext, AeronErrorHandlerClosure};
+    use super::*;
     use std::error;
-    use std::time::SystemTime;
+    use std::sync::atomic::Ordering;
+    use std::thread::sleep;
+    use std::time::{Duration, SystemTime};
 
     #[test]
     fn version_check() -> Result<(), Box<dyn error::Error>> {
@@ -40,6 +42,41 @@ mod tests {
             ctx.set_error_handler(error_handler.as_ref())?;
         }
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn simple_ping_pong() -> Result<(), Box<dyn error::Error>> {
+        println!("creating media driver ctx");
+        println!("creating media driver ctx");
+        let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
+        let (stop, driver_handle) = rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
+
+        println!("started media driver");
+        sleep(Duration::from_secs(1));
+
+        let ctx = AeronContext::new()?;
+        ctx.set_dir(media_driver_ctx.get_dir())?;
+        assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
+        let mut error_count = 1;
+        let error_handler = Some(AeronErrorHandlerClosure::from(|error_code, msg| {
+            eprintln!("aeron error {}: {}", error_code, msg);
+            error_count += 1;
+        }));
+        ctx.set_error_handler(error_handler.as_ref())?;
+
+        println!("creating client");
+        let aeron = Aeron::new(ctx.clone())?;
+        println!("starting client");
+
+        aeron.start()?;
+
+
+        println!("stopping client");
+
+        stop.store(true, Ordering::SeqCst);
+
+        let _ = driver_handle.join().unwrap();
         Ok(())
     }
 }

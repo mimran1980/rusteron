@@ -129,7 +129,7 @@ impl ReturnType {
                         "{}HandlerImpl",
                         snake_to_pascal_case(&self.original.c_type)
                     ))
-                    .expect("Invalid class name in wrapper");
+                        .expect("Invalidclass name in wrapper");
                     return quote! { Option<&#new_type> };
                 } else {
                     return quote! {};
@@ -222,12 +222,12 @@ impl ReturnType {
                     "{}HandlerImpl",
                     snake_to_pascal_case(&handler.c_type)
                 ))
-                .expect("Invalid class name in wrapper");
+                    .expect("Invalid class name in wrapper");
                 let new_handler = syn::parse_str::<syn::Type>(&format!(
                     "{}Handler",
                     snake_to_pascal_case(&handler.c_type)
                 ))
-                .expect("Invalid class name in wrapper");
+                    .expect("Invalid class name in wrapper");
                 return Some(quote! {
                     #new_type: #new_handler
                 });
@@ -244,7 +244,7 @@ impl ReturnType {
                     "{}HandlerImpl",
                     snake_to_pascal_case(&handler.c_type)
                 ))
-                .expect("Invalid class name in wrapper");
+                    .expect("Invalid class name in wrapper");
                 return Some(quote! {
                     #new_type
                 });
@@ -268,7 +268,7 @@ impl ReturnType {
                     "{}HandlerImpl",
                     snake_to_pascal_case(&self.original.c_type)
                 ))
-                .expect("Invalid class name in wrapper");
+                    .expect("Invalid class name in wrapper");
                 if include_field_name {
                     return quote! {
                     #handler_name: if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
@@ -343,7 +343,10 @@ impl ReturnType {
             let arg_name = self.original.as_ident();
             return if self.original.is_c_string() {
                 quote! {
-                    #arg_name: std::ffi::CString::new(#result).unwrap().into_raw()
+                    #arg_name: {
+                            let c_string = std::ffi::CString::new(#result).expect("CString::new failed");
+                            c_string.into_raw()
+                        }
                 }
             } else {
                 quote! { #arg_name: #result.into() }
@@ -352,7 +355,10 @@ impl ReturnType {
 
         if self.original.is_c_string() {
             quote! {
-                std::ffi::CString::new(#result).unwrap().into_raw()
+                {
+                            let c_string = std::ffi::CString::new(#result).expect("CString::new failed");
+                            c_string.into_raw()
+                }
             }
         } else {
             quote! { #result.into() }
@@ -616,9 +622,9 @@ impl CWrapper {
             .filter(|arg| {
                 !arg.name.starts_with("_")
                     && !self
-                        .methods
-                        .iter()
-                        .any(|m| m.struct_method_name.as_str() == arg.name)
+                    .methods
+                    .iter()
+                    .any(|m| m.struct_method_name.as_str() == arg.name)
             })
             .map(|arg| {
                 let field_name = &arg.name;
@@ -643,7 +649,7 @@ impl CWrapper {
                         },
                         cwrappers.clone(),
                     )
-                    .get_new_return_type(true)
+                        .get_new_return_type(true)
                 };
 
                 quote! {
@@ -1334,11 +1340,11 @@ pub fn generate_rust_code(
 
     let default_impl = if wrapper.has_default_method()
         && !constructor
-            .iter()
-            .map(|x| x.to_string())
-            .join("")
-            .trim()
-            .is_empty()
+        .iter()
+        .map(|x| x.to_string())
+        .join("")
+        .trim()
+        .is_empty()
     {
         quote! {
             /// This will create an instance where the struct is zeroed, use with care
@@ -1393,6 +1399,13 @@ pub fn generate_rust_code(
         impl From<#class_name> for *mut #type_name {
             #[inline]
             fn from(value: #class_name) -> Self {
+                value.get_inner()
+            }
+        }
+
+        impl From<&#class_name> for *mut #type_name {
+            #[inline]
+            fn from(value: &#class_name) -> Self {
                 value.get_inner()
             }
         }

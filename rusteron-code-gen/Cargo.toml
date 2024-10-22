@@ -7,7 +7,7 @@ documentation = "https://docs.rs/rusteron"
 description = "Code generator for aeron c bindings"
 license = "Apache-2.0"
 edition = "2021"
-readme = "README.md"
+#readme = "README.md"
 
 [dependencies]
 syn = { version = "2.0", features = ["full"] }

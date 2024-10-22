@@ -26,9 +26,6 @@ quote = {  workspace = true }
 itertools = {  workspace = true }
 rusteron-code-gen = {path = "../rusteron-code-gen"}
 
-#[dev-dependencies]
-#rusteron-client = {path = "../rusteron-client"}
-
 [features]
 static = []
 deref-methods = []

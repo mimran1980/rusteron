@@ -10,13 +10,15 @@ pub mod bindings {
 use bindings::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread::JoinHandle;
+
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!("../../rusteron-client/src/aeron.rs");
 
 unsafe impl Send for AeronDriverContext {}
 
 impl AeronDriver {
-    pub fn launch_embedded(aeron_context: &AeronDriverContext) -> Arc<AtomicBool> {
+    pub fn launch_embedded(aeron_context: &AeronDriverContext) -> (Arc<AtomicBool>, JoinHandle<Result<(), AeronCError>>) {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_copy = stop.clone();
         let stop_copy2 = stop.clone();
@@ -27,7 +29,7 @@ impl AeronDriver {
         })
         .expect("Error setting Ctrl-C handler");
 
-        std::thread::spawn(move || {
+        (stop_copy, std::thread::spawn(move || {
             let aeron_driver = AeronDriver::new(aeron_context)?;
             aeron_driver.start(true)?;
 
@@ -39,8 +41,7 @@ impl AeronDriver {
             }
 
             Ok::<_, AeronCError>(())
-        });
-        stop_copy
+        }))
     }
 }
 
@@ -70,7 +71,7 @@ mod tests {
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
 
-        let stop = AeronDriver::launch_embedded(&aeron_context);
+        let (stop, _driver_handle) = AeronDriver::launch_embedded(&aeron_context);
 
         // aeron_driver
         //     .conductor()
