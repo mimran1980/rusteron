@@ -228,7 +228,7 @@ impl ReturnType {
                     snake_to_pascal_case(&handler.c_type)
                 ))
                     .expect("Invalid class name in wrapper");
-                return Some(quote! {
+                    return Some(quote! {
                     #new_type: #new_handler
                 });
             }
@@ -343,10 +343,7 @@ impl ReturnType {
             let arg_name = self.original.as_ident();
             return if self.original.is_c_string() {
                 quote! {
-                    #arg_name: {
-                            let c_string = std::ffi::CString::new(#result).expect("CString::new failed");
-                            c_string.into_raw()
-                        }
+                    #arg_name: std::ffi::CString::new(#result).unwrap().into_raw()
                 }
             } else {
                 quote! { #arg_name: #result.into() }
@@ -355,10 +352,7 @@ impl ReturnType {
 
         if self.original.is_c_string() {
             quote! {
-                {
-                            let c_string = std::ffi::CString::new(#result).expect("CString::new failed");
-                            c_string.into_raw()
-                }
+                std::ffi::CString::new(#result).unwrap().into_raw()
             }
         } else {
             quote! { #result.into() }
@@ -806,6 +800,7 @@ impl CWrapper {
                 pub fn new_zeroed() -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
                         move |ctx| {
+                            println!("creating zeroed empty resource {}", stringify!(#type_name));
                             let inst: #type_name = unsafe { std::mem::zeroed() };
                             let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
                             unsafe { *ctx = inner_ptr };
@@ -932,6 +927,11 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
 
     let wrapper_closure_type_name =
         format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
+    let logger_type_name =
+        format_ident!("{}Logger", snake_to_pascal_case(&handler.type_name));
+    let none_const_name =
+        format_ident!("NO_{}", &handler.type_name[..handler.type_name.len() -2].replace("aeron_", "").to_uppercase());
+
     let handle_method_name = format_ident!(
         "handle_{}",
         &handler.type_name[..handler.type_name.len() - 2]
@@ -988,6 +988,29 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         .filter(|t| !t.is_empty())
         .collect();
 
+    let closure_unused_args: Vec<proc_macro2::TokenStream> = handler
+        .args
+        .iter()
+        .filter_map(|arg| {
+            let name = &arg.name;
+            if name == &closure {
+                return None;
+            }
+
+            let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
+            let type_name = return_type.get_new_return_type(false);
+            let field_name = format_ident!("_{}", name);
+            if type_name.is_empty() {
+                None
+            } else {
+                Some(quote! {
+                    #field_name: #type_name
+                })
+            }
+        })
+        .filter(|t| !t.is_empty())
+        .collect();
+
     let fn_mut_args: Vec<proc_macro2::TokenStream> = handler
         .args
         .iter()
@@ -1016,6 +1039,14 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         .filter(|t| !t.is_empty())
         .collect();
 
+    let logger_return_type = if closure_return_type.to_token_stream().to_string().eq("()") {
+        closure_return_type.clone().to_token_stream()
+    } else {
+        quote! {
+            unimplemented!()
+        }
+    };
+
     let wrapper_closure_args: Vec<proc_macro2::TokenStream> = handler
         .args
         .iter()
@@ -1040,6 +1071,15 @@ pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream 
         pub trait #closure_type_name {
             fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type;
         }
+
+        pub struct #logger_type_name;
+        impl #closure_type_name for #logger_type_name {
+            fn #handle_method_name(&mut self, #(#closure_unused_args),*) -> #closure_return_type {
+                println!("{}", stringify!(#handle_method_name));
+                #logger_return_type
+            }
+        }
+        pub const #none_const_name: Option<&#logger_type_name> = None;
 
         /// Utility class designed to simplify the creation of handlers by allowing the use of closures.
         /// Note due to lifetime issues with FnMut, all arguments will be owned i.e. performs allocation for strings
@@ -1115,6 +1155,10 @@ pub fn generate_rust_code(
             let async_class_name = format_ident!("{}", wrapper.class_name);
             let poll_method_name = format_ident!("{}_poll", wrapper.without_name);
             let new_method_name = format_ident!("{}", new_method.fn_name);
+
+            let client_class = wrappers.get(new_method.arguments.iter().skip(1).next().unwrap().c_type.split_whitespace().last().unwrap()).unwrap();
+            let client_type = format_ident!("{}", client_class.class_name);
+            let client_type_method_name = format_ident!("{}", new_method.fn_name.replace(&format!("{}_", client_class.without_name), ""));
 
             let init_args: Vec<proc_macro2::TokenStream> = poll_method
                 .arguments
@@ -1220,8 +1264,32 @@ pub fn generate_rust_code(
                 .filter(|t| !t.is_empty())
                 .collect();
 
+            let async_new_args_for_client = async_new_args.iter().skip(1).cloned().collect_vec();
+
+            let async_new_args_name_only: Vec<proc_macro2::TokenStream> = new_method
+                .arguments
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, arg)| {
+                    if idx < 2 {
+                        None
+                    } else {
+                        let arg_name = arg.as_ident();
+                        let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
+                            .get_new_return_type(false);
+                        if arg_type.clone().into_token_stream().is_empty() {
+                            None
+                        } else {
+                            Some(quote! { #arg_name })
+                        }
+                    }
+                })
+                .filter(|t| !t.is_empty())
+                .collect();
+
             quote! {
             impl #main_class_name {
+                #[inline]
                 pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
                         move |ctx| unsafe {
@@ -1239,7 +1307,15 @@ pub fn generate_rust_code(
                 }
             }
 
+            impl #client_type {
+                #[inline]
+                pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
+                    #async_class_name::new(self.clone(), #(#async_new_args_name_only),*)
+                }
+            }
+
             impl #async_class_name {
+                #[inline]
                 pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
                     let resource_async = ManagedCResource::new(
                         move |ctx| unsafe {

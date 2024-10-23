@@ -11,9 +11,12 @@ include!("aeron.rs");
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
     use super::*;
     use std::error;
-    use std::sync::atomic::Ordering;
+    use std::rc::Rc;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread::sleep;
     use std::time::{Duration, SystemTime};
 
@@ -45,9 +48,12 @@ mod tests {
         Ok(())
     }
 
+    fn no_handler<T>() -> Option<&'static T> {
+        None
+    }
+
     #[test]
     pub fn simple_ping_pong() -> Result<(), Box<dyn error::Error>> {
-        println!("creating media driver ctx");
         println!("creating media driver ctx");
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) = rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
@@ -70,8 +76,49 @@ mod tests {
         println!("starting client");
 
         aeron.start()?;
+        println!("client started");
+        let publisher = aeron.async_add_publication("aeron:ipc", 123)?.poll_blocking(Duration::from_secs(5)).unwrap();
+        println!("created publisher");
+
+        let subscription = aeron.async_add_subscription("aeron:ipc", 123, None::<&AeronAvailableImageLogger>, None::<&AeronUnavailableImageLogger>)?.poll_blocking(Duration::from_secs(5)).unwrap();
+        println!("created subscription");
+
+        {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                loop {
+                    if stop.load(Ordering::Acquire) {
+                        break;
+                    }
+                    println!("sending message");
+                    if publisher.offer("123".as_bytes(), NO_RESERVED_VALUE_SUPPLIER) < 1 {
+                        eprintln!("failed to send message");
+                    }
+                    sleep(Duration::from_millis(10));
+                }
+                println!("stopping publisher thread");
+            });            
+        }
 
 
+        let count = Arc::new(AtomicUsize::new(0usize));
+        let count_copy = Arc::clone(&count);
+        let closure = AeronFragmentHandlerClosure::from(move |msg, header| {
+            println!("received a message from aeron {:?}, count: {}", header, count_copy.load(Ordering::SeqCst));
+            // count_copy.set(count_copy.get());
+            // panic!()
+        });
+        
+        for _ in 0..100 {
+            if count.load(Ordering::SeqCst) > 100 {
+                stop.store(true, Ordering::SeqCst);
+                break;
+            }
+            subscription.poll(Some(&closure), 1024)?;
+            println!("count {count:?}");
+            sleep(Duration::from_millis(10));
+        }
+        
         println!("stopping client");
 
         stop.store(true, Ordering::SeqCst);

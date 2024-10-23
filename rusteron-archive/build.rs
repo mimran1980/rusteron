@@ -4,7 +4,6 @@ use rusteron_code_gen::{append_to_file, format_with_rustfmt};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 use proc_macro2::TokenStream;
-use quote::TokenStreamExt;
 
 pub enum LinkType {
     Dynamic,
