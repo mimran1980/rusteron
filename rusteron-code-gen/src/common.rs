@@ -9,6 +9,7 @@ pub struct ManagedCResource<T> {
     resource: *mut T,
     cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
     cleanup_struct: bool,
+    borrowed: bool,
 }
 
 impl<T> Debug for ManagedCResource<T> {
@@ -42,6 +43,7 @@ impl<T> ManagedCResource<T> {
             resource,
             cleanup: Some(Box::new(cleanup)),
             cleanup_struct,
+            borrowed: false,
         };
         println!("created c resource: {:?}", result);
         Ok(result)
@@ -52,6 +54,7 @@ impl<T> ManagedCResource<T> {
             resource: value as *mut _,
             cleanup: None,
             cleanup_struct: false,
+            borrowed: true,
         }
     }
 
@@ -80,7 +83,7 @@ impl<T> ManagedCResource<T> {
 
 impl<T> Drop for ManagedCResource<T> {
     fn drop(&mut self) {
-        if !self.resource.is_null() {
+        if !self.resource.is_null() && !self.borrowed {
             let resource = self.resource.clone();
             // Ensure the clean-up function is called when the resource is dropped.
             println!("closing c resource: {:?}", self);
@@ -154,3 +157,41 @@ impl std::error::Error for AeronCError {}
 //         }
 //     }
 // }
+
+struct Handler<T> {
+    raw_ptr: *mut T,
+}
+
+impl<T> Handler<T> {
+    pub fn new(handler: T) -> Self {
+        // Double-box the handler and convert it into a raw pointer
+        let boxed_handler = Box::new(Box::new(handler));
+        let raw_ptr = Box::into_raw(boxed_handler) as *mut T;
+        Self { raw_ptr }
+    }
+
+    pub fn none() -> Handler<()> {
+        Handler {
+            raw_ptr: std::ptr::null_mut(),
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.raw_ptr == std::ptr::null_mut()
+    }
+
+    pub fn as_raw(&self) -> *mut ::std::os::raw::c_void {
+        self.raw_ptr as *mut ::std::os::raw::c_void
+    }
+}
+
+impl<T> Drop for Handler<T> {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.raw_ptr.is_null() {
+                let _boxed_boxed_handler = Box::from_raw(self.raw_ptr as *mut Box<T>);
+                // The handler will be dropped here when `boxed_boxed_handler` goes out of scope
+            }
+        }
+    }
+}

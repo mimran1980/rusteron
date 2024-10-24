@@ -97,28 +97,27 @@ mod tests {
                     sleep(Duration::from_millis(10));
                 }
                 println!("stopping publisher thread");
-            });            
+            });
         }
 
 
         let count = Arc::new(AtomicUsize::new(0usize));
         let count_copy = Arc::clone(&count);
-        let closure = AeronFragmentHandlerClosure::from(move |msg, header| {
-            println!("received a message from aeron {:?}, count: {}", header, count_copy.load(Ordering::SeqCst));
-            // count_copy.set(count_copy.get());
-            // panic!()
+        let closure = AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
+            println!("received a message from aeron {:?}, count: {}, msg length:{}", header.position(), count_copy.fetch_add(1, Ordering::SeqCst), msg.len());
         });
-        
+
         for _ in 0..100 {
-            if count.load(Ordering::SeqCst) > 100 {
+            let c = count.load(Ordering::SeqCst);
+            if c > 100 {
                 stop.store(true, Ordering::SeqCst);
                 break;
             }
             subscription.poll(Some(&closure), 1024)?;
-            println!("count {count:?}");
+            println!("count {c:?}");
             sleep(Duration::from_millis(10));
         }
-        
+
         println!("stopping client");
 
         stop.store(true, Ordering::SeqCst);

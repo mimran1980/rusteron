@@ -17,7 +17,7 @@ pub const MEDIA_DRIVER_BINDINGS: &str = include_str!("../bindings/media-driver.r
 pub struct CBinding {
     pub wrappers: HashMap<String, CWrapper>,
     pub methods: Vec<Method>,
-    pub handlers: Vec<Handler>,
+    pub handlers: Vec<CHandler>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -100,7 +100,7 @@ impl Arg {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Handler {
+pub struct CHandler {
     pub type_name: String,
     pub args: Vec<Arg>,
     pub return_type: Arg,
@@ -911,7 +911,7 @@ fn get_docs(docs: &HashSet<String>, _wrappers: &HashMap<String, CWrapper>) -> Ve
         .collect()
 }
 
-pub fn generate_handlers(handler: &Handler, bindings: &CBinding) -> TokenStream {
+pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream {
     let fn_name = format_ident!("{}_callback", handler.type_name);
     let doc_comments: Vec<proc_macro2::TokenStream> = handler
         .docs

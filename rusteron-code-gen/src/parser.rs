@@ -1,5 +1,5 @@
 use crate::generator::{CBinding, CWrapper, Method};
-use crate::{Arg, ArgProcessing, Handler};
+use crate::{Arg, ArgProcessing, CHandler};
 use itertools::Itertools;
 use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
@@ -115,7 +115,7 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                                         }
                                         if let Some((_name, cvoid)) = args.first() {
                                             if cvoid.ends_with("c_void") {
-                                                let value = Handler {
+                                                let value = CHandler {
                                                     type_name: ty.ident.to_string(),
                                                     args: process_types(args),
                                                     return_type: Arg {
