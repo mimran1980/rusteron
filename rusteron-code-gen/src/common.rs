@@ -158,39 +158,62 @@ impl std::error::Error for AeronCError {}
 //     }
 // }
 
-struct Handler<T> {
+/// # Handler
+///
+/// `Handler` is a struct that wraps a raw pointer and a drop flag.
+///
+/// **Important:** `Handler` does not get dropped automatically.
+/// You need to call the `release` method if you want to clear the memory manually.
+///
+/// ## Example
+///
+/// ```no_run
+/// use rusteron_code_gen::Handler;
+/// let handler = Handler::new(your_value);
+/// // When you are done with the handler
+/// handler.release();
+/// ```
+pub struct Handler<T> {
     raw_ptr: *mut T,
+    should_drop: bool,
 }
 
 impl<T> Handler<T> {
     pub fn new(handler: T) -> Self {
-        // Double-box the handler and convert it into a raw pointer
-        let boxed_handler = Box::new(Box::new(handler));
-        let raw_ptr = Box::into_raw(boxed_handler) as *mut T;
-        Self { raw_ptr }
+        let raw_ptr = Box::into_raw(Box::new(handler)) as *mut _;
+        Self {
+            raw_ptr,
+            should_drop: true,
+        }
     }
 
-    pub fn none() -> Handler<()> {
-        Handler {
+    pub fn none() -> Self {
+        Self {
             raw_ptr: std::ptr::null_mut(),
+            should_drop: false,
+        }
+    }
+
+    pub fn wrap(handler: Box<&T>) -> Self {
+        let raw_ptr = Box::into_raw(handler) as *mut T;
+        Self {
+            raw_ptr,
+            should_drop: false,
         }
     }
 
     pub fn is_none(&self) -> bool {
-        self.raw_ptr == std::ptr::null_mut()
+        self.raw_ptr.is_null()
     }
 
-    pub fn as_raw(&self) -> *mut ::std::os::raw::c_void {
-        self.raw_ptr as *mut ::std::os::raw::c_void
+    pub fn as_raw(&self) -> *mut std::os::raw::c_void {
+        self.raw_ptr as *mut std::os::raw::c_void
     }
-}
 
-impl<T> Drop for Handler<T> {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.raw_ptr.is_null() {
-                let _boxed_boxed_handler = Box::from_raw(self.raw_ptr as *mut Box<T>);
-                // The handler will be dropped here when `boxed_boxed_handler` goes out of scope
+    pub fn release(self) {
+        if self.should_drop && !self.raw_ptr.is_null() {
+            unsafe {
+                let _ = Box::from_raw(self.raw_ptr as *mut Box<T>);
             }
         }
     }

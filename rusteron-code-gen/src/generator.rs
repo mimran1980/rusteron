@@ -130,7 +130,7 @@ impl ReturnType {
                         snake_to_pascal_case(&self.original.c_type)
                     ))
                         .expect("Invalidclass name in wrapper");
-                    return quote! { Option<&#new_type> };
+                    return quote! { &Handler<#new_type> };
                 } else {
                     return quote! {};
                 }
@@ -272,18 +272,13 @@ impl ReturnType {
                 if include_field_name {
                     return quote! {
                     #handler_name: if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
-                    #clientd_name: #handler_name.map(|h|
-                        (Box::into_raw(Box::new(Box::new(h))) as *mut _) as *mut ::std::os::raw::c_void)
-                        .unwrap_or_else(|| std::ptr::null_mut())
+                    #clientd_name: #handler_name.as_raw()
 
                     };
                 } else {
                     return quote! {
                     if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
-                    #handler_name.map(|h|
-                        (Box::into_raw(Box::new(Box::new(h))) as *mut _) as *mut ::std::os::raw::c_void)
-                        .unwrap_or_else(|| std::ptr::null_mut())
-
+                    #handler_name.as_raw()
                     };
                 }
             } else {
