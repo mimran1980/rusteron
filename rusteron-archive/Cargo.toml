@@ -24,4 +24,3 @@ rusteron-code-gen = {path = "../rusteron-code-gen"}
 
 [features]
 static = []
-deref-methods = []

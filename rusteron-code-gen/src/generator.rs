@@ -367,125 +367,6 @@ pub struct CWrapper {
 }
 
 impl CWrapper {
-    #[cfg(not(feature = "deref-methods"))]
-    fn generate_methods_for_t(
-        &self,
-        _wrappers: &HashMap<String, CWrapper>,
-    ) -> Vec<proc_macro2::TokenStream> {
-        vec![]
-    }
-
-    #[cfg(feature = "deref-methods")]
-    fn generate_methods_for_t(
-        &self,
-        wrappers: &HashMap<String, CWrapper>,
-    ) -> Vec<proc_macro2::TokenStream> {
-        self.methods
-            .iter()
-            .filter(|m| !m.arguments.iter().any(|arg| arg.is_double_mut_pointer()))
-            .map(|method| {
-                let unique = wrappers
-                    .values()
-                    .flat_map(|w| w.methods.iter())
-                    .filter(|m| m.struct_method_name == method.struct_method_name)
-                    .count()
-                    == 0;
-                let fn_name = syn::Ident::new(
-                    if unique {
-                        &method.struct_method_name
-                    } else {
-                        &method.fn_name
-                    },
-                    proc_macro2::Span::call_site(),
-                );
-
-                let return_type_helper =
-                    ReturnType::new(method.return_type.clone(), wrappers.clone());
-                let return_type = return_type_helper.get_new_return_type(true);
-                let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
-
-                let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
-
-                // Filter out arguments that are `*mut` of the struct's type
-                let fn_arguments: Vec<proc_macro2::TokenStream> = method
-                    .arguments
-                    .iter()
-                    .filter_map(|arg| {
-                        let ty = &arg.c_type;
-                        let t = if arg.is_single_mut_pointer() {
-                            ty.split(" ").last().unwrap()
-                        } else {
-                            "notfound"
-                        };
-                        if let Some(matching_wrapper) = wrappers.get(t) {
-                            if matching_wrapper.type_name == self.type_name {
-                                None
-                            } else {
-                                let arg_name = arg.as_ident();
-                                let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                                    .get_new_return_type(false);
-                                if arg_type.clone().into_token_stream().is_empty() {
-                                    None
-                                } else {
-                                    Some(quote! { #arg_name: #arg_type })
-                                }
-                            }
-                        } else {
-                            let arg_name = arg.as_ident();
-                            let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                                .get_new_return_type(false);
-                            if arg_type.clone().into_token_stream().is_empty() {
-                                None
-                            } else {
-                                Some(quote! { #arg_name: #arg_type })
-                            }
-                        }
-                    })
-                    .filter(|t| !t.is_empty())
-                    .collect();
-
-                // Filter out argument names for the FFI call
-                let arg_names: Vec<proc_macro2::TokenStream> = method
-                    .arguments
-                    .iter()
-                    .filter_map(|arg| {
-                        let ty = &arg.c_type;
-                        let t = if arg.is_single_mut_pointer() {
-                            ty.split(" ").last().unwrap()
-                        } else {
-                            "notfound"
-                        };
-                        if let Some(_matching_wrapper) = wrappers.get(t) {
-                            let field_name = arg.as_ident();
-                            let t = syn::Ident::new(t, proc_macro2::Span::call_site());
-                            if ty.ends_with(self.type_name.as_str()) {
-                                Some(quote! {  (self as *const #t) as *mut #t })
-                            } else {
-                                Some(quote! { #field_name })
-                            }
-                        } else {
-                            let arg_name = arg.as_ident();
-                            Some(quote! { #arg_name })
-                        }
-                    })
-                    .filter(|t| !t.is_empty())
-                    .collect();
-
-                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, true);
-                quote! {
-                    #[inline]
-                    #(#method_docs)*
-                    pub fn #fn_name(&self, #(#fn_arguments),*) -> #return_type {
-                        unsafe {
-                            let result = #ffi_call(#(#arg_names),*);
-                            #converter
-                        }
-                    }
-                }
-            })
-            .collect()
-    }
-
     /// Generate methods for the struct
     fn generate_methods(
         &self,
@@ -1136,7 +1017,6 @@ pub fn generate_rust_code(
     let type_name = syn::Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
     let methods = wrapper.generate_methods(wrappers);
-    let methods_t: Vec<TokenStream> = wrapper.generate_methods_for_t(wrappers);
     let constructor = wrapper.generate_constructor(wrappers);
 
     let async_impls = if wrapper.type_name.starts_with("aeron_async_") {
@@ -1427,18 +1307,6 @@ pub fn generate_rust_code(
 
     let fields = wrapper.generate_fields(&wrappers);
 
-    // Generate the struct definition and impl block
-
-    let methods_impl = if !methods_t.is_empty() {
-        quote! {
-            impl #type_name {
-                #(#methods_t)*
-            }
-        }
-    } else {
-        quote! {}
-    };
-
     let default_impl = if wrapper.has_default_method()
         && !constructor
             .iter()
@@ -1477,8 +1345,6 @@ pub fn generate_rust_code(
                 self.inner.get()
             }
         }
-
-        #methods_impl
 
         impl std::ops::Deref for #class_name {
             type Target = #type_name;
