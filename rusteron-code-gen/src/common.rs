@@ -167,7 +167,7 @@ impl std::error::Error for AeronCError {}
 ///
 /// ## Example
 ///
-/// ```no_run
+/// ```no_compile
 /// use rusteron_code_gen::Handler;
 /// let handler = Handler::leak(your_value);
 /// // When you are done with the handler
