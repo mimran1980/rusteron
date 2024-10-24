@@ -169,7 +169,7 @@ impl std::error::Error for AeronCError {}
 ///
 /// ```no_run
 /// use rusteron_code_gen::Handler;
-/// let handler = Handler::new(your_value);
+/// let handler = Handler::leak(your_value);
 /// // When you are done with the handler
 /// handler.release();
 /// ```
@@ -179,7 +179,7 @@ pub struct Handler<T> {
 }
 
 impl<T> Handler<T> {
-    pub fn new(handler: T) -> Self {
+    pub fn leak(handler: T) -> Self {
         let raw_ptr = Box::into_raw(Box::new(handler)) as *mut _;
         Self {
             raw_ptr,

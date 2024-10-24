@@ -43,7 +43,7 @@ mod tests {
                 error_count += 1;
             });
 
-            ctx.set_error_handler(&Handler::new(error_handler))?;
+            ctx.set_error_handler(&Handler::leak(error_handler))?;
         }
 
         Ok(())
@@ -70,7 +70,7 @@ mod tests {
             eprintln!("aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
-        ctx.set_error_handler(&Handler::new(error_handler))?;
+        ctx.set_error_handler(&Handler::leak(error_handler))?;
 
         println!("creating client");
         let aeron = Aeron::new(ctx.clone())?;
@@ -106,7 +106,7 @@ mod tests {
         let closure = AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
             println!("received a message from aeron {:?}, count: {}, msg length:{}", header.position(), count_copy.fetch_add(1, Ordering::SeqCst), msg.len());
         });
-        let closure = Handler::new(closure);
+        let closure = Handler::leak(closure);
 
         for _ in 0..100 {
             let c = count.load(Ordering::SeqCst);
