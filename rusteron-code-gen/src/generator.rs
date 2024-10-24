@@ -129,8 +129,8 @@ impl ReturnType {
                         "{}HandlerImpl",
                         snake_to_pascal_case(&self.original.c_type)
                     ))
-                        .expect("Invalidclass name in wrapper");
-                    return quote! { &Handler<#new_type> };
+                    .expect("Invalidclass name in wrapper");
+                    return quote! { Option<&Handler<#new_type>> };
                 } else {
                     return quote! {};
                 }
@@ -222,13 +222,13 @@ impl ReturnType {
                     "{}HandlerImpl",
                     snake_to_pascal_case(&handler.c_type)
                 ))
-                    .expect("Invalid class name in wrapper");
+                .expect("Invalid class name in wrapper");
                 let new_handler = syn::parse_str::<syn::Type>(&format!(
                     "{}Handler",
                     snake_to_pascal_case(&handler.c_type)
                 ))
-                    .expect("Invalid class name in wrapper");
-                    return Some(quote! {
+                .expect("Invalid class name in wrapper");
+                return Some(quote! {
                     #new_type: #new_handler
                 });
             }
@@ -244,7 +244,7 @@ impl ReturnType {
                     "{}HandlerImpl",
                     snake_to_pascal_case(&handler.c_type)
                 ))
-                    .expect("Invalid class name in wrapper");
+                .expect("Invalid class name in wrapper");
                 return Some(quote! {
                     #new_type
                 });
@@ -268,17 +268,16 @@ impl ReturnType {
                     "{}HandlerImpl",
                     snake_to_pascal_case(&self.original.c_type)
                 ))
-                    .expect("Invalid class name in wrapper");
+                .expect("Invalid class name in wrapper");
                 if include_field_name {
                     return quote! {
-                    #handler_name: if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
-                    #clientd_name: #handler_name.as_raw()
-
+                        #handler_name: if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
+                        #clientd_name: #handler_name.map(|m|m.as_raw()).unwrap_or_else(|| std::ptr::null_mut())
                     };
                 } else {
                     return quote! {
-                    if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
-                    #handler_name.as_raw()
+                        if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
+                        #handler_name.map(|m|m.as_raw()).unwrap_or_else(|| std::ptr::null_mut())
                     };
                 }
             } else {
@@ -331,8 +330,6 @@ impl ReturnType {
                 return quote! {};
             }
         }
-
-
 
         if include_field_name {
             let arg_name = self.original.as_ident();
@@ -611,9 +608,9 @@ impl CWrapper {
             .filter(|arg| {
                 !arg.name.starts_with("_")
                     && !self
-                    .methods
-                    .iter()
-                    .any(|m| m.struct_method_name.as_str() == arg.name)
+                        .methods
+                        .iter()
+                        .any(|m| m.struct_method_name.as_str() == arg.name)
             })
             .map(|arg| {
                 let field_name = &arg.name;
@@ -638,7 +635,7 @@ impl CWrapper {
                         },
                         cwrappers.clone(),
                     )
-                        .get_new_return_type(true)
+                    .get_new_return_type(true)
                 };
 
                 quote! {
@@ -922,14 +919,18 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
 
     let wrapper_closure_type_name =
         format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
-    let logger_type_name =
-        format_ident!("{}Logger", snake_to_pascal_case(&handler.type_name));
-    let none_const_name =
-        format_ident!("NO_{}", &handler.type_name[..handler.type_name.len() -2].replace("aeron_", "").to_uppercase());
+    let logger_type_name = format_ident!("{}Logger", snake_to_pascal_case(&handler.type_name));
 
     let handle_method_name = format_ident!(
         "handle_{}",
         &handler.type_name[..handler.type_name.len() - 2]
+    );
+
+    let no_method_name = format_ident!(
+        "no_{}_handler",
+        &handler.type_name[..handler.type_name.len() - 2]
+            .replace("_on_", "_")
+            .replace("aeron_", "")
     );
 
     let args: Vec<proc_macro2::TokenStream> = handler
@@ -1052,7 +1053,8 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
 
             let field_name = format_ident!("{}", name);
-            let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone()).get_new_return_type(false);
+            let return_type =
+                ReturnType::new(arg.clone(), bindings.wrappers.clone()).get_new_return_type(false);
             if return_type.is_empty() {
                 None
             } else {
@@ -1074,7 +1076,13 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
                 #logger_return_type
             }
         }
-        pub const #none_const_name: Option<&#logger_type_name> = None;
+
+        impl Handlers {
+            /// No handler is set i.e. None with correct type
+            pub fn #no_method_name() -> Option<&'static Handler<#logger_type_name>> {
+                None::<&Handler<#logger_type_name>>
+            }
+        }
 
         /// Utility class designed to simplify the creation of handlers by allowing the use of closures.
         /// Note due to lifetime issues with FnMut, all arguments will be owned i.e. performs allocation for strings
@@ -1151,9 +1159,27 @@ pub fn generate_rust_code(
             let poll_method_name = format_ident!("{}_poll", wrapper.without_name);
             let new_method_name = format_ident!("{}", new_method.fn_name);
 
-            let client_class = wrappers.get(new_method.arguments.iter().skip(1).next().unwrap().c_type.split_whitespace().last().unwrap()).unwrap();
+            let client_class = wrappers
+                .get(
+                    new_method
+                        .arguments
+                        .iter()
+                        .skip(1)
+                        .next()
+                        .unwrap()
+                        .c_type
+                        .split_whitespace()
+                        .last()
+                        .unwrap(),
+                )
+                .unwrap();
             let client_type = format_ident!("{}", client_class.class_name);
-            let client_type_method_name = format_ident!("{}", new_method.fn_name.replace(&format!("{}_", client_class.without_name), ""));
+            let client_type_method_name = format_ident!(
+                "{}",
+                new_method
+                    .fn_name
+                    .replace(&format!("{}_", client_class.without_name), "")
+            );
 
             let init_args: Vec<proc_macro2::TokenStream> = poll_method
                 .arguments
@@ -1411,11 +1437,11 @@ pub fn generate_rust_code(
 
     let default_impl = if wrapper.has_default_method()
         && !constructor
-        .iter()
-        .map(|x| x.to_string())
-        .join("")
-        .trim()
-        .is_empty()
+            .iter()
+            .map(|x| x.to_string())
+            .join("")
+            .trim()
+            .is_empty()
     {
         quote! {
             /// This will create an instance where the struct is zeroed, use with care

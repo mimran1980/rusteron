@@ -178,19 +178,15 @@ pub struct Handler<T> {
     should_drop: bool,
 }
 
+/// Utility method for setting empty handlers
+pub struct Handlers;
+
 impl<T> Handler<T> {
     pub fn leak(handler: T) -> Self {
         let raw_ptr = Box::into_raw(Box::new(handler)) as *mut _;
         Self {
             raw_ptr,
             should_drop: true,
-        }
-    }
-
-    pub fn none() -> Self {
-        Self {
-            raw_ptr: std::ptr::null_mut(),
-            should_drop: false,
         }
     }
 

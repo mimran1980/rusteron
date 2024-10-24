@@ -1,9 +1,9 @@
 use cmake::Config;
 use dunce::canonicalize;
+use proc_macro2::TokenStream;
 use rusteron_code_gen::{append_to_file, format_with_rustfmt};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
-use proc_macro2::TokenStream;
 
 pub enum LinkType {
     Dynamic,
@@ -135,7 +135,11 @@ pub fn main() {
         let code = rusteron_code_gen::generate_handlers(handler, &bindings);
         stream.extend(code);
     }
-    append_to_file(aeron.to_str().unwrap(), &format_with_rustfmt(&stream.to_string()).unwrap()).unwrap();
+    append_to_file(
+        aeron.to_str().unwrap(),
+        &format_with_rustfmt(&stream.to_string()).unwrap(),
+    )
+    .unwrap();
 
     // panic!("{}", aeron.to_str().unwrap());
 }

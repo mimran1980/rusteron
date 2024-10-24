@@ -11,12 +11,11 @@ include!("aeron.rs");
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
     use super::*;
-    use std::{error, thread};
-    use std::rc::Rc;
-    use std::sync::Arc;
+    use std::error;
+
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
     use std::thread::sleep;
     use std::time::{Duration, SystemTime};
 
@@ -43,21 +42,18 @@ mod tests {
                 error_count += 1;
             });
 
-            ctx.set_error_handler(&Handler::leak(error_handler))?;
+            ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
         }
 
         Ok(())
-    }
-
-    fn no_handler<T>() -> Option<&'static T> {
-        None
     }
 
     #[test]
     pub fn simple_send() -> Result<(), Box<dyn error::Error>> {
         println!("creating media driver ctx");
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
-        let (stop, driver_handle) = rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
+        let (stop, driver_handle) =
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
 
         println!("started media driver");
         sleep(Duration::from_secs(1));
@@ -70,7 +66,7 @@ mod tests {
             eprintln!("aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
-        ctx.set_error_handler(&Handler::leak(error_handler))?;
+        ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
 
         println!("creating client");
         let aeron = Aeron::new(ctx.clone())?;
@@ -78,11 +74,24 @@ mod tests {
 
         aeron.start()?;
         println!("client started");
-        let publisher = aeron.async_add_publication("aeron:ipc", 123)?.poll_blocking(Duration::from_secs(5)).unwrap();
+        let publisher = aeron
+            .async_add_publication("aeron:ipc", 123)?
+            .poll_blocking(Duration::from_secs(5))
+            .unwrap();
         println!("created publisher");
 
-        let subscription = aeron.async_add_subscription("aeron:ipc", 123, &Handler::<AeronAvailableImageLogger>::none(), &Handler::<AeronUnavailableImageLogger>::none())?.poll_blocking(Duration::from_secs(5)).unwrap();
+        let subscription = aeron
+            .async_add_subscription(
+                "aeron:ipc",
+                123,
+                Handlers::no_available_image_handler(),
+                Handlers::no_unavailable_image_handler(),
+            )?
+            .poll_blocking(Duration::from_secs(5))
+            .unwrap();
         println!("created subscription");
+        let string_len = media_driver_ctx.ipc_mtu_length * 100;
+        println!("string length: {}", string_len);
 
         let publisher_handler = {
             let stop = stop.clone();
@@ -92,7 +101,11 @@ mod tests {
                         break;
                     }
                     println!("sending message");
-                    if publisher.offer("123".as_bytes(), &Handler::<AeronReservedValueSupplierLogger>::none()) < 1 {
+                    if publisher.offer(
+                        "1".repeat(string_len).as_bytes(),
+                        Handlers::no_reserved_value_supplier_handler(),
+                    ) < 1
+                    {
                         eprintln!("failed to send message");
                     }
                 }
@@ -100,12 +113,18 @@ mod tests {
             })
         };
 
-
         let count = Arc::new(AtomicUsize::new(0usize));
         let count_copy = Arc::clone(&count);
-        let closure = AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
-            println!("received a message from aeron {:?}, count: {}, msg length:{}", header.position(), count_copy.fetch_add(1, Ordering::SeqCst), msg.len());
-        });
+        let closure =
+            AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
+                println!(
+                    "received a message from aeron {:?}, count: {}, msg length:{}",
+                    header.position(),
+                    count_copy.fetch_add(1, Ordering::SeqCst),
+                    msg.len()
+                );
+                assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
+            });
         let closure = Handler::leak(closure);
 
         for _ in 0..100 {
@@ -115,7 +134,7 @@ mod tests {
                 stop.store(true, Ordering::SeqCst);
                 break;
             }
-            subscription.poll(&closure, 1024)?;
+            subscription.poll(Some(&closure), 1024)?;
         }
 
         println!("stopping client");
@@ -123,7 +142,6 @@ mod tests {
         stop.store(true, Ordering::SeqCst);
 
         let _ = publisher_handler.join().unwrap();
-        drop(aeron);
         let _ = driver_handle.join().unwrap();
         Ok(())
     }

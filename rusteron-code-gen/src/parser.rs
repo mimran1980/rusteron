@@ -322,20 +322,28 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
             let processing = ArgProcessing::Handler(vec![param1.clone(), param2.clone()]);
             result[i - 1].processing = processing.clone();
             result[i].processing = processing.clone();
-        } else if param1.is_c_string() && !param1.is_mut_pointer() && (param2.c_type == "usize" || param2.c_type == "i32") && param2.name.contains("length") {
+        } else if param1.is_c_string()
+            && !param1.is_mut_pointer()
+            && (param2.c_type == "usize" || param2.c_type == "i32")
+            && param2.name.contains("length")
+        {
             //     pub stripped_channel: *mut ::std::os::raw::c_char,
             //     pub stripped_channel_length: usize,
             let processing = ArgProcessing::StringWithLength(vec![param1.clone(), param2.clone()]);
             result[i - 1].processing = processing.clone();
             result[i].processing = processing.clone();
-        } else if param1.is_byte_array() && !param1.is_mut_pointer() && (param2.c_type == "usize" || param2.c_type == "i32") && param2.name.contains("length") {
+        } else if param1.is_byte_array()
+            && !param1.is_mut_pointer()
+            && (param2.c_type == "usize" || param2.c_type == "i32")
+            && param2.name.contains("length")
+        {
             //         key_buffer: *const u8,
             //         key_buffer_length: usize,
-            let processing = ArgProcessing::ByteArrayWithLength(vec![param1.clone(), param2.clone()]);
+            let processing =
+                ArgProcessing::ByteArrayWithLength(vec![param1.clone(), param2.clone()]);
             result[i - 1].processing = processing.clone();
             result[i].processing = processing.clone();
         }
-
 
         //
     }

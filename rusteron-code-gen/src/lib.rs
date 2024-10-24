@@ -66,7 +66,9 @@ pub fn format_token_stream(tokens: TokenStream) -> String {
 mod tests {
     use crate::generator::MEDIA_DRIVER_BINDINGS;
     use crate::parser::parse_bindings;
-    use crate::{append_to_file, format_token_stream, format_with_rustfmt, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
+    use crate::{
+        append_to_file, format_token_stream, format_with_rustfmt, ARCHIVE_BINDINGS, CLIENT_BINDINGS,
+    };
     use proc_macro2::TokenStream;
     use std::fs;
 
