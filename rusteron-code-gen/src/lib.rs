@@ -160,8 +160,6 @@ mod tests {
                 .class_name
         );
 
-        // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
-
         let file = write_to_file(TokenStream::new(), true, "archive.rs");
         for (p, w) in bindings.wrappers.values().enumerate() {
             let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true);

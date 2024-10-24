@@ -207,8 +207,12 @@ impl ReturnType {
                 }
             }
         } else if self.original.is_c_string() {
-            // return quote! { if #result.is_null() { panic!(stringify!(#result)) } else { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
-            return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
+            if let ArgProcessing::StringWithLength(args) = &self.original.processing {
+                let length = &args[1].as_ident();
+                return quote! { std::str::from_utf8_unchecked(std::slice::from_raw_parts(#result as *const u8, #length.try_into().unwrap()))};
+            } else {
+                return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
+            }
         } else {
             quote! { #result.into() }
         }
