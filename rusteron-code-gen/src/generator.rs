@@ -228,7 +228,7 @@ impl ReturnType {
                 ))
                 .expect("Invalid class name in wrapper");
                 let new_handler = syn::parse_str::<syn::Type>(&format!(
-                    "{}Handler",
+                    "{}Callback",
                     snake_to_pascal_case(&handler.c_type)
                 ))
                 .expect("Invalid class name in wrapper");
@@ -799,7 +799,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
 
     let closure = handler.args[0].name.clone();
     let closure_name = format_ident!("{}", closure);
-    let closure_type_name = format_ident!("{}Handler", snake_to_pascal_case(&handler.type_name));
+    let closure_type_name = format_ident!("{}Callback", snake_to_pascal_case(&handler.type_name));
     let closure_return_type = handler.return_type.as_type();
 
     let wrapper_closure_type_name =

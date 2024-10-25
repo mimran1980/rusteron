@@ -67,6 +67,13 @@ mod tests {
             error_count += 1;
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
+        ctx.set_on_new_publication(Some(&Handler::leak(AeronNewPublicationLogger)))?;
+        ctx.set_on_available_counter(Some(&Handler::leak(AeronAvailableCounterLogger)))?;
+        ctx.set_on_close_client(Some(&Handler::leak(AeronCloseClientLogger)))?;
+        ctx.set_on_new_subscription(Some(&Handler::leak(AeronNewSubscriptionLogger)))?;
+        ctx.set_on_unavailable_counter(Some(&Handler::leak(AeronUnavailableCounterLogger)))?;
+        ctx.set_on_available_counter(Some(&Handler::leak(AeronAvailableCounterLogger)))?;
+        ctx.set_on_new_exclusive_publication(Some(&Handler::leak(AeronNewPublicationLogger)))?;
 
         println!("creating client");
         let aeron = Aeron::new(ctx.clone())?;
@@ -76,8 +83,7 @@ mod tests {
         println!("client started");
         let publisher = aeron
             .async_add_publication("aeron:ipc", 123)?
-            .poll_blocking(Duration::from_secs(5))
-            .unwrap();
+            .poll_blocking(Duration::from_secs(5))?;
         println!("created publisher");
 
         let subscription = aeron
@@ -90,6 +96,8 @@ mod tests {
             .poll_blocking(Duration::from_secs(5))
             .unwrap();
         println!("created subscription");
+
+        // pick a large enough size to confirm fragement assembler is working
         let string_len = media_driver_ctx.ipc_mtu_length * 100;
         println!("string length: {}", string_len);
 
