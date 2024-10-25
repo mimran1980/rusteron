@@ -1,4 +1,5 @@
 use rusteron_client::*;
+use std::cell::Cell;
 use std::error;
 use std::time::Duration;
 
@@ -61,20 +62,20 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
         })
     };
 
-    let mut count = 0;
-    let closure = AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
+    let count = Cell::new(0usize);
+    let closure = AeronFragmentHandlerClosure::from(|msg: Vec<u8>, header: AeronHeader| {
         println!(
             "received a message from aeron [position: {:?}, msg length:{}]",
             header.position(),
             msg.len()
         );
-        count += 1;
+        count.set(count.get() + 1);
         assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
     });
     let closure = Handler::leak(closure);
 
     for _ in 0..100 {
-        if count > 100 {
+        if count.get() > 100 {
             break;
         }
         subscription.poll(Some(&closure), 1024)?;

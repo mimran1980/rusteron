@@ -177,7 +177,6 @@ impl AeronErrorType {
 ///
 /// The error code is derived from Aeron C API calls.
 /// Use `get_message()` to retrieve a human-readable message, if available.
-#[derive(Debug)]
 pub struct AeronCError {
     pub code: i32,
 }
@@ -198,6 +197,15 @@ impl AeronCError {
 impl fmt::Display for AeronCError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Aeron error {}: {:?}", self.code, self.kind())
+    }
+}
+
+impl fmt::Debug for AeronCError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AeronCError")
+            .field("code", &self.code)
+            .field("kind", &self.kind())
+            .finish()
     }
 }
 
