@@ -17,7 +17,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread::sleep;
-    use std::time::{Duration, SystemTime};
+    use std::time::{Duration};
 
     #[test]
     fn version_check() -> Result<(), Box<dyn error::Error>> {
@@ -29,21 +29,14 @@ mod tests {
         let cargo_version = "1.47.0";
         assert_eq!(aeron_version, cargo_version);
 
-        // don't want to run just want to enfore that it compiles
-        if SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)?
-            .as_secs()
-            < 1
-        {
-            let ctx = AeronContext::new()?;
-            let mut error_count = 1;
-            let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-                eprintln!("aeron error {}: {}", error_code, msg);
-                error_count += 1;
-            });
+        let ctx = AeronContext::new()?;
+        let mut error_count = 1;
+        let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
+            eprintln!("aeron error {}: {}", error_code, msg);
+            error_count += 1;
+        });
 
-            ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
-        }
+        ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
 
         Ok(())
     }
@@ -76,7 +69,7 @@ mod tests {
         ctx.set_on_new_exclusive_publication(Some(&Handler::leak(AeronNewPublicationLogger)))?;
 
         println!("creating client");
-        let aeron = Aeron::new(ctx.clone())?;
+        let aeron = Aeron::new(ctx)?;
         println!("starting client");
 
         aeron.start()?;

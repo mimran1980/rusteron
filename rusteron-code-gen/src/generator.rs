@@ -606,13 +606,47 @@ impl CWrapper {
                             } else {
                                 let arg_name = arg.as_ident();
                                 let rtype = arg.as_type();
+
+                                // check if I need to make copy of object for reference counting
+                                let fields = if arg.is_single_mut_pointer() && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap()) {
+                                    let arg_copy = format_ident!("{}_copy", arg.name);
+                                    quote! {
+                                        let #arg_copy = #arg_name.clone();
+                                    }
+                                } else {
+                                    quote! {}
+                                };
+
+
                                 let value = ReturnType::new(arg.clone(), wrappers.clone())
                                     .handle_rs_to_c_return(quote! { #arg_name }, false);
-                                Some(quote! { let #arg_name: #rtype = #value; })
+                                Some(quote! { #fields let #arg_name: #rtype = #value; })
                             }
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
+
+                    let drop_copies: Vec<proc_macro2::TokenStream> = method
+                        .arguments
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, arg)| {
+                            if idx == 0 {
+                                None
+                            } else {
+                                // check if I need to make copy of object for reference counting
+                                if arg.is_single_mut_pointer() && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap()) {
+                                        let arg_copy = format_ident!("{}_copy", arg.name);
+                                        return Some(quote! {
+                                        drop(#arg_copy)
+                                        });
+                                } else {
+                                return None;
+                                };
+                            }
+                        })
+                        .filter(|t| !t.is_empty())
+                        .collect_vec();
 
                     let new_args: Vec<proc_macro2::TokenStream> = method
                         .arguments
@@ -649,9 +683,18 @@ impl CWrapper {
                         #(#method_docs)*
                         pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronCError> {
                             #(#lets)*
+                            let drop_copies_closure = std::rc::Rc::new(std::cell::RefCell::new(Some(|| {
+                                #(#drop_copies);*
+                            })));
                             let resource_constructor = ManagedCResource::new(
                                 move |ctx| unsafe { #init_fn(#(#init_args),*) },
-                                move |ctx| unsafe { #close_fn(#(#close_args),*) },
+                                move |ctx| {
+                                    let result = unsafe { #close_fn(#(#close_args),*) };
+                                    if let Some(drop_closure) = drop_copies_closure.borrow_mut().take() {
+                                       drop_closure();
+                                    }
+                                    result
+                                },
                                 false
                             )?;
 
