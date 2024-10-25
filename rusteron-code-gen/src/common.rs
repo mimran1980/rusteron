@@ -1,3 +1,4 @@
+use crate::AeronErrorType::Unknown;
 use std::fmt::{Debug, Formatter};
 use std::{any, fmt, ptr};
 
@@ -99,6 +100,79 @@ impl<T> Drop for ManagedCResource<T> {
     }
 }
 
+#[derive(Debug)]
+pub enum AeronErrorType {
+    NullOrNotConnected,
+    ClientErrorDriverTimeout,
+    ClientErrorClientTimeout,
+    ClientErrorConductorServiceTimeout,
+    ClientErrorBufferFull,
+    PublicationBackPressured,
+    PublicationAdminAction,
+    PublicationClosed,
+    PublicationMaxPositionExceeded,
+    PublicationError,
+    Unknown(i32),
+}
+
+impl From<AeronErrorType> for AeronCError {
+    fn from(value: AeronErrorType) -> Self {
+        AeronCError::from_code(value.code())
+    }
+}
+
+impl AeronErrorType {
+    pub fn code(&self) -> i32 {
+        match self {
+            AeronErrorType::NullOrNotConnected => -1,
+            AeronErrorType::ClientErrorDriverTimeout => -1000,
+            AeronErrorType::ClientErrorClientTimeout => -1001,
+            AeronErrorType::ClientErrorConductorServiceTimeout => -1002,
+            AeronErrorType::ClientErrorBufferFull => -1003,
+            AeronErrorType::PublicationBackPressured => -2,
+            AeronErrorType::PublicationAdminAction => -3,
+            AeronErrorType::PublicationClosed => -4,
+            AeronErrorType::PublicationMaxPositionExceeded => -5,
+            AeronErrorType::PublicationError => -6,
+            AeronErrorType::Unknown(code) => *code,
+        }
+    }
+
+    pub fn from_code(code: i32) -> Self {
+        match code {
+            -1 => AeronErrorType::NullOrNotConnected,
+            -1000 => AeronErrorType::ClientErrorDriverTimeout,
+            -1001 => AeronErrorType::ClientErrorClientTimeout,
+            -1002 => AeronErrorType::ClientErrorConductorServiceTimeout,
+            -1003 => AeronErrorType::ClientErrorBufferFull,
+            -2 => AeronErrorType::PublicationBackPressured,
+            -3 => AeronErrorType::PublicationAdminAction,
+            -4 => AeronErrorType::PublicationClosed,
+            -5 => AeronErrorType::PublicationMaxPositionExceeded,
+            -6 => AeronErrorType::PublicationError,
+            _ => Unknown(code),
+        }
+    }
+
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            AeronErrorType::NullOrNotConnected => "Null Value or Not Connected",
+            AeronErrorType::ClientErrorDriverTimeout => "Client Error Driver Timeout",
+            AeronErrorType::ClientErrorClientTimeout => "Client Error Client Timeout",
+            AeronErrorType::ClientErrorConductorServiceTimeout => {
+                "Client Error Conductor Service Timeout"
+            }
+            AeronErrorType::ClientErrorBufferFull => "Client Error Buffer Full",
+            AeronErrorType::PublicationBackPressured => "Publication Back Pressured",
+            AeronErrorType::PublicationAdminAction => "Publication Admin Action",
+            AeronErrorType::PublicationClosed => "Publication Closed",
+            AeronErrorType::PublicationMaxPositionExceeded => "Publication Max Position Exceeded",
+            AeronErrorType::PublicationError => "Publication Error",
+            AeronErrorType::Unknown(_) => "Unknown Error",
+        }
+    }
+}
+
 /// Represents an Aeron-specific error with a code and an optional message.
 ///
 /// The error code is derived from Aeron C API calls.
@@ -116,33 +190,14 @@ impl AeronCError {
         AeronCError { code }
     }
 
-    /// Retrieves the error message corresponding to the error code.
-    ///
-    /// The message is fetched from the Aeron C API using `aeron_driver_last_error()`.
-    /// If the conversion of the C string to UTF-8 fails, this returns `None`.
-    pub fn get_message(&self) -> Option<&'static str> {
-        todo!()
-        // unsafe {
-        // let err_ptr = aeron_driver_last_error();
-        // if !err_ptr.is_null() {
-        //     // Try to convert the C string to a Rust &str, handle any UTF-8 errors gracefully
-        //     match CStr::from_ptr(err_ptr).to_str() {
-        //         Ok(message) => Some(message),
-        //         Err(_) => None, // Return None if the conversion fails
-        //     }
-        // } else {
-        //     None
-        // }
-        // }
+    pub fn kind(&self) -> AeronErrorType {
+        AeronErrorType::from_code(self.code)
     }
 }
 
 impl fmt::Display for AeronCError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.get_message() {
-            Some(msg) => write!(f, "Aeron error {}: {}", self.code, msg),
-            None => write!(f, "Aeron error {}", self.code),
-        }
+        write!(f, "Aeron error {}: {:?}", self.code, self.kind())
     }
 }
 
