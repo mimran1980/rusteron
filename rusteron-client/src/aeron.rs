@@ -163,3 +163,11 @@ impl<T: AeronControlledFragmentHandlerCallback> Handler<T> {
         ))?))
     }
 }
+
+impl AeronBufferClaim {
+    pub fn data_mut(&self) -> &mut [u8] {
+        std::thread::sleep(std::time::Duration::from_secs(100));
+        debug_assert!(!self.data.is_null());
+        unsafe { std::slice::from_raw_parts_mut(self.data, self.length) }
+    }
+}
