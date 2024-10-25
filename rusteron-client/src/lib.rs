@@ -14,9 +14,9 @@ include!("aeron.rs");
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error;
-
     use serial_test::serial;
+    use std::error;
+    use std::io::Write;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread::sleep;
@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     #[serial]
-    pub fn simple_send() -> Result<(), Box<dyn error::Error>> {
+    pub fn simple_large_send() -> Result<(), Box<dyn error::Error>> {
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
             rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
@@ -109,6 +109,122 @@ mod tests {
                     if result < large_msg.len() as i64 {
                         eprintln!("ERROR: failed to send message");
                     } else {
+                        println!("send message [result={}]", result);
+                    }
+                }
+                println!("stopping publisher thread");
+            })
+        };
+
+        let count = Arc::new(AtomicUsize::new(0usize));
+        let count_copy = Arc::clone(&count);
+        let stop2 = stop.clone();
+
+        let closure =
+            AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
+                println!(
+                    "received a message from aeron {:?}, count: {}, msg length:{}",
+                    header.position(),
+                    count_copy.fetch_add(1, Ordering::SeqCst),
+                    msg.len()
+                );
+                if msg.len() != string_len {
+                    stop2.store(true, Ordering::SeqCst);
+                    eprintln!(
+                        "ERROR: message was {} was expecting {} [header={:?}]",
+                        msg.len(),
+                        string_len,
+                        header
+                    );
+                    sleep(Duration::from_secs(1));
+                }
+                assert_eq!(msg.len(), string_len);
+                assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
+            });
+        let closure = Handler::leak_with_fragment_assembler(closure)?;
+
+        loop {
+            let c = count.load(Ordering::SeqCst);
+            println!("count {c:?}");
+            if c > 100 {
+                break;
+            }
+            subscription.poll(Some(&closure), 128)?;
+        }
+
+        println!("stopping client");
+
+        stop.store(true, Ordering::SeqCst);
+
+        let _ = publisher_handler.join().unwrap();
+        let _ = driver_handle.join().unwrap();
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    pub fn try_claim() -> Result<(), Box<dyn error::Error>> {
+        let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
+        let (stop, driver_handle) =
+            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+
+        let ctx = AeronContext::new()?;
+        ctx.set_dir(media_driver_ctx.get_dir())?;
+        assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
+        let mut error_count = 1;
+        let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
+            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
+            error_count += 1;
+        });
+        ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
+
+        println!("creating client");
+        let aeron = Aeron::new(ctx)?;
+        println!("starting client");
+
+        aeron.start()?;
+        println!("client started");
+        let publisher = aeron
+            .async_add_publication("aeron:ipc", 123)?
+            .poll_blocking(Duration::from_secs(5))?;
+        println!("created publisher");
+
+        let subscription = aeron
+            .async_add_subscription(
+                "aeron:ipc",
+                123,
+                Handlers::no_available_image_handler(),
+                Handlers::no_unavailable_image_handler(),
+            )?
+            .poll_blocking(Duration::from_secs(5))
+            .unwrap();
+        println!("created subscription");
+
+        // pick a large enough size to confirm fragement assembler is working
+        let string_len = 156;
+        println!("string length: {}", string_len);
+
+        let publisher_handler = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let binding = "1".repeat(string_len);
+                let msg = binding.as_bytes();
+                let buffer = AeronBufferClaim::default();
+                loop {
+                    if stop.load(Ordering::Acquire) || publisher.is_closed() {
+                        break;
+                    }
+
+                    let result = publisher.try_claim(string_len, &buffer);
+
+                    if result < msg.len() as i64 {
+                        eprintln!(
+                            "ERROR: failed to send message {:?}",
+                            AeronCError::from_code(result as i32)
+                        );
+                    } else {
+                        buffer.data_mut().write_all(&msg).unwrap();
+                        buffer.commit().unwrap();
                         println!("send message [result={}]", result);
                     }
                 }
