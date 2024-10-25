@@ -10,13 +10,17 @@ pub mod bindings {
 use bindings::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread::JoinHandle;
+
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!("../../rusteron-client/src/aeron.rs");
 
 unsafe impl Send for AeronDriverContext {}
 
 impl AeronDriver {
-    pub fn launch_embedded(aeron_context: &AeronDriverContext) -> Arc<AtomicBool> {
+    pub fn launch_embedded(
+        aeron_context: &AeronDriverContext,
+    ) -> (Arc<AtomicBool>, JoinHandle<Result<(), AeronCError>>) {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_copy = stop.clone();
         let stop_copy2 = stop.clone();
@@ -27,20 +31,22 @@ impl AeronDriver {
         })
         .expect("Error setting Ctrl-C handler");
 
-        std::thread::spawn(move || {
-            let aeron_driver = AeronDriver::new(aeron_context)?;
-            aeron_driver.start(true)?;
+        (
+            stop_copy,
+            std::thread::spawn(move || {
+                let aeron_driver = AeronDriver::new(aeron_context)?;
+                aeron_driver.start(true)?;
 
-            // Poll for work until Ctrl+C is pressed
-            while !stop.load(Ordering::Acquire) {
-                while aeron_driver.main_do_work()? > 0 {
-                    // busy spin
+                // Poll for work until Ctrl+C is pressed
+                while !stop.load(Ordering::Acquire) {
+                    while aeron_driver.main_do_work()? > 0 {
+                        // busy spin
+                    }
                 }
-            }
 
-            Ok::<_, AeronCError>(())
-        });
-        stop_copy
+                Ok::<_, AeronCError>(())
+            }),
+        )
     }
 }
 
@@ -57,7 +63,7 @@ mod tests {
         let patch = unsafe { crate::aeron_version_patch() };
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
-        let cargo_version = "1.47.0"; // env!("CARGO_PKG_VERSION");
+        let cargo_version = "1.47.0";
         assert_eq!(aeron_version, cargo_version);
     }
 
@@ -70,7 +76,7 @@ mod tests {
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
 
-        let stop = AeronDriver::launch_embedded(&aeron_context);
+        let (stop, _driver_handle) = AeronDriver::launch_embedded(&aeron_context);
 
         // aeron_driver
         //     .conductor()
@@ -86,14 +92,16 @@ mod tests {
         let client = Aeron::new(ctx.clone())?;
         let mut error_count = 0;
 
-        let error_handler = Some(AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("Aeron error {}: {}", error_code, msg);
-            error_count += 1;
-        }));
+        let error_handler = Some(Handler::leak(AeronErrorHandlerClosure::from(
+            |error_code, msg| {
+                eprintln!("Aeron error {}: {}", error_code, msg);
+                error_count += 1;
+            },
+        )));
         ctx.set_error_handler(error_handler.as_ref())?;
 
         struct Test {}
-        impl AeronAvailableCounterHandler for Test {
+        impl AeronAvailableCounterCallback for Test {
             fn handle_aeron_on_available_counter(
                 &mut self,
                 counters_reader: AeronCountersReader,
@@ -104,7 +112,7 @@ mod tests {
             }
         }
 
-        impl AeronNewPublicationHandler for Test {
+        impl AeronNewPublicationCallback for Test {
             fn handle_aeron_on_new_publication(
                 &mut self,
                 async_: AeronAsyncAddPublication,
@@ -116,7 +124,7 @@ mod tests {
                 println!("on new publication {async_:?} {channel} {stream_id} {session_id} {correlation_id}")
             }
         }
-        let handler = Some(Test {});
+        let handler = Some(Handler::leak(Test {}));
         ctx.set_on_available_counter(handler.as_ref())?;
         ctx.set_on_new_publication(handler.as_ref())?;
 
@@ -125,14 +133,8 @@ mod tests {
         assert!(client.epoch_clock() > 0);
         assert!(client.nano_clock() > 0);
 
-        let counter_async = AeronAsyncAddCounter::new(
-            client.clone(),
-            2543543,
-            "12312312".as_ptr(),
-            "12312312".len(),
-            "abcd",
-            4,
-        )?;
+        let counter_async =
+            AeronAsyncAddCounter::new(client.clone(), 2543543, "12312312".as_bytes(), "abcd")?;
 
         let counter = counter_async.poll_blocking(Duration::from_secs(15))?;
         unsafe {

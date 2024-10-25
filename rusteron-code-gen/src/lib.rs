@@ -66,7 +66,9 @@ pub fn format_token_stream(tokens: TokenStream) -> String {
 mod tests {
     use crate::generator::MEDIA_DRIVER_BINDINGS;
     use crate::parser::parse_bindings;
-    use crate::{append_to_file, format_token_stream, ARCHIVE_BINDINGS, CLIENT_BINDINGS};
+    use crate::{
+        append_to_file, format_token_stream, format_with_rustfmt, ARCHIVE_BINDINGS, CLIENT_BINDINGS,
+    };
     use proc_macro2::TokenStream;
     use std::fs;
 
@@ -98,7 +100,7 @@ mod tests {
 
         for handler in &bindings.handlers {
             let code = crate::generate_handlers(handler, &bindings);
-            append_to_file(&file, &code.to_string()).unwrap();
+            append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
 
         let t = trybuild::TestCases::new();
@@ -136,7 +138,7 @@ mod tests {
 
         for handler in &bindings.handlers {
             let code = crate::generate_handlers(handler, &bindings);
-            append_to_file(&file, &code.to_string()).unwrap();
+            append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
 
         let t = trybuild::TestCases::new();
@@ -158,8 +160,6 @@ mod tests {
                 .class_name
         );
 
-        // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
-
         let file = write_to_file(TokenStream::new(), true, "archive.rs");
         for (p, w) in bindings.wrappers.values().enumerate() {
             let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true);
@@ -168,7 +168,7 @@ mod tests {
 
         for handler in &bindings.handlers {
             let code = crate::generate_handlers(handler, &bindings);
-            append_to_file(&file, &code.to_string()).unwrap();
+            append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
 
         let t = trybuild::TestCases::new();
