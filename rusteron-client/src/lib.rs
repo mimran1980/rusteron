@@ -17,7 +17,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread::sleep;
-    use std::time::{Duration};
+    use std::time::Duration;
 
     #[test]
     fn version_check() -> Result<(), Box<dyn error::Error>> {
