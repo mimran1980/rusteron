@@ -6,7 +6,7 @@ use quote::{format_ident, quote, ToTokens};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::str::FromStr;
-use syn::Type;
+use syn::{parse_str, Type};
 
 pub const COMMON_CODE: &str = include_str!("common.rs");
 pub const CLIENT_BINDINGS: &str = include_str!("../bindings/client.rs");
@@ -42,6 +42,13 @@ pub struct Arg {
     pub name: String,
     pub c_type: String,
     pub processing: ArgProcessing,
+}
+
+impl Arg {
+    fn is_primitive(&self) -> bool {
+        ["i64", "u64", "f32", "f64", "i32", "i16", "u32", "u16", "bool", "usize", "isize"]
+            .iter().any(|f| self.c_type.ends_with(f))
+    }
 }
 
 impl Arg {
@@ -173,6 +180,10 @@ impl ReturnType {
             return quote! { &str };
         }
         let return_type: syn::Type = syn::parse_str(&self.original).expect("Invalid return type");
+        if self.original.is_single_mut_pointer() && self.original.is_primitive() {
+            let mut_type: Type = parse_str(&return_type.to_token_stream().to_string().replace("* mut ", "&mut ")).unwrap();
+            return quote! { #mut_type };
+        }
         quote! { #return_type }
     }
 
@@ -212,6 +223,10 @@ impl ReturnType {
                 return quote! { std::str::from_utf8_unchecked(std::slice::from_raw_parts(#result as *const u8, #length.try_into().unwrap()))};
             } else {
                 return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
+            }
+        } else if self.original.is_single_mut_pointer() && self.original.is_primitive() {
+            return quote! {
+                unsafe { &mut *#result }
             }
         } else {
             quote! { #result.into() }
@@ -342,8 +357,20 @@ impl ReturnType {
                     #arg_name: std::ffi::CString::new(#result).unwrap().into_raw()
                 }
             } else {
+                if self.original.is_single_mut_pointer() && self.original.is_primitive() {
+                    return quote! {
+                        #arg_name: #result as *mut _
+                    }
+                }
+
                 quote! { #arg_name: #result.into() }
             };
+        }
+
+        if self.original.is_single_mut_pointer() && self.original.is_primitive() {
+            return quote! {
+                #result as *mut _
+            }
         }
 
         if self.original.is_c_string() {
@@ -523,10 +550,20 @@ impl CWrapper {
                     .get_new_return_type(true)
                 };
 
+                let rt = ReturnType::new(
+                    Arg {
+                        processing: ArgProcessing::Default,
+                        ..arg.clone()
+                    },
+                    cwrappers.clone(),
+                );
+                let return_type = rt.get_new_return_type(false);
+                let converter = rt.handle_c_to_rs_return(quote! { self.#fn_name }, false);
+
                 quote! {
                     #[inline]
                     pub fn #fn_name(&self) -> #return_type {
-                        self.#fn_name.into()
+                        #converter
                     }
                 }
             })
@@ -954,6 +991,9 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
                 } else {
                     None
                 };
+            } else if arg.is_single_mut_pointer() && arg.is_primitive() {
+                let owned_type: Type = parse_str(arg.c_type.split_whitespace().last().unwrap()).unwrap();
+                return Some(quote! { #owned_type });
             } else {
                 return Some(quote! {
                     #type_name

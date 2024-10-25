@@ -146,4 +146,77 @@ mod tests {
         let _ = driver_handle.join().unwrap();
         Ok(())
     }
+
+    #[test]
+    pub fn counters() -> Result<(), Box<dyn error::Error>> {
+        println!("creating media driver ctx");
+        let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
+        let (stop, driver_handle) =
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
+
+        println!("started media driver");
+        sleep(Duration::from_secs(1));
+
+        let ctx = AeronContext::new()?;
+        ctx.set_dir(media_driver_ctx.get_dir())?;
+        assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
+        let mut error_count = 1;
+        let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
+            eprintln!("aeron error {}: {}", error_code, msg);
+            error_count += 1;
+        });
+        ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
+        ctx.set_on_unavailable_counter(Some(&Handler::leak(AeronUnavailableCounterLogger)))?;
+        ctx.set_on_available_counter(Some(&Handler::leak(AeronAvailableCounterClosure::from(
+            |counters_reader: AeronCountersReader,
+             registration_id: i64,
+             counter_id: i32| {
+                println!("on counter {counters_reader:?}, registration_id={registration_id}, counter_id={counter_id}");
+                let mut result = 0;
+                counters_reader.counter_registration_id(counter_id, &mut result ).unwrap();
+                assert_eq!(result, registration_id);
+            }
+        ))))?;
+
+        println!("creating client");
+        let aeron = Aeron::new(ctx.clone())?;
+        println!("starting client");
+
+
+        aeron.start()?;
+        println!("client started");
+
+        let counter = aeron.async_add_counter(123, "test".as_bytes(), "this is a test")?
+            .poll_blocking(Duration::from_secs(5))?;
+
+        let publisher_handler = {
+            let stop = stop.clone();
+            let counter = counter.clone();
+            std::thread::spawn(move || {
+                loop {
+                    if stop.load(Ordering::Acquire) {
+                        break;
+                    }
+                    counter.addr_atomic().fetch_add(1, Ordering::SeqCst);
+                    sleep(Duration::from_micros(1));
+                }
+                println!("stopping publisher thread");
+            })
+        };
+
+        while counter.addr_atomic().load(Ordering::SeqCst) < 100 {
+            sleep(Duration::from_micros(10));
+        }
+
+        println!("counter is {}", counter.addr_atomic().load(Ordering::SeqCst));
+
+        println!("stopping client");
+
+        stop.store(true, Ordering::SeqCst);
+
+        let _ = publisher_handler.join().unwrap();
+        let _ = driver_handle.join().unwrap();
+        Ok(())
+    }
+
 }
