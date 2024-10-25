@@ -101,7 +101,7 @@ mod tests {
         ctx.set_error_handler(error_handler.as_ref())?;
 
         struct Test {}
-        impl AeronAvailableCounterHandler for Test {
+        impl AeronAvailableCounterCallback for Test {
             fn handle_aeron_on_available_counter(
                 &mut self,
                 counters_reader: AeronCountersReader,
@@ -112,7 +112,7 @@ mod tests {
             }
         }
 
-        impl AeronNewPublicationHandler for Test {
+        impl AeronNewPublicationCallback for Test {
             fn handle_aeron_on_new_publication(
                 &mut self,
                 async_: AeronAsyncAddPublication,
