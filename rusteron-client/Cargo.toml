@@ -24,8 +24,8 @@ rusteron-code-gen = {path = "../rusteron-code-gen"}
 ctrlc = { workspace = true }
 
 [dev-dependencies]
-rusteron-media-driver = {path = "../rusteron-media-driver", features = ["static"]}
-#rusteron-media-driver = {path = "../rusteron-media-driver"}
+#rusteron-media-driver = {path = "../rusteron-media-driver", features = ["static"]}
+rusteron-media-driver = {path = "../rusteron-media-driver"}
 
 [features]
 static = []

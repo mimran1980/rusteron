@@ -26,7 +26,7 @@ mod tests {
         let patch = unsafe { crate::aeron_version_patch() };
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
-        let cargo_version = "1.47.0"; // env!("CARGO_PKG_VERSION");
+        let cargo_version = "1.47.0";
         assert_eq!(aeron_version, cargo_version);
 
         // don't want to run just want to enfore that it compiles
