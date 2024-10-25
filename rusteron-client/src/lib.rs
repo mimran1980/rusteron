@@ -16,12 +16,14 @@ mod tests {
     use super::*;
     use std::error;
 
+    use serial_test::serial;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread::sleep;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     #[test]
+    #[serial]
     fn version_check() -> Result<(), Box<dyn error::Error>> {
         let major = unsafe { crate::aeron_version_major() };
         let minor = unsafe { crate::aeron_version_minor() };
@@ -44,6 +46,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     pub fn simple_send() -> Result<(), Box<dyn error::Error>> {
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
@@ -138,8 +141,7 @@ mod tests {
                 assert_eq!(msg.len(), string_len);
                 assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
             });
-        let closure = Handler::leak(closure);
-        let closure = Handler::leak(AeronFragmentAssembler::new(Some(&closure))?);
+        let closure = Handler::leak_with_fragment_assembler(closure)?;
 
         loop {
             let c = count.load(Ordering::SeqCst);
@@ -160,6 +162,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     pub fn counters() -> Result<(), Box<dyn error::Error>> {
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
@@ -216,9 +219,14 @@ mod tests {
             })
         };
 
-        while counter.addr_atomic().load(Ordering::SeqCst) < 100 {
+        let now = Instant::now();
+        while counter.addr_atomic().load(Ordering::SeqCst) < 100
+            && now.elapsed() < Duration::from_secs(10)
+        {
             sleep(Duration::from_micros(10));
         }
+
+        assert!(now.elapsed() < Duration::from_secs(10));
 
         println!(
             "counter is {}",

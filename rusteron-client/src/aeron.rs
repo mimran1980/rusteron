@@ -127,3 +127,39 @@ impl AeronFragmentHandlerCallback for AeronFragmentAssembler {
         }
     }
 }
+
+impl AeronControlledFragmentHandlerCallback for AeronControlledFragmentAssembler {
+    fn handle_aeron_controlled_fragment_handler(
+        &mut self,
+        buffer: &[u8],
+        header: AeronHeader,
+    ) -> aeron_controlled_fragment_handler_action_t {
+        unsafe {
+            aeron_controlled_fragment_assembler_handler(
+                self.get_inner() as *mut _,
+                buffer.as_ptr(),
+                buffer.len(),
+                header.get_inner(),
+            )
+        }
+    }
+}
+
+impl<T: AeronFragmentHandlerCallback> Handler<T> {
+    pub fn leak_with_fragment_assembler(
+        handler: T,
+    ) -> Result<Handler<AeronFragmentAssembler>, AeronCError> {
+        let handler = Handler::leak(handler);
+        Ok(Handler::leak(AeronFragmentAssembler::new(Some(&handler))?))
+    }
+}
+impl<T: AeronControlledFragmentHandlerCallback> Handler<T> {
+    pub fn leak_with_controlled_fragment_assembler(
+        handler: T,
+    ) -> Result<Handler<AeronControlledFragmentAssembler>, AeronCError> {
+        let handler = Handler::leak(handler);
+        Ok(Handler::leak(AeronControlledFragmentAssembler::new(Some(
+            &handler,
+        ))?))
+    }
+}
