@@ -2,6 +2,8 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(clippy::all)]
+#![allow(unused_unsafe)]
+
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -46,7 +48,7 @@ mod tests {
         println!("creating media driver ctx");
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         println!("started media driver");
         sleep(Duration::from_secs(1));
@@ -152,7 +154,7 @@ mod tests {
         println!("creating media driver ctx");
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         println!("started media driver");
         sleep(Duration::from_secs(1));
@@ -167,14 +169,18 @@ mod tests {
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
         ctx.set_on_unavailable_counter(Some(&Handler::leak(AeronUnavailableCounterLogger)))?;
+        let mut found_counter = false;
         ctx.set_on_available_counter(Some(&Handler::leak(AeronAvailableCounterClosure::from(
             |counters_reader: AeronCountersReader,
              registration_id: i64,
              counter_id: i32| {
-                println!("on counter {counters_reader:?}, registration_id={registration_id}, counter_id={counter_id}");
-                let mut result = 0;
-                counters_reader.counter_registration_id(counter_id, &mut result ).unwrap();
-                assert_eq!(result, registration_id);
+                println!("on counter {:?} {counters_reader:?}, registration_id={registration_id}, counter_id={counter_id}, value={}", counters_reader.get_counter_label(counter_id, 1000), counters_reader.addr(counter_id));
+                assert_eq!(counters_reader.get_counter_registration_id(counter_id).unwrap(), registration_id);
+                if let Ok(label) = counters_reader.get_counter_label(counter_id, 1000) {
+                    if label == "test" {
+                        found_counter = true;
+                    }
+                }
             }
         ))))?;
 
@@ -182,11 +188,11 @@ mod tests {
         let aeron = Aeron::new(ctx.clone())?;
         println!("starting client");
 
-
         aeron.start()?;
         println!("client started");
 
-        let counter = aeron.async_add_counter(123, "test".as_bytes(), "this is a test")?
+        let counter = aeron
+            .async_add_counter(123, "test".as_bytes(), "this is a test")?
             .poll_blocking(Duration::from_secs(5))?;
 
         let publisher_handler = {
@@ -208,9 +214,14 @@ mod tests {
             sleep(Duration::from_micros(10));
         }
 
-        println!("counter is {}", counter.addr_atomic().load(Ordering::SeqCst));
+        println!(
+            "counter is {}",
+            counter.addr_atomic().load(Ordering::SeqCst)
+        );
 
         println!("stopping client");
+
+        assert!(found_counter);
 
         stop.store(true, Ordering::SeqCst);
 
@@ -218,5 +229,4 @@ mod tests {
         let _ = driver_handle.join().unwrap();
         Ok(())
     }
-
 }

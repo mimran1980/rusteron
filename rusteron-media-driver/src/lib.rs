@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(clippy::all)]
+#![allow(unused_unsafe)]
 
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -20,16 +21,19 @@ unsafe impl Send for AeronDriverContext {}
 impl AeronDriver {
     pub fn launch_embedded(
         aeron_context: &AeronDriverContext,
+        register_sigint: bool,
     ) -> (Arc<AtomicBool>, JoinHandle<Result<(), AeronCError>>) {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_copy = stop.clone();
         let stop_copy2 = stop.clone();
         let aeron_context = aeron_context.clone();
         // Register signal handler for SIGINT (Ctrl+C)
-        ctrlc::set_handler(move || {
-            stop_copy2.store(true, Ordering::SeqCst);
-        })
-        .expect("Error setting Ctrl-C handler");
+        if register_sigint {
+            ctrlc::set_handler(move || {
+                stop_copy2.store(true, Ordering::SeqCst);
+            })
+                .expect("Error setting Ctrl-C handler");
+        }
 
         (
             stop_copy,
@@ -76,7 +80,7 @@ mod tests {
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
 
-        let (stop, _driver_handle) = AeronDriver::launch_embedded(&aeron_context);
+        let (stop, _driver_handle) = AeronDriver::launch_embedded(&aeron_context, false);
 
         // aeron_driver
         //     .conductor()

@@ -46,8 +46,11 @@ pub struct Arg {
 
 impl Arg {
     fn is_primitive(&self) -> bool {
-        ["i64", "u64", "f32", "f64", "i32", "i16", "u32", "u16", "bool", "usize", "isize"]
-            .iter().any(|f| self.c_type.ends_with(f))
+        [
+            "i64", "u64", "f32", "f64", "i32", "i16", "u32", "u16", "bool", "usize", "isize",
+        ]
+        .iter()
+        .any(|f| self.c_type.ends_with(f))
     }
 }
 
@@ -181,7 +184,13 @@ impl ReturnType {
         }
         let return_type: syn::Type = syn::parse_str(&self.original).expect("Invalid return type");
         if self.original.is_single_mut_pointer() && self.original.is_primitive() {
-            let mut_type: Type = parse_str(&return_type.to_token_stream().to_string().replace("* mut ", "&mut ")).unwrap();
+            let mut_type: Type = parse_str(
+                &return_type
+                    .to_token_stream()
+                    .to_string()
+                    .replace("* mut ", "&mut "),
+            )
+            .unwrap();
             return quote! { #mut_type };
         }
         quote! { #return_type }
@@ -222,12 +231,12 @@ impl ReturnType {
                 let length = &args[1].as_ident();
                 return quote! { std::str::from_utf8_unchecked(std::slice::from_raw_parts(#result as *const u8, #length.try_into().unwrap()))};
             } else {
-                return quote! { std::ffi::CStr::from_ptr(#result).to_str().unwrap()};
+                return quote! { unsafe { std::ffi::CStr::from_ptr(#result).to_str().unwrap() } };
             }
         } else if self.original.is_single_mut_pointer() && self.original.is_primitive() {
             return quote! {
                 unsafe { &mut *#result }
-            }
+            };
         } else {
             quote! { #result.into() }
         }
@@ -360,7 +369,7 @@ impl ReturnType {
                 if self.original.is_single_mut_pointer() && self.original.is_primitive() {
                     return quote! {
                         #arg_name: #result as *mut _
-                    }
+                    };
                 }
 
                 quote! { #arg_name: #result.into() }
@@ -370,7 +379,7 @@ impl ReturnType {
         if self.original.is_single_mut_pointer() && self.original.is_primitive() {
             return quote! {
                 #result as *mut _
-            }
+            };
         }
 
         if self.original.is_c_string() {
@@ -526,29 +535,7 @@ impl CWrapper {
             })
             .map(|arg| {
                 let field_name = &arg.name;
-                let return_type = &arg.c_type;
                 let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
-
-                let return_type = if arg.is_c_raw_int() {
-                    let r_type: Type = syn::parse_str(return_type).unwrap();
-                    quote! { #r_type }
-                } else if arg.is_c_string() {
-                    return quote! {
-                        #[inline]
-                        pub fn #fn_name(&self) -> &str {
-                            unsafe { std::ffi::CStr::from_ptr(self.#fn_name).to_str().unwrap() }
-                        }
-                    };
-                } else {
-                    ReturnType::new(
-                        Arg {
-                            processing: ArgProcessing::Default,
-                            ..arg.clone()
-                        },
-                        cwrappers.clone(),
-                    )
-                    .get_new_return_type(true)
-                };
 
                 let rt = ReturnType::new(
                     Arg {
@@ -992,7 +979,8 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
                     None
                 };
             } else if arg.is_single_mut_pointer() && arg.is_primitive() {
-                let owned_type: Type = parse_str(arg.c_type.split_whitespace().last().unwrap()).unwrap();
+                let owned_type: Type =
+                    parse_str(arg.c_type.split_whitespace().last().unwrap()).unwrap();
                 return Some(quote! { #owned_type });
             } else {
                 return Some(quote! {
@@ -1368,7 +1356,8 @@ pub fn generate_rust_code(
         #![allow(non_camel_case_types)]
         #![allow(non_snake_case)]
         #![allow(clippy::all)]
-        ",
+        #![allow(unused_unsafe)]
+",
             );
         }
 
