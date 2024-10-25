@@ -32,7 +32,7 @@ impl AeronDriver {
             ctrlc::set_handler(move || {
                 stop_copy2.store(true, Ordering::SeqCst);
             })
-                .expect("Error setting Ctrl-C handler");
+            .expect("Error setting Ctrl-C handler");
         }
 
         (
