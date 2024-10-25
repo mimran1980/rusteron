@@ -49,7 +49,7 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
     let string_len = 1024 * 1024;
     println!("string length: {}", string_len);
 
-    let publisher_handler = {
+    let _publisher_handler = {
         std::thread::spawn(move || loop {
             println!("sending message");
             if publisher.offer(
