@@ -20,7 +20,7 @@ mod tests {
         let patch = unsafe { crate::aeron_version_patch() };
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
-π        let cargo_version = "1.47.0";
+        let cargo_version = "1.47.0";
         assert_eq!(aeron_version, cargo_version);
     }
 }
