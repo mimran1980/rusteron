@@ -34,7 +34,7 @@ mod tests {
         let ctx = AeronContext::new()?;
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("aeron error {}: {}", error_code, msg);
+            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
 
@@ -45,20 +45,16 @@ mod tests {
 
     #[test]
     pub fn simple_send() -> Result<(), Box<dyn error::Error>> {
-        println!("creating media driver ctx");
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
-
-        println!("started media driver");
-        sleep(Duration::from_secs(1));
+            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
         assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("aeron error {}: {}", error_code, msg);
+            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
@@ -99,17 +95,18 @@ mod tests {
         let publisher_handler = {
             let stop = stop.clone();
             std::thread::spawn(move || {
+                let binding = "1".repeat(string_len);
+                let large_msg = binding.as_bytes();
                 loop {
-                    if stop.load(Ordering::Acquire) {
+                    if stop.load(Ordering::Acquire) || publisher.is_closed() {
                         break;
                     }
-                    println!("sending message");
-                    if publisher.offer(
-                        "1".repeat(string_len).as_bytes(),
-                        Handlers::no_reserved_value_supplier_handler(),
-                    ) < 1
-                    {
-                        eprintln!("failed to send message");
+                    let result =
+                        publisher.offer(large_msg, Handlers::no_reserved_value_supplier_handler());
+                    if result < large_msg.len() as i64 {
+                        eprintln!("ERROR: failed to send message");
+                    } else {
+                        println!("send message [result={}]", result);
                     }
                 }
                 println!("stopping publisher thread");
@@ -118,6 +115,7 @@ mod tests {
 
         let count = Arc::new(AtomicUsize::new(0usize));
         let count_copy = Arc::clone(&count);
+        let stop2 = stop.clone();
         let closure =
             AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
                 println!(
@@ -126,18 +124,28 @@ mod tests {
                     count_copy.fetch_add(1, Ordering::SeqCst),
                     msg.len()
                 );
+                if msg.len() != string_len {
+                    stop2.store(true, Ordering::SeqCst);
+                    eprintln!(
+                        "ERROR: message was {} was expecting {} [header={:?}]",
+                        msg.len(),
+                        string_len,
+                        header
+                    );
+                    sleep(Duration::from_secs(1));
+                }
+                assert_eq!(msg.len(), string_len);
                 assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
             });
         let closure = Handler::leak(closure);
 
-        for _ in 0..100 {
+        loop {
             let c = count.load(Ordering::SeqCst);
             println!("count {c:?}");
             if c > 100 {
-                stop.store(true, Ordering::SeqCst);
                 break;
             }
-            subscription.poll(Some(&closure), 1024)?;
+            subscription.poll(Some(&closure), 128)?;
         }
 
         println!("stopping client");
@@ -151,20 +159,16 @@ mod tests {
 
     #[test]
     pub fn counters() -> Result<(), Box<dyn error::Error>> {
-        println!("creating media driver ctx");
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
-
-        println!("started media driver");
-        sleep(Duration::from_secs(1));
+            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
         assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("aeron error {}: {}", error_code, msg);
+            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
@@ -200,7 +204,7 @@ mod tests {
             let counter = counter.clone();
             std::thread::spawn(move || {
                 loop {
-                    if stop.load(Ordering::Acquire) {
+                    if stop.load(Ordering::Acquire) || counter.is_closed() {
                         break;
                     }
                     counter.addr_atomic().fetch_add(1, Ordering::SeqCst);

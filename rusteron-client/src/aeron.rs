@@ -1,5 +1,3 @@
-
-
 unsafe impl Send for AeronPublication {}
 unsafe impl Send for AeronCounter {}
 
@@ -17,10 +15,7 @@ impl AeronCountersReader {
     #[doc = " \n**param** counter_id      for which the registration id is requested."]
     #[doc = " \n**param** registration_id pointer for value to be set on success."]
     #[doc = " \n**return** -1 on failure, 0 on success."]
-    pub fn get_counter_registration_id(
-        &self,
-        counter_id: i32,
-    ) -> Result<i64, AeronCError> {
+    pub fn get_counter_registration_id(&self, counter_id: i32) -> Result<i64, AeronCError> {
         let mut result = 0;
         self.counter_registration_id(counter_id, &mut result)?;
         Ok(result)
@@ -32,10 +27,7 @@ impl AeronCountersReader {
     #[doc = " \n**param** counter_id      for which the owner id is requested."]
     #[doc = " \n**param** owner_id        pointer for value to be set on success."]
     #[doc = " \n**return** -1 on failure, 0 on success."]
-    pub fn get_counter_owner_id(
-        &self,
-        counter_id: i32,
-    ) -> Result<i64, AeronCError> {
+    pub fn get_counter_owner_id(&self, counter_id: i32) -> Result<i64, AeronCError> {
         let mut result = 0;
         self.counter_owner_id(counter_id, &mut result)?;
         Ok(result)
@@ -48,10 +40,7 @@ impl AeronCountersReader {
     #[doc = " \n**param** counter_id      for which the reference id is requested."]
     #[doc = " \n**param** reference_id    pointer for value to be set on success."]
     #[doc = " \n**return** -1 on failure, 0 on success."]
-    pub fn get_counter_reference_id(
-        &self,
-        counter_id: i32,
-    ) -> Result<i64, AeronCError> {
+    pub fn get_counter_reference_id(&self, counter_id: i32) -> Result<i64, AeronCError> {
         let mut result = 0;
         self.counter_reference_id(counter_id, &mut result)?;
         Ok(result)
@@ -103,5 +92,25 @@ impl AeronCountersReader {
             result.push(b as char);
         }
         Ok(result)
+    }
+}
+
+impl Aeron {
+    pub fn new_blocking(
+        context: AeronContext,
+        timeout: std::time::Duration,
+    ) -> Result<Self, AeronCError> {
+        if let Ok(aeron) = Aeron::new(context.clone()) {
+            return Ok(aeron);
+        }
+        let time = std::time::Instant::now();
+        while time.elapsed() < timeout {
+            if let Ok(aeron) = Aeron::new(context.clone()) {
+                return Ok(aeron);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        println!("failed to create aeron client for {:?}", context);
+        Err(AeronErrorType::TimedOut.into())
     }
 }

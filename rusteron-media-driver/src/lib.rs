@@ -11,7 +11,8 @@ pub mod bindings {
 use bindings::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread::JoinHandle;
+use std::thread::{sleep, JoinHandle};
+use std::time::Duration;
 
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!("../../rusteron-client/src/aeron.rs");
@@ -20,37 +21,52 @@ unsafe impl Send for AeronDriverContext {}
 
 impl AeronDriver {
     pub fn launch_embedded(
-        aeron_context: &AeronDriverContext,
+        aeron_context: AeronDriverContext,
         register_sigint: bool,
     ) -> (Arc<AtomicBool>, JoinHandle<Result<(), AeronCError>>) {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_copy = stop.clone();
-        let stop_copy2 = stop.clone();
         let aeron_context = aeron_context.clone();
         // Register signal handler for SIGINT (Ctrl+C)
         if register_sigint {
+            let stop_copy2 = stop.clone();
             ctrlc::set_handler(move || {
                 stop_copy2.store(true, Ordering::SeqCst);
             })
             .expect("Error setting Ctrl-C handler");
         }
 
-        (
-            stop_copy,
-            std::thread::spawn(move || {
-                let aeron_driver = AeronDriver::new(aeron_context)?;
-                aeron_driver.start(true)?;
+        let started = Arc::new(AtomicBool::new(false));
+        let started2 = started.clone();
 
-                // Poll for work until Ctrl+C is pressed
-                while !stop.load(Ordering::Acquire) {
-                    while aeron_driver.main_do_work()? > 0 {
-                        // busy spin
-                    }
+        let handle = std::thread::spawn(move || {
+            let aeron_driver = AeronDriver::new(aeron_context.clone())?;
+            aeron_driver.start(true)?;
+
+            println!(
+                "Aeron driver started [dir={}]",
+                aeron_driver.context().get_dir()
+            );
+
+            started2.store(true, Ordering::SeqCst);
+
+            // Poll for work until Ctrl+C is pressed
+            while !stop.load(Ordering::Acquire) {
+                while aeron_driver.main_do_work()? > 0 {
+                    // busy spin
                 }
+            }
 
-                Ok::<_, AeronCError>(())
-            }),
-        )
+            println!("stopping media driver");
+
+            Ok::<_, AeronCError>(())
+        });
+
+        while !started.load(Ordering::SeqCst) {
+            sleep(Duration::from_millis(100));
+        }
+
+        (stop_copy, handle)
     }
 }
 

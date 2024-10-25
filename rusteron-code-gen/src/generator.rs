@@ -46,11 +46,10 @@ pub struct Arg {
 
 impl Arg {
     fn is_primitive(&self) -> bool {
-        [
+        static PRIMITIVE_TYPES: &[&str] = &[
             "i64", "u64", "f32", "f64", "i32", "i16", "u32", "u16", "bool", "usize", "isize",
-        ]
-        .iter()
-        .any(|f| self.c_type.ends_with(f))
+        ];
+        PRIMITIVE_TYPES.iter().any(|&f| self.c_type.ends_with(f))
     }
 }
 
@@ -1329,7 +1328,7 @@ pub fn generate_rust_code(
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
                     println!("failed async poll for {:?}", self);
-                    Err(AeronCError::from_code(-255))
+                    Err(AeronErrorType::TimedOut.into())
                 }
             }
                         }

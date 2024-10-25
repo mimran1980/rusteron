@@ -1,4 +1,5 @@
 use crate::AeronErrorType::Unknown;
+use std::backtrace::Backtrace;
 use std::fmt::{Debug, Formatter};
 use std::{any, fmt, ptr};
 
@@ -112,6 +113,7 @@ pub enum AeronErrorType {
     PublicationClosed,
     PublicationMaxPositionExceeded,
     PublicationError,
+    TimedOut,
     Unknown(i32),
 }
 
@@ -134,6 +136,7 @@ impl AeronErrorType {
             AeronErrorType::PublicationClosed => -4,
             AeronErrorType::PublicationMaxPositionExceeded => -5,
             AeronErrorType::PublicationError => -6,
+            AeronErrorType::TimedOut => -234324,
             AeronErrorType::Unknown(code) => *code,
         }
     }
@@ -150,6 +153,7 @@ impl AeronErrorType {
             -4 => AeronErrorType::PublicationClosed,
             -5 => AeronErrorType::PublicationMaxPositionExceeded,
             -6 => AeronErrorType::PublicationError,
+            -234324 => AeronErrorType::TimedOut,
             _ => Unknown(code),
         }
     }
@@ -168,6 +172,7 @@ impl AeronErrorType {
             AeronErrorType::PublicationClosed => "Publication Closed",
             AeronErrorType::PublicationMaxPositionExceeded => "Publication Max Position Exceeded",
             AeronErrorType::PublicationError => "Publication Error",
+            AeronErrorType::TimedOut => "Timed Out",
             AeronErrorType::Unknown(_) => "Unknown Error",
         }
     }
@@ -186,6 +191,18 @@ impl AeronCError {
     ///
     /// Error codes below zero are considered failure.
     pub fn from_code(code: i32) -> Self {
+        #[cfg(debug_assertions)]
+        {
+            if code < 0 {
+                let backtrace = Backtrace::capture();
+                eprintln!(
+                    "Aeron C error code: {}, kind: '{:?}' - {:#?}",
+                    code,
+                    AeronErrorType::from_code(code),
+                    backtrace
+                );
+            }
+        }
         AeronCError { code }
     }
 

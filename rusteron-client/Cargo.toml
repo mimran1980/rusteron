@@ -25,6 +25,7 @@ ctrlc = { workspace = true }
 
 [dev-dependencies]
 rusteron-media-driver = {path = "../rusteron-media-driver"}
+serial_test = "3.1"
 
 [features]
 static = ["rusteron-media-driver/static"]
