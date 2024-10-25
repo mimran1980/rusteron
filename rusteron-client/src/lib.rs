@@ -116,6 +116,7 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0usize));
         let count_copy = Arc::clone(&count);
         let stop2 = stop.clone();
+
         let closure =
             AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
                 println!(
@@ -138,6 +139,7 @@ mod tests {
                 assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
             });
         let closure = Handler::leak(closure);
+        let closure = Handler::leak(AeronFragmentAssembler::new(Some(&closure))?);
 
         loop {
             let c = count.load(Ordering::SeqCst);

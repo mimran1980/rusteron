@@ -114,3 +114,16 @@ impl Aeron {
         Err(AeronErrorType::TimedOut.into())
     }
 }
+
+impl AeronFragmentHandlerCallback for AeronFragmentAssembler {
+    fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) -> () {
+        unsafe {
+            aeron_fragment_assembler_handler(
+                self.get_inner() as *mut _,
+                buffer.as_ptr(),
+                buffer.len(),
+                header.get_inner(),
+            )
+        }
+    }
+}

@@ -289,6 +289,7 @@ impl ReturnType {
             if !self.original.is_mut_pointer() {
                 let handler = handler_client.get(0).unwrap();
                 let handler_name = handler.as_ident();
+                let handler_type = handler.as_type();
                 let clientd_name = handler_client.get(1).unwrap().as_ident();
                 let method_name = format_ident!("{}_callback", handler.c_type);
                 let new_type = syn::parse_str::<syn::Type>(&format!(
@@ -298,12 +299,12 @@ impl ReturnType {
                 .expect("Invalid class name in wrapper");
                 if include_field_name {
                     return quote! {
-                        #handler_name: if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
+                        #handler_name: { let callback: #handler_type = if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) }; callback },
                         #clientd_name: #handler_name.map(|m|m.as_raw()).unwrap_or_else(|| std::ptr::null_mut())
                     };
                 } else {
                     return quote! {
-                        if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) },
+                        { let callback: #handler_type = if #handler_name.is_none() { None } else { Some(#method_name::<#new_type>) }; callback },
                         #handler_name.map(|m|m.as_raw()).unwrap_or_else(|| std::ptr::null_mut())
                     };
                 }
@@ -568,22 +569,32 @@ impl CWrapper {
             .filter(|m| m.arguments.iter().any(|arg| arg.is_double_mut_pointer()))
             .map(|method| {
                 let init_fn = format_ident!("{}", method.fn_name);
-                let close_fn = format_ident!(
+
+                let mut close_method = None;
+                for name in ["_destroy", "_delete"] {
+                    let close_fn = format_ident!(
                     "{}",
                     method
                         .fn_name
                         .replace("_init", "_close")
-                        .replace("_create", "_destroy")
+                        .replace("_create", name)
                         .replace("_add_", "_remove_")
                 );
-                let close_method = self
-                    .methods
-                    .iter()
-                    .find(|m| close_fn.to_string().contains(&m.fn_name));
-                let found_close = init_fn != close_fn
-                    && close_method.is_some()
-                    && close_method.unwrap().return_type.is_c_raw_int();
+                    let method = self
+                        .methods
+                        .iter()
+                        .find(|m| close_fn.to_string().contains(&m.fn_name));
+                    if method.is_some() {
+                        close_method = method;
+                        break;
+                    }
+                }
+                let found_close = close_method.is_some()
+                    && close_method.unwrap().return_type.is_c_raw_int()
+                    && close_method.unwrap() != method
+                    && close_method.unwrap().arguments.iter().skip(1).all(|a| method.arguments.iter().any(|a2| a.name == a2.name));
                 if found_close {
+                    let close_fn = format_ident!("{}", close_method.unwrap().fn_name);
                     let method_docs: Vec<proc_macro2::TokenStream> =
                         get_docs(&method.docs, wrappers);
                     let init_args: Vec<proc_macro2::TokenStream> = method
@@ -641,7 +652,22 @@ impl CWrapper {
                                 };
 
 
-                                let value = ReturnType::new(arg.clone(), wrappers.clone())
+                                let return_type = ReturnType::new(arg.clone(), wrappers.clone());
+
+                                if let ArgProcessing::Handler(args) = &return_type.original.processing {
+                                    let arg1 = args[0].as_ident();
+                                    let arg2 = args[1].as_ident();
+                                    let value = return_type
+                                        .handle_rs_to_c_return(quote! { #arg_name }, false);
+
+                                    if value.is_empty() {
+                                        return None;
+                                    }
+
+                                    return Some(quote! { #fields let (#arg1, #arg2)= (#value); });
+                                }
+
+                                let value = return_type
                                     .handle_rs_to_c_return(quote! { #arg_name }, false);
                                 Some(quote! { #fields let #arg_name: #rtype = #value; })
                             }
@@ -659,12 +685,12 @@ impl CWrapper {
                             } else {
                                 // check if I need to make copy of object for reference counting
                                 if arg.is_single_mut_pointer() && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap()) {
-                                        let arg_copy = format_ident!("{}_copy", arg.name);
-                                        return Some(quote! {
+                                    let arg_copy = format_ident!("{}_copy", arg.name);
+                                    return Some(quote! {
                                         drop(#arg_copy)
                                         });
                                 } else {
-                                return None;
+                                    return None;
                                 };
                             }
                         })
@@ -702,9 +728,25 @@ impl CWrapper {
 
                     // panic!("{}", lets.clone().iter().map(|s|s.to_string()).join("\n"));
 
+                    let generic_types: Vec<proc_macro2::TokenStream> = method
+                        .arguments
+                        .iter()
+                        .flat_map(|arg| {
+                            ReturnType::new(arg.clone(), wrappers.clone())
+                                .method_generics_for_where()
+                                .into_iter()
+                        })
+                        .collect_vec();
+                    let where_clause = if generic_types.is_empty() {
+                        quote! {}
+                    } else {
+                        quote! { <#(#generic_types),*> }
+                    };
+
+
                     quote! {
                         #(#method_docs)*
-                        pub fn #fn_name(#(#new_args),*) -> Result<Self, AeronCError> {
+                        pub fn #fn_name #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
                             #(#lets)*
                             let drop_copies_closure = std::rc::Rc::new(std::cell::RefCell::new(Some(|| {
                                 #(#drop_copies);*

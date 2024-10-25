@@ -96,7 +96,7 @@ mod tests {
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
 
-        let (stop, _driver_handle) = AeronDriver::launch_embedded(&aeron_context, false);
+        let (stop, _driver_handle) = AeronDriver::launch_embedded(aeron_context.clone(), false);
 
         // aeron_driver
         //     .conductor()
