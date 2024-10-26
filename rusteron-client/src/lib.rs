@@ -302,7 +302,7 @@ mod tests {
                 println!("on counter {:?} {counters_reader:?}, registration_id={registration_id}, counter_id={counter_id}, value={}", counters_reader.get_counter_label(counter_id, 1000), counters_reader.addr(counter_id));
                 assert_eq!(counters_reader.get_counter_registration_id(counter_id).unwrap(), registration_id);
                 if let Ok(label) = counters_reader.get_counter_label(counter_id, 1000) {
-                    if label == "test" {
+                    if label == "test_counter" {
                         found_counter = true;
                     }
                 }
@@ -317,19 +317,18 @@ mod tests {
         println!("client started");
 
         let counter = aeron
-            .async_add_counter(123, "test".as_bytes(), "this is a test")?
+            .async_add_counter(123, "test_counter".as_bytes(), "this is a test")?
             .poll_blocking(Duration::from_secs(5))?;
 
         let publisher_handler = {
             let stop = stop.clone();
             let counter = counter.clone();
             std::thread::spawn(move || {
-                loop {
+                for _ in 0..150 {
                     if stop.load(Ordering::Acquire) || counter.is_closed() {
                         break;
                     }
                     counter.addr_atomic().fetch_add(1, Ordering::SeqCst);
-                    sleep(Duration::from_micros(1));
                 }
                 println!("stopping publisher thread");
             })
