@@ -143,7 +143,7 @@ impl ReturnType {
                         "{}HandlerImpl",
                         snake_to_pascal_case(&self.original.c_type)
                     ))
-                    .expect("Invalidclass name in wrapper");
+                    .expect("Invalid class name in wrapper");
                     return quote! { Option<&Handler<#new_type>> };
                 } else {
                     return quote! {};
@@ -661,25 +661,7 @@ impl CWrapper {
             .map(|method| {
                 let init_fn = format_ident!("{}", method.fn_name);
 
-                let mut close_method = None;
-                for name in ["_destroy", "_delete"] {
-                    let close_fn = format_ident!(
-                    "{}",
-                    method
-                        .fn_name
-                        .replace("_init", "_close")
-                        .replace("_create", name)
-                        .replace("_add_", "_remove_")
-                );
-                    let method = self
-                        .methods
-                        .iter()
-                        .find(|m| close_fn.to_string().contains(&m.fn_name));
-                    if method.is_some() {
-                        close_method = method;
-                        break;
-                    }
-                }
+                let close_method = self.find_close_method(method);
                 let found_close = close_method.is_some()
                     && close_method.unwrap().return_type.is_c_raw_int()
                     && close_method.unwrap() != method
@@ -958,6 +940,29 @@ impl CWrapper {
         } else {
             constructors
         }
+    }
+
+    fn find_close_method(&self, method: &Method) -> Option<&Method> {
+        let mut close_method = None;
+        for name in ["_destroy", "_delete"] {
+            let close_fn = format_ident!(
+                "{}",
+                method
+                    .fn_name
+                    .replace("_init", "_close")
+                    .replace("_create", name)
+                    .replace("_add_", "_remove_")
+            );
+            let method = self
+                .methods
+                .iter()
+                .find(|m| close_fn.to_string().contains(&m.fn_name));
+            if method.is_some() {
+                close_method = method;
+                break;
+            }
+        }
+        close_method
     }
 
     fn has_default_method(&self) -> bool {
