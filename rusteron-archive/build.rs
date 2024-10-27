@@ -115,6 +115,7 @@ pub fn main() {
         .allowlist_type("aeron_.*")
         .allowlist_var("AERON_.*")
         .constified_enum_module("aeron_.*_enum")
+        .derive_debug(true)
         .generate()
         .expect("Unable to generate aeron_archive bindings");
 

@@ -117,7 +117,7 @@ pub fn main() {
         .constified_enum_module("aeron_.*_enum")
         // Some padding structures use arrays > 120 elements,
         // so we can't derive Debug implementations
-        .derive_debug(false)
+        .derive_debug(true)
         .generate()
         .expect("Unable to generate aeron_driver bindings");
 

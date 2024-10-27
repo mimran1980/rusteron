@@ -605,6 +605,7 @@ impl CWrapper {
     fn generate_fields(
         &self,
         cwrappers: &HashMap<String, CWrapper>,
+        debug_fields: &mut Vec<TokenStream>,
     ) -> Vec<proc_macro2::TokenStream> {
         self.fields
             .iter()
@@ -637,6 +638,10 @@ impl CWrapper {
                     return_type = rt.get_new_return_type(false);
                 }
                 let converter = rt.handle_c_to_rs_return(quote! { self.#fn_name }, false, true);
+
+                if !return_type.to_string().trim().ends_with("_1") {
+                    debug_fields.push(quote! { .field(stringify!(#fn_name), &self.#fn_name()) });
+                }
 
                 quote! {
                     #[inline]
@@ -1532,7 +1537,8 @@ pub fn generate_rust_code(
         })
         .collect();
 
-    let fields = wrapper.generate_fields(&wrappers);
+    let mut debug_fields = vec![];
+    let fields = wrapper.generate_fields(&wrappers, &mut debug_fields);
 
     let default_impl = if wrapper.has_default_method()
         && !constructor
@@ -1558,9 +1564,18 @@ pub fn generate_rust_code(
         #warning_code
 
         #(#class_docs)*
-        #[derive(Debug, Clone)]
+        #[derive(Clone)]
         pub struct #class_name {
             inner: std::rc::Rc<ManagedCResource<#type_name>>,
+        }
+
+        impl core::fmt::Debug for  #class_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct(stringify!(#class_name))
+                    .field("inner", &self.inner)
+                    #(#debug_fields)*
+                    .finish()
+            }
         }
 
         impl #class_name {
