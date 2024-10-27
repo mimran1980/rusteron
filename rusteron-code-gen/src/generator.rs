@@ -440,8 +440,6 @@ impl CWrapper {
                 let return_type = return_type_helper.get_new_return_type(true);
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
-                let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers);
-
                 // Filter out arguments that are `*mut` of the struct's type
                 let generic_types: Vec<proc_macro2::TokenStream> = method
                     .arguments
@@ -535,12 +533,16 @@ impl CWrapper {
                     quote! {}
                 };
 
+
+                let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers, Some(&fn_arguments) );
+
                 let mut_primitivies = method.arguments.iter()
                     .filter(|a| a.is_mut_pointer() && a.is_primitive())
                     .collect_vec();
                 let single_mut_field = method.return_type.is_c_raw_int() && mut_primitivies.len() == 1;
 
-                // in aeron some methods return error code but have &mut primitive
+
+               // in aeron some methods return error code but have &mut primitive
                 // ideally we should return that primitive instead of forcing user to pass it in
                 if single_mut_field {
                     let mut_field = mut_primitivies.first().unwrap();
@@ -557,11 +559,12 @@ impl CWrapper {
 
                     arg_names[idx] = quote! { &mut mut_result };
 
-                    let method_docs = method_docs.iter().filter(|d| !d.to_string().contains("**return**"))
+                    let method_docs = method_docs.iter()
+                        .filter(|d| !d.to_string().contains("# Return"))
                         .map(|d| {
                             let string = d.to_string();
                             if string.contains("out param") {
-                                TokenStream::from_str(&string.replace("**param**", "**return**")).unwrap()
+                                TokenStream::from_str(&string.replace("- `", "\n# Return\n")).unwrap()
                             } else {
                                 d.clone()
                             }
@@ -639,7 +642,11 @@ impl CWrapper {
                 }
                 let converter = rt.handle_c_to_rs_return(quote! { self.#fn_name }, false, true);
 
-                if !return_type.to_string().trim().ends_with("_1") {
+                if rt.original.is_primitive()
+                    || rt.original.is_c_string()
+                    || rt.original.is_byte_array()
+                    || cwrappers.contains_key(&rt.original.c_type)
+                {
                     debug_fields.push(quote! { .field(stringify!(#fn_name), &self.#fn_name()) });
                 }
 
@@ -673,8 +680,6 @@ impl CWrapper {
                     && close_method.unwrap().arguments.iter().skip(1).all(|a| method.arguments.iter().any(|a2| a.name == a2.name));
                 if found_close {
                     let close_fn = format_ident!("{}", close_method.unwrap().fn_name);
-                    let method_docs: Vec<proc_macro2::TokenStream> =
-                        get_docs(&method.docs, wrappers);
                     let init_args: Vec<proc_macro2::TokenStream> = method
                         .arguments
                         .iter()
@@ -821,6 +826,9 @@ impl CWrapper {
                         quote! { <#(#generic_types),*> }
                     };
 
+
+                    let method_docs: Vec<proc_macro2::TokenStream> =
+                        get_docs(&method.docs, wrappers, Some(&new_args));
 
                     quote! {
                         #(#method_docs)*
@@ -982,21 +990,46 @@ impl CWrapper {
     }
 }
 
-fn get_docs(docs: &HashSet<String>, wrappers: &HashMap<String, CWrapper>) -> Vec<TokenStream> {
+fn get_docs(
+    docs: &HashSet<String>,
+    wrappers: &HashMap<String, CWrapper>,
+    arguments: Option<&Vec<TokenStream>>,
+) -> Vec<TokenStream> {
+    let mut first_param = true;
     docs.iter()
         .flat_map(|d| d.lines())
+        .filter(|s| {
+            arguments.is_none()
+                || !s.contains("@param")
+                || (s.contains("@param")
+                    && arguments.unwrap().iter().any(|a| {
+                        s.contains(
+                            format!(" {}", a.to_string().split_whitespace().next().unwrap())
+                                .as_str(),
+                        )
+                    }))
+        })
         .map(|doc| {
-            let mut doc = doc
-                .replace("@param", "\n**param**")
-                .replace("@return", "\n**return**")
+            let mut doc = doc.to_string();
+            if first_param && doc.contains("@param") {
+                doc = format!("# Parameters\n");
+                first_param = false;
+            }
+
+            doc = doc
+                .replace("@return", "\n# Return\n")
                 .replace("<p>", "\n")
                 .replace("</p>", "\n");
 
+            if doc.contains("@param") {
+                doc = regex::Regex::new("@param ([^ ]+)")
+                    .unwrap()
+                    .replace(doc.as_str(), "\n - `$1`")
+                    .to_string();
+            }
+
             doc = wrappers.values().fold(doc, |acc, v| {
-                acc.replace(
-                    &v.type_name,
-                    &format!("`{}`/`{}`", v.class_name, v.type_name),
-                )
+                acc.replace(&v.type_name, &format!("`{}`", v.class_name))
             });
 
             quote! {
