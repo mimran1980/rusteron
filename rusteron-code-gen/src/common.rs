@@ -61,6 +61,7 @@ impl<T> ManagedCResource<T> {
     }
 
     /// Gets a raw pointer to the resource.
+    #[inline]
     pub fn get(&self) -> *mut T {
         self.resource
     }

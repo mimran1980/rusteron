@@ -1470,6 +1470,7 @@ pub fn generate_rust_code(
             #(#fields)*
             #(#methods)*
 
+            #[inline]
             pub fn get_inner(&self) -> *mut #type_name {
                 self.inner.get()
             }
