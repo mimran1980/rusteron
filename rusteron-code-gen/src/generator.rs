@@ -1012,21 +1012,21 @@ fn get_docs(
         .map(|doc| {
             let mut doc = doc.to_string();
             if first_param && doc.contains("@param") {
-                doc = format!("# Parameters\n");
+                doc = format!("# Parameters\n{}", doc);
                 first_param = false;
+            }
+
+            if doc.contains("@param") {
+                doc = regex::Regex::new("@param\\s+([^ ]+)")
+                    .unwrap()
+                    .replace(doc.as_str(), "\n - `$1`")
+                    .to_string();
             }
 
             doc = doc
                 .replace("@return", "\n# Return\n")
                 .replace("<p>", "\n")
                 .replace("</p>", "\n");
-
-            if doc.contains("@param") {
-                doc = regex::Regex::new("@param ([^ ]+)")
-                    .unwrap()
-                    .replace(doc.as_str(), "\n - `$1`")
-                    .to_string();
-            }
 
             doc = wrappers.values().fold(doc, |acc, v| {
                 acc.replace(&v.type_name, &format!("`{}`", v.class_name))
