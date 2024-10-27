@@ -10,7 +10,7 @@
 
 ## Project Background
 
-This project is based on a fork of [`libaeron-sys`](https://github.com/bspeice/libaeron-sys). Since it uses C bindings, **rusteron** inherently operates in an `unsafe` context. This means it requires extra caution when using, as incorrect handling can lead to undefined behavior such as segmentation faults. For example, using a publisher after the `AeronContext` has closed will result in a segmentation fault.
+This project is based on a fork of [`libaeron-sys`](https://github.com/bspeice/libaeron-sys). Since it uses C bindings, **rusteron** inherently operates in an `unsafe` context. This means it requires extra caution when using, as incorrect handling can lead to undefined behaviour such as segmentation faults. For example, using a publisher after the `Aeron` client has closed will result in a segmentation fault.
 
 The purpose of **rusteron** is to take these C bindings and generate a Rust wrapper around them to facilitate more ergonomic and performant use in Rust-based applications. Although this is not yet fully idiomatic, it provides a working bridge to the Aeron C API.
 

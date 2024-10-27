@@ -31,7 +31,7 @@ Ensure that you have also set up the necessary Aeron C libraries required by **r
 
 ## Safety Considerations
 
-Since **rusteron-archive** relies on Aeron C bindings, it uses `unsafe` Rust code. Users must ensure that resources are managed properly to avoid crashes or undefined behavior.
+Since **rusteron-archive** relies on Aeron C bindings, it uses `unsafe` Rust code. Users must ensure that resources are managed properly to avoid crashes or undefined behaviour.
 
 ## Contributing
 

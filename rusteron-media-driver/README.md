@@ -84,7 +84,7 @@ Since **rusteron-media-driver** relies on Aeron C bindings, it involves the use 
 - Resources are properly managed (e.g., starting and stopping drivers in a correct order).
 - Proper synchronisation when accessing shared data in a multithreaded environment.
 
-Improper use of the media driver can lead to crashes or other undefined behaviors.
+Improper use of the media driver can lead to crashes or other undefined behaviours.
 
 ## Contributing
 

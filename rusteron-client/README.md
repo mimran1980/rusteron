@@ -6,7 +6,7 @@
 
 The **rusteron-client** module acts as a Rust wrapper around the Aeron C client API. It offers functions for establishing connections, publishing messages, and subscribing to data streams, allowing seamless communication between distributed applications. Since it is built on top of Aeron's C bindings, this library operates in an `unsafe` context, requiring extra care from developers to ensure correctness.
 
-> **Note**: Since this module leverages Aeron C bindings, it is inherently unsafe and should be used with caution. Incorrect usage can lead to undefined behavior, such as segmentation faults.
+> **Note**: Since this module leverages Aeron C bindings, it is inherently unsafe and should be used with caution. Incorrect usage can lead to undefined behaviour, such as segmentation faults.
 
 ## Features
 
@@ -222,7 +222,7 @@ Since **rusteron-client** relies on Aeron C bindings, it involves `unsafe` Rust 
 - Resources are properly managed (e.g., not using a publisher after the Aeron client is closed).
 - Proper synchronisation when accessing shared data in a multithreaded environment.
 
-Failing to uphold these safety measures can lead to crashes or undefined behavior.
+Failing to uphold these safety measures can lead to crashes or undefined behaviour.
 
 ## Contributing
 
