@@ -30,20 +30,22 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
         }
     }
 
-    // need to filter out args which don't match
-    for wrapper in wrappers.values_mut() {
-        for method in wrapper.methods.iter_mut() {
-            for arg in method.arguments.iter_mut() {
-                if let ArgProcessing::Handler(args) = &arg.processing {
-                    let handler = args.get(0).unwrap();
-                    if !handlers.iter().any(|h| h.type_name == handler.c_type) {
-                        arg.processing = ArgProcessing::Default;
+    /*    // need to filter out args which don't match
+        for wrapper in wrappers.values_mut() {
+            for method in wrapper.methods.iter_mut() {
+                let method_debug = format!("{:?}", method);
+                for arg in method.arguments.iter_mut() {
+                    if let ArgProcessing::Handler(args) = &arg.processing {
+                        let handler = args.get(0).unwrap();
+                        if !handlers.iter().any(|h| h.type_name == handler.c_type) {
+                            println!("replacing {} back to default", method_debug);
+                            // arg.processing = ArgProcessing::Default;
+                        }
                     }
                 }
             }
         }
-    }
-
+    */
     let bindings = CBinding {
         wrappers: wrappers
             .into_iter()
@@ -54,13 +56,22 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                     "aeron_command",
                     "aeron_executor",
                     "aeron_name_resolver",
+                    "aeron_udp_channel_transport", // this one I have issues with handlers
+                    "aeron_udp_transport",         // this one I have issues with handlers
                 ]
                 .iter()
                 .any(|&filter| wrapper.type_name.starts_with(filter))
             })
             .collect(),
         methods,
-        handlers,
+        handlers: handlers
+            .into_iter()
+            .filter(|h| {
+                !["aeron_udp_channel", "aeron_udp_transport"]
+                    .iter()
+                    .any(|&filter| h.type_name.starts_with(filter))
+            })
+            .collect(),
     };
 
     let mismatched_types = bindings
@@ -99,44 +110,11 @@ fn process_c_method(
                     if wrappers.contains_key(&ty) {
                         Some(ty)
                     } else {
-                        let type_names = get_possible_wrappers(&fn_name);
-
-                        let mut value = None;
-                        for ty in type_names {
-                            if wrappers.contains_key(&ty) {
-                                value = Some(ty);
-                                break;
-                            }
-                        }
-
-                        value
+                        find_closest_wrapper_from_method_name(wrappers, &fn_name)
                     }
                 } else {
-                    let type_names = get_possible_wrappers(&fn_name);
-
-                    let mut value = None;
-                    for ty in type_names {
-                        if wrappers.contains_key(&ty) {
-                            value = Some(ty);
-                            break;
-                        }
-                    }
-
-                    value
+                    find_closest_wrapper_from_method_name(wrappers, &fn_name)
                 };
-
-                // let option = wrappers
-                //     .clone()
-                //     .iter()
-                //     .find(|(name, wrapper)| {
-                //         fn_name.starts_with(
-                //             &wrapper.without_name,
-                //         )
-                //     })
-                //     .into_iter()
-                //     .sorted_by_key(|(_, w)| w.type_name.clone())
-                //     .map(|(k, _)| k.to_string())
-                //     .last();
 
                 match option {
                     Some(key) => {
@@ -172,6 +150,23 @@ fn process_c_method(
     }
 }
 
+fn find_closest_wrapper_from_method_name(
+    wrappers: &mut HashMap<String, CWrapper>,
+    fn_name: &String,
+) -> Option<String> {
+    let type_names = get_possible_wrappers(&fn_name);
+
+    let mut value = None;
+    for ty in type_names {
+        if wrappers.contains_key(&ty) {
+            value = Some(ty);
+            break;
+        }
+    }
+
+    value
+}
+
 fn get_possible_wrappers(fn_name: &str) -> Vec<String> {
     fn_name
         .char_indices()
@@ -190,9 +185,8 @@ fn process_type(
     let docs = get_doc_comments(&ty.attrs);
 
     let type_name = ty.ident.to_string();
-    let class_name = snake_to_pascal_case(&type_name)
-        // .replace("Aeron", "")
-        ;
+    let class_name = snake_to_pascal_case(&type_name);
+
     if ty.to_token_stream().to_string().contains("_stct") {
         wrappers
             .entry(type_name.clone())
@@ -240,20 +234,19 @@ fn process_type(
                             if return_type.is_empty() {
                                 return_type = "()";
                             }
-                            if let Some(arg) = args.first() {
-                                if arg.is_c_void() {
-                                    let value = CHandler {
-                                        type_name: ty.ident.to_string(),
-                                        args: process_types(args),
-                                        return_type: Arg {
-                                            name: "".to_string(),
-                                            c_type: return_type.to_string(),
-                                            processing: ArgProcessing::Default,
-                                        },
-                                        docs: docs.clone(),
-                                    };
-                                    handlers.push(value);
-                                }
+
+                            if args.iter().filter(|a| a.is_c_void()).count() == 1 {
+                                let value = CHandler {
+                                    type_name: ty.ident.to_string(),
+                                    args: process_types(args),
+                                    return_type: Arg {
+                                        name: "".to_string(),
+                                        c_type: return_type.to_string(),
+                                        processing: ArgProcessing::Default,
+                                    },
+                                    docs: docs.clone(),
+                                };
+                                handlers.push(value);
                             }
                         }
                     }

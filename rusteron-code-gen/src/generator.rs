@@ -914,7 +914,13 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
         .map(|line| quote! { #[doc = #line] })
         .collect();
 
-    let closure = handler.args[0].name.clone();
+    let closure = handler
+        .args
+        .iter()
+        .find(|a| a.is_c_void())
+        .unwrap()
+        .name
+        .clone();
     let closure_name = format_ident!("{}", closure);
     let closure_type_name = format_ident!("{}Callback", snake_to_pascal_case(&handler.type_name));
     let closure_return_type = handler.return_type.as_type();
@@ -1069,6 +1075,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
         })
         .filter(|t| !t.is_empty())
         .collect();
+
     quote! {
         #(#doc_comments)*
         pub trait #closure_type_name {
