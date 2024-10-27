@@ -498,7 +498,7 @@ impl CWrapper {
                 let mut uses_self = false;
 
                 // Filter out argument names for the FFI call
-                let arg_names: Vec<proc_macro2::TokenStream> = method
+                let mut arg_names: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
                     .filter_map(|arg| {
@@ -535,13 +535,65 @@ impl CWrapper {
                     quote! {}
                 };
 
-                quote! {
-                    #[inline]
-                    #(#method_docs)*
-                    pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
-                        unsafe {
-                            let result = #ffi_call(#(#arg_names),*);
-                            #converter
+                let mut_primitivies = method.arguments.iter()
+                    .filter(|a| a.is_mut_pointer() && a.is_primitive())
+                    .collect_vec();
+                let single_mut_field = method.return_type.is_c_raw_int() && mut_primitivies.len() == 1;
+
+                // in aeron some methods return error code but have &mut primitive
+                // ideally we should return that primitive instead of forcing user to pass it in
+                if single_mut_field {
+                    let mut_field = mut_primitivies.first().unwrap();
+                    let rt: Type = parse_str(mut_field.c_type.split_whitespace().last().unwrap()).unwrap();
+                    let return_type = quote! { Result<#rt, AeronCError> };
+
+                    let fn_arguments= fn_arguments.into_iter().filter(|arg| {!arg.to_string().contains("& mut ")})
+                        .collect_vec();
+
+                    let idx = arg_names.iter().enumerate()
+                        .filter(|(_, arg)| arg.to_string().ends_with("* mut _"))
+                        .map(|(i, _)| i)
+                        .next().unwrap();
+
+                    arg_names[idx] = quote! { &mut mut_result };
+
+                    let method_docs = method_docs.iter().filter(|d| !d.to_string().contains("**return**"))
+                        .map(|d| {
+                            let string = d.to_string();
+                            if string.contains("out param") {
+                                TokenStream::from_str(&string.replace("**param**", "**return**")).unwrap()
+                            } else {
+                                d.clone()
+                            }
+                        })
+                        .collect_vec();
+
+                    quote! {
+                        #[inline]
+                        #(#method_docs)*
+                        pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
+                            unsafe {
+                                let mut mut_result: #rt = Default::default();
+                                let err_code = #ffi_call(#(#arg_names),*);
+
+                                if err_code < 0 {
+                                    return Err(AeronCError::from_code(err_code));
+                                } else {
+
+                                    return Ok(mut_result);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        #[inline]
+                        #(#method_docs)*
+                        pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
+                            unsafe {
+                                let result = #ffi_call(#(#arg_names),*);
+                                #converter
+                            }
                         }
                     }
                 }

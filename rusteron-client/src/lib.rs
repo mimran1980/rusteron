@@ -229,7 +229,7 @@ mod tests {
                             AeronCError::from_code(result as i32)
                         );
                     } else {
-                        buffer.data_mut().write_all(&msg).unwrap();
+                        buffer.data().write_all(&msg).unwrap();
                         buffer.commit().unwrap();
                         println!("send message [result={}]", result);
                     }
@@ -306,7 +306,7 @@ mod tests {
              registration_id: i64,
              counter_id: i32| {
                 println!("on counter {:?} {counters_reader:?}, registration_id={registration_id}, counter_id={counter_id}, value={}", counters_reader.get_counter_label(counter_id, 1000), counters_reader.addr(counter_id));
-                assert_eq!(counters_reader.get_counter_registration_id(counter_id).unwrap(), registration_id);
+                assert_eq!(counters_reader.counter_registration_id(counter_id).unwrap(), registration_id);
                 if let Ok(label) = counters_reader.get_counter_label(counter_id, 1000) {
                     if label == "test_counter" {
                         found_counter = true;

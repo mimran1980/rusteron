@@ -180,7 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if result < msg.len() as i64 {
                 eprintln!("ERROR: failed to send message {:?}", AeronCError::from_code(result as i32));
             } else {
-                buffer.data_mut().write_all(&msg).unwrap();
+                buffer.data().write_all(&msg).unwrap();
                 buffer.commit().unwrap();
                 println!("Sent message [result={}]", result);
             }
