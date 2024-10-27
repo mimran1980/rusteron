@@ -47,6 +47,8 @@ mod tests {
 
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
 
+        assert!(Aeron::epoch_clock() > 0);
+
         Ok(())
     }
 
@@ -150,7 +152,6 @@ mod tests {
 
         loop {
             let c = count.load(Ordering::SeqCst);
-            println!("count {c:?}");
             if c > 100 {
                 break;
             }

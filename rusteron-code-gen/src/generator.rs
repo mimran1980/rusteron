@@ -474,6 +474,8 @@ impl CWrapper {
                     .filter(|t| !t.is_empty())
                     .collect();
 
+                let mut uses_self = false;
+
                 // Filter out argument names for the FFI call
                 let arg_names: Vec<proc_macro2::TokenStream> = method
                     .arguments
@@ -488,6 +490,7 @@ impl CWrapper {
                         if let Some(_matching_wrapper) = wrappers.get(t) {
                             let field_name = arg.as_ident();
                             if ty.ends_with(self.type_name.as_str()) {
+                                uses_self = true;
                                 Some(quote! { self.get_inner() })
                             } else {
                                 Some(quote! { #field_name.get_inner() })
@@ -505,10 +508,16 @@ impl CWrapper {
 
                 let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, true);
 
+                let possible_self = if uses_self || return_type.to_string().eq("& str") {
+                    quote! { &self, }
+                } else {
+                    quote! {}
+                };
+
                 quote! {
                     #[inline]
                     #(#method_docs)*
-                    pub fn #fn_name #where_clause(&self, #(#fn_arguments),*) -> #return_type {
+                    pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
                         unsafe {
                             let result = #ffi_call(#(#arg_names),*);
                             #converter
@@ -1418,9 +1427,11 @@ pub fn generate_rust_code(
             );
         }
 
-        code.push_str("
-                pub type aeron_client_registering_resource_t = aeron_client_registering_resource_stct;
-");
+        code.push_str(
+            "
+                type aeron_client_registering_resource_t = aeron_client_registering_resource_stct;
+",
+        );
 
         TokenStream::from_str(code.as_str()).unwrap()
     };
