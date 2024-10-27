@@ -9,20 +9,6 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
     // set the directory
     // ctx.set_dir(media_driver_ctx.get_dir())?;
 
-    let mut error_count = 1;
-    let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-        eprintln!("aeron error {}: {}", error_code, msg);
-        error_count += 1;
-    });
-    ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
-    ctx.set_on_new_publication(Some(&Handler::leak(AeronNewPublicationLogger)))?;
-    ctx.set_on_available_counter(Some(&Handler::leak(AeronAvailableCounterLogger)))?;
-    ctx.set_on_close_client(Some(&Handler::leak(AeronCloseClientLogger)))?;
-    ctx.set_on_new_subscription(Some(&Handler::leak(AeronNewSubscriptionLogger)))?;
-    ctx.set_on_unavailable_counter(Some(&Handler::leak(AeronUnavailableCounterLogger)))?;
-    ctx.set_on_available_counter(Some(&Handler::leak(AeronAvailableCounterLogger)))?;
-    ctx.set_on_new_exclusive_publication(Some(&Handler::leak(AeronNewPublicationLogger)))?;
-
     println!("creating client");
     let aeron = Aeron::new(ctx)?;
     println!("starting client");
@@ -41,19 +27,17 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
             Handlers::no_available_image_handler(),
             Handlers::no_unavailable_image_handler(),
         )?
-        .poll_blocking(Duration::from_secs(5))
-        .unwrap();
+        .poll_blocking(Duration::from_secs(5))?;
     println!("created subscription");
 
     // pick a large enough size to confirm fragment assembler is working
-    let string_len = 1024 * 1024;
-    println!("string length: {}", string_len);
+    let large_string_len = 1024 * 1024;
+    println!("string length: {}", large_string_len);
 
     let _publisher_handler = {
         std::thread::spawn(move || loop {
-            println!("sending message");
             if publisher.offer(
-                "1".repeat(string_len).as_bytes(),
+                "1".repeat(large_string_len).as_bytes(),
                 Handlers::no_reserved_value_supplier_handler(),
             ) < 1
             {
@@ -70,9 +54,10 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
             msg.len()
         );
         count.set(count.get() + 1);
-        assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
+        assert_eq!(msg.as_slice(), "1".repeat(large_string_len).as_bytes())
     });
-    let closure = Handler::leak(closure);
+    // if you don't need fragmentation support use Handler::leak instead
+    let closure = Handler::leak_with_fragment_assembler(closure)?;
 
     loop {
         if count.get() > 100 {
