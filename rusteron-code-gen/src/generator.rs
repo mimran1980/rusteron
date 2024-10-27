@@ -57,6 +57,7 @@ impl Arg {
     const C_INT_RETURN_TYPE_STR: &'static str = ":: std :: os :: raw :: c_int";
     const C_CHAR_STR: &'static str = "* const :: std :: os :: raw :: c_char";
     const C_BYTE_ARRAY: &'static str = "* const u8";
+    const C_BYTE_MUT_ARRAY: &'static str = "* mut u8";
     const STAR_MUT: &'static str = "* mut";
     const DOUBLE_STAR_MUT: &'static str = "* mut * mut";
     const C_VOID: &'static str = "* mut :: std :: os :: raw :: c_void";
