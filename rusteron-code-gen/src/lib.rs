@@ -127,7 +127,12 @@ mod tests {
                 .class_name
         );
         // dbg!(bindings.wrappers.iter().filter(|(_,w)|w.methods.iter().any(|m|m.fn_name.ends_with("_poll")) ).next());
-        assert_eq!(0, bindings.methods.len());
+        assert_eq!(
+            0,
+            bindings.methods.len(),
+            "expected all methods to have been matched {:#?}",
+            bindings.methods
+        );
 
         // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
 

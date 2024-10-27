@@ -89,25 +89,17 @@ fn process_c_method(
                 let args = extract_function_arguments(&f.sig.inputs);
                 let ret = extract_return_type(&f.sig.output);
 
-                let option = if let Some((_name, ty)) = args.first() {
+                let option = if let Some(arg) = args
+                    .iter()
+                    .skip_while(|a| a.is_mut_pointer() && a.is_primitive())
+                    .next()
+                {
+                    let ty = &arg.c_type;
                     let ty = ty.split(' ').last().map(|t| t.to_string()).unwrap();
                     if wrappers.contains_key(&ty) {
                         Some(ty)
                     } else {
-                        let type_names = fn_name
-                            .split('_')
-                            .collect::<Vec<&str>>()
-                            .iter()
-                            .rev()
-                            .scan(String::new(), |acc, &s| {
-                                if acc.is_empty() {
-                                    *acc = s.to_string();
-                                } else {
-                                    *acc = s.to_string() + "_" + &acc;
-                                }
-                                Some(s.to_string() + "_t")
-                            })
-                            .collect_vec();
+                        let type_names = get_possible_wrappers(&fn_name);
 
                         let mut value = None;
                         for ty in type_names {
@@ -120,20 +112,7 @@ fn process_c_method(
                         value
                     }
                 } else {
-                    let type_names = fn_name
-                        .split('_')
-                        .collect::<Vec<&str>>()
-                        .iter()
-                        .rev()
-                        .scan(String::new(), |acc, &s| {
-                            if acc.is_empty() {
-                                *acc = s.to_string();
-                            } else {
-                                *acc = s.to_string() + "_" + &acc;
-                            }
-                            Some(s.to_string() + "_t")
-                        })
-                        .collect_vec();
+                    let type_names = get_possible_wrappers(&fn_name);
 
                     let mut value = None;
                     for ty in type_names {
@@ -193,6 +172,15 @@ fn process_c_method(
     }
 }
 
+fn get_possible_wrappers(fn_name: &str) -> Vec<String> {
+    fn_name
+        .char_indices()
+        .filter(|(_, c)| *c == '_')
+        .map(|(i, _)| format!("{}_t", &fn_name[..i]))
+        .rev()
+        .collect_vec()
+}
+
 fn process_type(
     wrappers: &mut HashMap<String, CWrapper>,
     handlers: &mut Vec<CHandler>,
@@ -225,7 +213,7 @@ fn process_type(
                         if let Some(syn::GenericArgument::Type(syn::Type::BareFn(bare_fn))) =
                             args.args.first()
                         {
-                            let args: Vec<(String, String)> = bare_fn
+                            let args: Vec<Arg> = bare_fn
                                 .inputs
                                 .iter()
                                 .map(|arg| {
@@ -235,6 +223,11 @@ fn process_type(
                                     };
                                     let arg_type = arg.ty.to_token_stream().to_string();
                                     (arg_name, arg_type)
+                                })
+                                .map(|(field_name, field_type)| Arg {
+                                    name: field_name,
+                                    c_type: field_type,
+                                    processing: ArgProcessing::Default,
                                 })
                                 .collect();
                             let string = bare_fn.output.to_token_stream().to_string();
@@ -247,8 +240,8 @@ fn process_type(
                             if return_type.is_empty() {
                                 return_type = "()";
                             }
-                            if let Some((_name, cvoid)) = args.first() {
-                                if cvoid.ends_with("c_void") {
+                            if let Some(arg) = args.first() {
+                                if arg.is_c_void() {
                                     let value = CHandler {
                                         type_name: ty.ident.to_string(),
                                         args: process_types(args),
@@ -276,13 +269,18 @@ fn process_struct(wrappers: &mut HashMap<String, CWrapper>, s: &ItemStruct) {
     let type_name = s.ident.to_string().replace("_stct", "_t");
     let class_name = snake_to_pascal_case(&type_name);
 
-    let fields: Vec<(String, String)> = s
+    let fields: Vec<Arg> = s
         .fields
         .iter()
         .map(|f| {
             let field_name = f.ident.as_ref().unwrap().to_string();
             let field_type = f.ty.to_token_stream().to_string();
             (field_name, field_type)
+        })
+        .map(|(field_name, field_type)| Arg {
+            name: field_name,
+            c_type: field_type,
+            processing: ArgProcessing::Default,
         })
         .collect();
 
@@ -296,28 +294,19 @@ fn process_struct(wrappers: &mut HashMap<String, CWrapper>, s: &ItemStruct) {
     w.fields = process_types(fields);
 }
 
-fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
-    let mut result = name_and_type
-        .into_iter()
-        .map(|(name, ty)| Arg {
-            name,
-            c_type: ty,
-            processing: ArgProcessing::Default,
-        })
-        .collect_vec();
-
+fn process_types(mut name_and_type: Vec<Arg>) -> Vec<Arg> {
     // now mark arguments which can be reduced
-    for i in 1..result.len() {
-        let param1 = &result[i - 1];
-        let param2 = &result[i];
+    for i in 1..name_and_type.len() {
+        let param1 = &name_and_type[i - 1];
+        let param2 = &name_and_type[i];
 
         if param2.is_c_void() && !param1.is_mut_pointer() && param1.c_type.ends_with("_t") {
             // closures
             //         handler: aeron_on_available_counter_t,
             //         clientd: *mut ::std::os::raw::c_void,
             let processing = ArgProcessing::Handler(vec![param1.clone(), param2.clone()]);
-            result[i - 1].processing = processing.clone();
-            result[i].processing = processing.clone();
+            name_and_type[i - 1].processing = processing.clone();
+            name_and_type[i].processing = processing.clone();
         } else if param1.is_c_string()
             && !param1.is_mut_pointer()
             && (param2.c_type == "usize" || param2.c_type == "i32")
@@ -326,8 +315,8 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
             //     pub stripped_channel: *mut ::std::os::raw::c_char,
             //     pub stripped_channel_length: usize,
             let processing = ArgProcessing::StringWithLength(vec![param1.clone(), param2.clone()]);
-            result[i - 1].processing = processing.clone();
-            result[i].processing = processing.clone();
+            name_and_type[i - 1].processing = processing.clone();
+            name_and_type[i].processing = processing.clone();
         } else if param1.is_byte_array()
             && !param1.is_mut_pointer()
             && (param2.c_type == "usize" || param2.c_type == "i32")
@@ -337,14 +326,14 @@ fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
             //         key_buffer_length: usize,
             let processing =
                 ArgProcessing::ByteArrayWithLength(vec![param1.clone(), param2.clone()]);
-            result[i - 1].processing = processing.clone();
-            result[i].processing = processing.clone();
+            name_and_type[i - 1].processing = processing.clone();
+            name_and_type[i].processing = processing.clone();
         }
 
         //
     }
 
-    result
+    name_and_type
 }
 
 // Helper function to extract doc comments
@@ -393,7 +382,7 @@ pub fn snake_to_pascal_case(mut snake: &str) -> String {
 // Helper function to extract function arguments as Rust code
 fn extract_function_arguments(
     inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
-) -> Vec<(String, String)> {
+) -> Vec<Arg> {
     inputs
         .iter()
         .map(|arg| match arg {
@@ -405,6 +394,11 @@ fn extract_function_arguments(
                 .map(|s| s.trim().to_string())
                 .collect_tuple()
                 .unwrap()
+        })
+        .map(|(name, ty)| Arg {
+            name,
+            c_type: ty,
+            processing: ArgProcessing::Default,
         })
         .collect_vec()
 }

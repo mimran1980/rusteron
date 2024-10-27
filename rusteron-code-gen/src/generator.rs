@@ -45,7 +45,7 @@ pub struct Arg {
 }
 
 impl Arg {
-    fn is_primitive(&self) -> bool {
+    pub fn is_primitive(&self) -> bool {
         static PRIMITIVE_TYPES: &[&str] = &[
             "i64", "u64", "f32", "f64", "i32", "i16", "u32", "u16", "bool", "usize", "isize",
         ];
