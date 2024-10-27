@@ -1,3 +1,4 @@
+use crate::get_possible_wrappers;
 #[allow(unused_imports)]
 use crate::snake_to_pascal_case;
 use itertools::Itertools;
@@ -700,7 +701,7 @@ impl CWrapper {
                         .enumerate()
                         .map(|(idx, arg)| {
                             if idx == 0 {
-                                quote! { ctx }
+                                quote! { ctx_field }
                             } else {
                                 let arg_name = arg.as_ident();
                                 quote! { #arg_name }
@@ -716,9 +717,9 @@ impl CWrapper {
                         .map(|(idx, arg)| {
                             if idx == 0 {
                                 if arg.is_double_mut_pointer() {
-                                    quote! { ctx }
+                                    quote! { ctx_field }
                                 } else {
-                                    quote! { *ctx }
+                                    quote! { *ctx_field }
                                 }
                             } else {
                                 let arg_name = arg.as_ident();
@@ -852,8 +853,8 @@ impl CWrapper {
                                 #(#drop_copies);*
                             })));
                             let resource_constructor = ManagedCResource::new(
-                                move |ctx| unsafe { #init_fn(#(#init_args),*) },
-                                move |ctx| {
+                                move |ctx_field| unsafe { #init_fn(#(#init_args),*) },
+                                move |ctx_field| {
                                     let result = unsafe { #close_fn(#(#close_args),*) };
                                     if let Some(drop_closure) = drop_copies_closure.borrow_mut().take() {
                                        drop_closure();
@@ -884,14 +885,14 @@ impl CWrapper {
                 #[inline]
                 pub fn new_zeroed() -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
-                        move |ctx| {
+                        move |ctx_field| {
                             println!("creating zeroed empty resource {}", stringify!(#type_name));
                             let inst: #type_name = unsafe { std::mem::zeroed() };
                             let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
-                            unsafe { *ctx = inner_ptr };
+                            unsafe { *ctx_field = inner_ptr };
                             0
                         },
-                        move |_ctx| { 0 },
+                        move |_ctx_field| { 0 },
                         true
                     )?;
 
@@ -946,13 +947,13 @@ impl CWrapper {
                     #[inline]
                     pub fn new #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
                         let r_constructor = ManagedCResource::new(
-                            move |ctx| {
+                            move |ctx_field| {
                                 let inst = #type_name { #(#init_args),* };
                                 let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
-                                unsafe { *ctx = inner_ptr };
+                                unsafe { *ctx_field = inner_ptr };
                                 0
                             },
-                            move |_ctx| { 0 },
+                            move |_ctx_field| { 0 },
                             true
                         )?;
 
@@ -1295,7 +1296,9 @@ pub fn generate_rust_code(
     let methods = wrapper.generate_methods(wrappers);
     let constructor = wrapper.generate_constructor(wrappers);
 
-    let async_impls = if wrapper.type_name.starts_with("aeron_async_") {
+    let async_impls = if wrapper.type_name.starts_with("aeron_async_")
+        || wrapper.type_name.starts_with("aeron_archive_async_")
+    {
         let new_method = wrapper
             .methods
             .iter()
@@ -1306,7 +1309,11 @@ pub fn generate_rust_code(
                 .type_name
                 .replace("_async_", "_")
                 .replace("_add_", "_");
-            let main = wrappers.get(main_type).unwrap();
+            let main = get_possible_wrappers(main_type)
+                .iter()
+                .filter_map(|f| wrappers.get(f))
+                .next()
+                .expect(&format!("failed to find main type {}", main_type));
 
             let poll_method = main
                 .methods
@@ -1347,7 +1354,7 @@ pub fn generate_rust_code(
                 .enumerate()
                 .filter_map(|(idx, arg)| {
                     if idx == 0 {
-                        Some(quote! { ctx })
+                        Some(quote! { ctx_field })
                     } else {
                         let arg_name = arg.as_ident();
                         let arg_name = ReturnType::new(arg.clone(), wrappers.clone())
@@ -1385,7 +1392,7 @@ pub fn generate_rust_code(
                 .enumerate()
                 .filter_map(|(idx, arg)| {
                     if idx == 0 {
-                        Some(quote! { ctx })
+                        Some(quote! { ctx_field })
                     } else {
                         let arg_name = arg.as_ident();
                         let arg_name = ReturnType::new(arg.clone(), wrappers.clone())
@@ -1473,10 +1480,10 @@ pub fn generate_rust_code(
                 #[inline]
                 pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
-                        move |ctx| unsafe {
+                        move |ctx_field| unsafe {
                             #poll_method_name(#(#init_args),*)
                         },
-                        move |_ctx| {
+                        move |_ctx_field| {
                             // TODO is there any cleanup to do
                             0
                         },
@@ -1499,10 +1506,10 @@ pub fn generate_rust_code(
                 #[inline]
                 pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
                     let resource_async = ManagedCResource::new(
-                        move |ctx| unsafe {
+                        move |ctx_field| unsafe {
                             #new_method_name(#(#async_init_args),*)
                         },
-                        move |_ctx| {
+                        move |_ctx_field| {
                             // TODO is there any cleanup to do
                             0
                         },

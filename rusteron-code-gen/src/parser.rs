@@ -167,7 +167,7 @@ fn find_closest_wrapper_from_method_name(
     value
 }
 
-fn get_possible_wrappers(fn_name: &str) -> Vec<String> {
+pub fn get_possible_wrappers(fn_name: &str) -> Vec<String> {
     fn_name
         .char_indices()
         .filter(|(_, c)| *c == '_')
