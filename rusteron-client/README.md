@@ -15,6 +15,7 @@ The **rusteron-client** module acts as a Rust wrapper around the Aeron C client 
 - **Subscription**: Receive messages from Aeron channels.
 - **Callbacks**: Handle events such as new publications, new subscriptions, and errors.
 - **Automatic Resource Management**: Resources are automatically managed, except for handlers, which require manual management.
+- Updated methods with a single mutable out primitive to return `Result<primitive, AeronCError>`, enhancing usability and consistency by encapsulating return values and error handling.
 
 ## General Patterns
 
