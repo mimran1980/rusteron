@@ -5,7 +5,7 @@ use quote::ToTokens;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use syn::{Attribute, Item, Lit, Meta, MetaNameValue};
+use syn::{Attribute, Item, ItemForeignMod, ItemStruct, ItemType, Lit, Meta, MetaNameValue};
 
 pub fn parse_bindings(out: &PathBuf) -> CBinding {
     let file_content = fs::read_to_string(out.clone()).expect("Unable to read file");
@@ -18,240 +18,13 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
     for item in syntax_tree.items {
         match item {
             Item::Struct(s) => {
-                // Print the struct name and its doc comments
-                let docs = get_doc_comments(&s.attrs);
-                let type_name = s.ident.to_string().replace("_stct", "_t");
-                let class_name = snake_to_pascal_case(&type_name)
-                    // .replace("Aeron", "")
-                    ;
-
-                let fields: Vec<(String, String)> = s
-                    .fields
-                    .iter()
-                    .map(|f| {
-                        let field_name = f.ident.as_ref().unwrap().to_string();
-                        let field_type = f.ty.to_token_stream().to_string();
-                        (field_name, field_type)
-                    })
-                    .collect();
-
-                let w = wrappers.entry(type_name.to_string()).or_insert(CWrapper {
-                    class_name,
-                    without_name: type_name[..type_name.len() - 2].to_string(),
-                    type_name,
-                    ..Default::default()
-                });
-                w.docs.extend(docs);
-                w.fields = process_types(fields);
+                process_struct(&mut wrappers, &s);
             }
-            // Item::Fn(f) => {
-            //     // Extract Rust functions (if any)
-            //     let docs = get_doc_comments(&f.attrs);
-            //     let fn_name = f.sig.ident.to_string();
-            //
-            //     // Get function arguments and return type as Rust code
-            //     let args = extract_function_arguments(&f.sig.inputs);
-            //     let ret = extract_return_type(&f.sig.output);
-            //
-            //
-            //     for wrapper in wrappers.values() {
-            //         let t = &wrapper.type_name[..wrapper.type_name.len() - 1];
-            //         if fn_name.starts_with(t) {
-            //             panic!("{:?}", wrapper)
-            //         }
-            //     }
-            // }
             Item::Type(ty) => {
-                // Handle type definitions and get docs
-                let docs = get_doc_comments(&ty.attrs);
-
-                let type_name = ty.ident.to_string();
-                let class_name = snake_to_pascal_case(&type_name)
-                    // .replace("Aeron", "")
-                    ;
-                if ty.to_token_stream().to_string().contains("_stct") {
-                    wrappers
-                        .entry(type_name.clone())
-                        .or_insert(CWrapper {
-                            class_name,
-                            without_name: type_name[..type_name.len() - 2].to_string(),
-                            type_name,
-                            ..Default::default()
-                        })
-                        .docs
-                        .extend(docs);
-                } else {
-                    // Parse the function pointer type
-                    if let syn::Type::Path(type_path) = &*ty.ty {
-                        if let Some(segment) = type_path.path.segments.last() {
-                            if segment.ident.to_string() == "Option" {
-                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-                                {
-                                    if let Some(syn::GenericArgument::Type(syn::Type::BareFn(
-                                        bare_fn,
-                                    ))) = args.args.first()
-                                    {
-                                        let args: Vec<(String, String)> = bare_fn
-                                            .inputs
-                                            .iter()
-                                            .map(|arg| {
-                                                let arg_name = match &arg.name {
-                                                    Some((ident, _)) => ident.to_string(),
-                                                    None => "".to_string(),
-                                                };
-                                                let arg_type = arg.ty.to_token_stream().to_string();
-                                                (arg_name, arg_type)
-                                            })
-                                            .collect();
-                                        let string = bare_fn.output.to_token_stream().to_string();
-                                        let mut return_type = string.trim();
-
-                                        if return_type.starts_with("-> ") {
-                                            return_type = &return_type[3..];
-                                        }
-
-                                        if return_type.is_empty() {
-                                            return_type = "()";
-                                        }
-                                        if let Some((_name, cvoid)) = args.first() {
-                                            if cvoid.ends_with("c_void") {
-                                                let value = CHandler {
-                                                    type_name: ty.ident.to_string(),
-                                                    args: process_types(args),
-                                                    return_type: Arg {
-                                                        name: "".to_string(),
-                                                        c_type: return_type.to_string(),
-                                                        processing: ArgProcessing::Default,
-                                                    },
-                                                    docs: docs.clone(),
-                                                };
-                                                handlers.push(value);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                process_type(&mut wrappers, &mut handlers, &ty);
             }
             Item::ForeignMod(fm) => {
-                // Extract functions inside extern "C" blocks
-                if fm.abi.name.is_some() && fm.abi.name.as_ref().unwrap().value() == "C" {
-                    for foreign_item in fm.items {
-                        if let syn::ForeignItem::Fn(f) = foreign_item {
-                            let docs = get_doc_comments(&f.attrs);
-                            let fn_name = f.sig.ident.to_string();
-
-                            // Get function arguments and return type as Rust code
-                            let args = extract_function_arguments(&f.sig.inputs);
-                            let ret = extract_return_type(&f.sig.output);
-
-                            let option = if let Some((_name, ty)) = args.first() {
-                                let ty = ty.split(' ').last().map(|t| t.to_string()).unwrap();
-                                if wrappers.contains_key(&ty) {
-                                    Some(ty)
-                                } else {
-                                    let type_names = fn_name
-                                        .split('_')
-                                        .collect::<Vec<&str>>()
-                                        .iter()
-                                        .rev()
-                                        .scan(String::new(), |acc, &s| {
-                                            if acc.is_empty() {
-                                                *acc = s.to_string();
-                                            } else {
-                                                *acc = s.to_string() + "_" + &acc;
-                                            }
-                                            Some(s.to_string() + "_t")
-                                        })
-                                        .collect_vec();
-
-                                    let mut value = None;
-                                    for ty in type_names {
-                                        if wrappers.contains_key(&ty) {
-                                            value = Some(ty);
-                                            break;
-                                        }
-                                    }
-
-                                    value
-                                }
-                            } else {
-                                let type_names = fn_name
-                                    .split('_')
-                                    .collect::<Vec<&str>>()
-                                    .iter()
-                                    .rev()
-                                    .scan(String::new(), |acc, &s| {
-                                        if acc.is_empty() {
-                                            *acc = s.to_string();
-                                        } else {
-                                            *acc = s.to_string() + "_" + &acc;
-                                        }
-                                        Some(s.to_string() + "_t")
-                                    })
-                                    .collect_vec();
-
-                                let mut value = None;
-                                for ty in type_names {
-                                    if wrappers.contains_key(&ty) {
-                                        value = Some(ty);
-                                        break;
-                                    }
-                                }
-
-                                value
-                            };
-
-                            // let option = wrappers
-                            //     .clone()
-                            //     .iter()
-                            //     .find(|(name, wrapper)| {
-                            //         fn_name.starts_with(
-                            //             &wrapper.without_name,
-                            //         )
-                            //     })
-                            //     .into_iter()
-                            //     .sorted_by_key(|(_, w)| w.type_name.clone())
-                            //     .map(|(k, _)| k.to_string())
-                            //     .last();
-
-                            match option {
-                                Some(key) => {
-                                    let wrapper = wrappers.get_mut(&key).unwrap();
-                                    wrapper.methods.push(Method {
-                                        fn_name: fn_name.clone(),
-                                        struct_method_name: fn_name
-                                            .replace(
-                                                &wrapper.type_name[..wrapper.type_name.len() - 1],
-                                                "",
-                                            )
-                                            .to_string(),
-                                        return_type: Arg {
-                                            name: "".to_string(),
-                                            c_type: ret.clone(),
-                                            processing: ArgProcessing::Default,
-                                        },
-                                        arguments: process_types(args.clone()),
-                                        docs: docs.clone(),
-                                    });
-                                }
-                                None => methods.push(Method {
-                                    fn_name: fn_name.clone(),
-                                    struct_method_name: "".to_string(),
-                                    return_type: Arg {
-                                        name: "".to_string(),
-                                        c_type: ret.clone(),
-                                        processing: ArgProcessing::Default,
-                                    },
-                                    arguments: process_types(args.clone()),
-                                    docs: docs.clone(),
-                                }),
-                            }
-                        }
-                    }
-                }
+                process_c_method(&mut wrappers, &mut methods, fm);
             }
             _ => {}
         }
@@ -298,6 +71,229 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
         .collect_vec();
     assert_eq!(Vec::<(String, CWrapper)>::new(), mismatched_types);
     bindings
+}
+
+fn process_c_method(
+    wrappers: &mut HashMap<String, CWrapper>,
+    methods: &mut Vec<Method>,
+    fm: ItemForeignMod,
+) {
+    // Extract functions inside extern "C" blocks
+    if fm.abi.name.is_some() && fm.abi.name.as_ref().unwrap().value() == "C" {
+        for foreign_item in fm.items {
+            if let syn::ForeignItem::Fn(f) = foreign_item {
+                let docs = get_doc_comments(&f.attrs);
+                let fn_name = f.sig.ident.to_string();
+
+                // Get function arguments and return type as Rust code
+                let args = extract_function_arguments(&f.sig.inputs);
+                let ret = extract_return_type(&f.sig.output);
+
+                let option = if let Some((_name, ty)) = args.first() {
+                    let ty = ty.split(' ').last().map(|t| t.to_string()).unwrap();
+                    if wrappers.contains_key(&ty) {
+                        Some(ty)
+                    } else {
+                        let type_names = fn_name
+                            .split('_')
+                            .collect::<Vec<&str>>()
+                            .iter()
+                            .rev()
+                            .scan(String::new(), |acc, &s| {
+                                if acc.is_empty() {
+                                    *acc = s.to_string();
+                                } else {
+                                    *acc = s.to_string() + "_" + &acc;
+                                }
+                                Some(s.to_string() + "_t")
+                            })
+                            .collect_vec();
+
+                        let mut value = None;
+                        for ty in type_names {
+                            if wrappers.contains_key(&ty) {
+                                value = Some(ty);
+                                break;
+                            }
+                        }
+
+                        value
+                    }
+                } else {
+                    let type_names = fn_name
+                        .split('_')
+                        .collect::<Vec<&str>>()
+                        .iter()
+                        .rev()
+                        .scan(String::new(), |acc, &s| {
+                            if acc.is_empty() {
+                                *acc = s.to_string();
+                            } else {
+                                *acc = s.to_string() + "_" + &acc;
+                            }
+                            Some(s.to_string() + "_t")
+                        })
+                        .collect_vec();
+
+                    let mut value = None;
+                    for ty in type_names {
+                        if wrappers.contains_key(&ty) {
+                            value = Some(ty);
+                            break;
+                        }
+                    }
+
+                    value
+                };
+
+                // let option = wrappers
+                //     .clone()
+                //     .iter()
+                //     .find(|(name, wrapper)| {
+                //         fn_name.starts_with(
+                //             &wrapper.without_name,
+                //         )
+                //     })
+                //     .into_iter()
+                //     .sorted_by_key(|(_, w)| w.type_name.clone())
+                //     .map(|(k, _)| k.to_string())
+                //     .last();
+
+                match option {
+                    Some(key) => {
+                        let wrapper = wrappers.get_mut(&key).unwrap();
+                        wrapper.methods.push(Method {
+                            fn_name: fn_name.clone(),
+                            struct_method_name: fn_name
+                                .replace(&wrapper.type_name[..wrapper.type_name.len() - 1], "")
+                                .to_string(),
+                            return_type: Arg {
+                                name: "".to_string(),
+                                c_type: ret.clone(),
+                                processing: ArgProcessing::Default,
+                            },
+                            arguments: process_types(args.clone()),
+                            docs: docs.clone(),
+                        });
+                    }
+                    None => methods.push(Method {
+                        fn_name: fn_name.clone(),
+                        struct_method_name: "".to_string(),
+                        return_type: Arg {
+                            name: "".to_string(),
+                            c_type: ret.clone(),
+                            processing: ArgProcessing::Default,
+                        },
+                        arguments: process_types(args.clone()),
+                        docs: docs.clone(),
+                    }),
+                }
+            }
+        }
+    }
+}
+
+fn process_type(
+    wrappers: &mut HashMap<String, CWrapper>,
+    handlers: &mut Vec<CHandler>,
+    ty: &ItemType,
+) {
+    // Handle type definitions and get docs
+    let docs = get_doc_comments(&ty.attrs);
+
+    let type_name = ty.ident.to_string();
+    let class_name = snake_to_pascal_case(&type_name)
+        // .replace("Aeron", "")
+        ;
+    if ty.to_token_stream().to_string().contains("_stct") {
+        wrappers
+            .entry(type_name.clone())
+            .or_insert(CWrapper {
+                class_name,
+                without_name: type_name[..type_name.len() - 2].to_string(),
+                type_name,
+                ..Default::default()
+            })
+            .docs
+            .extend(docs);
+    } else {
+        // Parse the function pointer type -> it is typically used for handlers/callbacks
+        if let syn::Type::Path(type_path) = &*ty.ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident.to_string() == "Option" {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        if let Some(syn::GenericArgument::Type(syn::Type::BareFn(bare_fn))) =
+                            args.args.first()
+                        {
+                            let args: Vec<(String, String)> = bare_fn
+                                .inputs
+                                .iter()
+                                .map(|arg| {
+                                    let arg_name = match &arg.name {
+                                        Some((ident, _)) => ident.to_string(),
+                                        None => "".to_string(),
+                                    };
+                                    let arg_type = arg.ty.to_token_stream().to_string();
+                                    (arg_name, arg_type)
+                                })
+                                .collect();
+                            let string = bare_fn.output.to_token_stream().to_string();
+                            let mut return_type = string.trim();
+
+                            if return_type.starts_with("-> ") {
+                                return_type = &return_type[3..];
+                            }
+
+                            if return_type.is_empty() {
+                                return_type = "()";
+                            }
+                            if let Some((_name, cvoid)) = args.first() {
+                                if cvoid.ends_with("c_void") {
+                                    let value = CHandler {
+                                        type_name: ty.ident.to_string(),
+                                        args: process_types(args),
+                                        return_type: Arg {
+                                            name: "".to_string(),
+                                            c_type: return_type.to_string(),
+                                            processing: ArgProcessing::Default,
+                                        },
+                                        docs: docs.clone(),
+                                    };
+                                    handlers.push(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn process_struct(wrappers: &mut HashMap<String, CWrapper>, s: &ItemStruct) {
+    // Print the struct name and its doc comments
+    let docs = get_doc_comments(&s.attrs);
+    let type_name = s.ident.to_string().replace("_stct", "_t");
+    let class_name = snake_to_pascal_case(&type_name);
+
+    let fields: Vec<(String, String)> = s
+        .fields
+        .iter()
+        .map(|f| {
+            let field_name = f.ident.as_ref().unwrap().to_string();
+            let field_type = f.ty.to_token_stream().to_string();
+            (field_name, field_type)
+        })
+        .collect();
+
+    let w = wrappers.entry(type_name.to_string()).or_insert(CWrapper {
+        class_name,
+        without_name: type_name[..type_name.len() - 2].to_string(),
+        type_name,
+        ..Default::default()
+    });
+    w.docs.extend(docs);
+    w.fields = process_types(fields);
 }
 
 fn process_types(name_and_type: Vec<(String, String)>) -> Vec<Arg> {
