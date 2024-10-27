@@ -311,7 +311,7 @@ fn process_types(mut name_and_type: Vec<Arg>) -> Vec<Arg> {
             name_and_type[i - 1].processing = processing.clone();
             name_and_type[i].processing = processing.clone();
         } else if param1.is_byte_array()
-            && !param1.is_mut_pointer()
+            // && !param1.is_mut_pointer()
             && (param2.c_type == "usize" || param2.c_type == "i32")
             && param2.name.contains("length")
         {

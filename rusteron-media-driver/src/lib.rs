@@ -155,8 +155,8 @@ mod tests {
 
         client.start()?;
         println!("aeron driver started");
-        assert!(client.epoch_clock() > 0);
-        assert!(client.nano_clock() > 0);
+        assert!(Aeron::epoch_clock() > 0);
+        assert!(Aeron::nano_clock() > 0);
 
         let counter_async =
             AeronAsyncAddCounter::new(client.clone(), 2543543, "12312312".as_bytes(), "abcd")?;

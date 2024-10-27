@@ -67,7 +67,11 @@ impl Arg {
     }
 
     pub fn is_byte_array(&self) -> bool {
-        self.c_type == Self::C_BYTE_ARRAY
+        self.c_type == Self::C_BYTE_ARRAY || self.c_type == Self::C_BYTE_MUT_ARRAY
+    }
+
+    pub fn is_mut_byte_array(&self) -> bool {
+        self.c_type == Self::C_BYTE_MUT_ARRAY
     }
 
     pub fn is_c_raw_int(&self) -> bool {
@@ -156,7 +160,11 @@ impl ReturnType {
         } else if let ArgProcessing::ByteArrayWithLength(_) = self.original.processing {
             if self.original.name.len() > 0 {
                 if self.original.is_byte_array() {
-                    return quote! { &[u8] };
+                    if self.original.is_mut_byte_array() {
+                        return quote! { &mut [u8] };
+                    } else {
+                        return quote! { &[u8] };
+                    }
                 } else {
                     return quote! {};
                 }
@@ -200,6 +208,7 @@ impl ReturnType {
         &self,
         result: proc_macro2::TokenStream,
         convert_errors: bool,
+        use_self: bool,
     ) -> proc_macro2::TokenStream {
         if let ArgProcessing::StringWithLength(_) = &self.original.processing {
             if !self.original.is_c_string() {
@@ -212,9 +221,20 @@ impl ReturnType {
             } else {
                 let star_const = &args[0].as_ident();
                 let length = &args[1].as_ident();
-                return quote! {
-                    std::slice::from_raw_parts(#star_const, #length)
+                let me = if use_self {
+                    quote! {self.}
+                } else {
+                    quote! {}
                 };
+                if self.original.is_mut_byte_array() {
+                    return quote! {
+                        unsafe { std::slice::from_raw_parts_mut(#me #star_const, #me #length.try_into().unwrap()) }
+                    };
+                } else {
+                    return quote! {
+                        std::slice::from_raw_parts(#me #star_const, #me #length)
+                    };
+                }
             }
         }
 
@@ -346,12 +366,12 @@ impl ReturnType {
                 let length_name = handler_client.get(1).unwrap().as_ident();
                 if include_field_name {
                     return quote! {
-                    #array_name: #array_name.as_ptr(),
+                    #array_name: #array_name.as_ptr() as *mut _,
                     #length_name: #array_name.len()
                     };
                 } else {
                     return quote! {
-                        #array_name.as_ptr(),
+                        #array_name.as_ptr() as *mut _,
                         #array_name.len()
                     };
                 }
@@ -507,7 +527,7 @@ impl CWrapper {
                     .filter(|t| !t.is_empty())
                     .collect();
 
-                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, true);
+                let converter = return_type_helper.handle_c_to_rs_return(quote! { result }, true, false);
 
                 let possible_self = if uses_self || return_type.to_string().eq("& str") {
                     quote! { &self, }
@@ -547,15 +567,24 @@ impl CWrapper {
                 let field_name = &arg.name;
                 let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
 
-                let rt = ReturnType::new(
-                    Arg {
-                        processing: ArgProcessing::Default,
-                        ..arg.clone()
-                    },
-                    cwrappers.clone(),
-                );
-                let return_type = rt.get_new_return_type(false);
-                let converter = rt.handle_c_to_rs_return(quote! { self.#fn_name }, false);
+                let mut rt = ReturnType::new(arg.clone(), cwrappers.clone());
+                let mut return_type = rt.get_new_return_type(false);
+                let handler = if let ArgProcessing::Handler(_) = &arg.processing {
+                    true
+                } else {
+                    false
+                };
+                if return_type.is_empty() || handler {
+                    rt = ReturnType::new(
+                        Arg {
+                            processing: ArgProcessing::Default,
+                            ..arg.clone()
+                        },
+                        cwrappers.clone(),
+                    );
+                    return_type = rt.get_new_return_type(false);
+                }
+                let converter = rt.handle_c_to_rs_return(quote! { self.#fn_name }, false, true);
 
                 quote! {
                     #[inline]
@@ -971,7 +1000,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             let arg_name = arg.as_ident();
             if name != &closure {
                 let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
-                Some(return_type.handle_c_to_rs_return(quote! {#arg_name}, false))
+                Some(return_type.handle_c_to_rs_return(quote! {#arg_name}, false, false))
             } else {
                 None
             }
