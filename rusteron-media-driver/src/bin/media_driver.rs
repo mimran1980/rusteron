@@ -39,8 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let client = Aeron::new(ctx)?;
         client.start()?;
 
-        assert!(client.epoch_clock() > 0);
-        assert!(client.nano_clock() > 0);
+        assert!(Aeron::epoch_clock() > 0);
+        assert!(Aeron::nano_clock() > 0);
         let result = AeronAsyncAddPublication::new(client.clone(), "aeron:ipc", 32)?;
 
         loop {
