@@ -559,17 +559,31 @@ impl CWrapper {
 
                     arg_names[idx] = quote! { &mut mut_result };
 
-                    let method_docs = method_docs.iter()
+                    let mut first = true;
+                    let mut method_docs = method_docs.iter()
                         .filter(|d| !d.to_string().contains("# Return"))
                         .map(|d| {
-                            let string = d.to_string();
+                            let mut string = d.to_string();
+                            string = string.replace("# Parameters", "");
                             if string.contains("out param") {
-                                TokenStream::from_str(&string.replace("- `", "\n# Return\n")).unwrap()
+                                TokenStream::from_str(&string.replace("- `", "\n# Return\n`")).unwrap()
                             } else {
-                                d.clone()
+                                if string.contains("- `") && first {
+                                    first = false;
+                                    string = string.replacen("- `","# Parameters\n- `", 1);
+                                }
+                                TokenStream::from_str(&string).unwrap()
                             }
                         })
                         .collect_vec();
+
+                    let filter_param_title = !method_docs.iter().any(|d| d.to_string().contains("- `"));
+
+                    if filter_param_title {
+                        method_docs = method_docs.into_iter()
+                            .map(|s| TokenStream::from_str(s.to_string().replace("# Parameters\n", "").as_str()).unwrap())
+                            .collect_vec();
+                    }
 
                     quote! {
                         #[inline]
