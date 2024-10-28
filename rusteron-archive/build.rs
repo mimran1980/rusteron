@@ -28,8 +28,8 @@ impl LinkType {
 
     fn target_name(&self) -> &'static str {
         match self {
-            LinkType::Dynamic => "aeron",
-            LinkType::Static => "aeron_static",
+            LinkType::Dynamic => "aeron_archive_c_client",
+            LinkType::Static => "aeron_archive_c_client_static",
         }
     }
 }
@@ -43,7 +43,7 @@ pub fn main() {
     }
 
     let aeron_path = canonicalize(Path::new("./aeron")).unwrap();
-    let header_path = aeron_path.join("aeron-archive/src/main/c/client");
+    let header_path = aeron_path.join("aeron-archive/src/main/c");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let link_type = LinkType::detect();
@@ -110,6 +110,7 @@ pub fn main() {
             "-I{}",
             aeron_path.join("aeron-client/src/main/c").display()
         ))
+        .clang_arg("-DAERON_USE_SHARED_LIBS")
         .header("bindings.h")
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")
@@ -151,6 +152,4 @@ pub fn main() {
         &format_with_rustfmt(&stream.to_string()).unwrap(),
     )
     .unwrap();
-
-    // panic!("{}", aeron.to_str().unwrap());
 }

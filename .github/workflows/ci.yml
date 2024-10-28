@@ -40,7 +40,14 @@ jobs:
 
       - name: Install dependencies on Ubuntu
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y uuid-dev
+        run: |
+          sudo apt-get update && sudo apt-get install -y uuid-dev
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Check formatting
         run: cargo fmt --all -- --check
