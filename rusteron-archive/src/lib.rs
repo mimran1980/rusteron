@@ -19,6 +19,8 @@ include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread::sleep;
+    use std::time::Duration;
 
     #[test]
     fn version_check() {
@@ -33,8 +35,13 @@ mod tests {
 
     #[test]
     pub fn test_failed_connect() {
+        println!("creating archive");
         let ctx = AeronArchiveContext::new().unwrap();
+        sleep(Duration::from_secs(1));
+        println!("setting timeout");
         ctx.set_message_timeout_ns(1).unwrap();
+        sleep(Duration::from_secs(1));
+        println!("trying async connect");
         let connect = AeronArchiveAsyncConnect::new(ctx);
         assert_eq!(
             Some(AeronErrorType::NullOrNotConnected.into()),

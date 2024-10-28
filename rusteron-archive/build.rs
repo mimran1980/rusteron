@@ -65,18 +65,7 @@ pub fn main() {
         link_type.target_name_base()
     );
 
-    if cfg!(target_os = "macos") {
-        println!(
-            "cargo:rustc-link-arg=-Wl,-force_load,{}{}",
-            link_type.link_lib(),
-            link_type.target_name()
-        );
-        println!(
-            "cargo:rustc-link-arg=-Wl,-force_load,{}{}",
-            link_type.link_lib(),
-            link_type.target_name_base()
-        );
-    } else if cfg!(target_os = "linux") {
+    if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
     } else if cfg!(target_os = "windows") {
         println!("cargo:rustc-link-arg=/FORCE:MULTIPLE");
@@ -103,7 +92,7 @@ pub fn main() {
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")
-        // .define("BUILD_SHARED_LIBS", "OFF")
+        .define("BUILD_SHARED_LIBS", "ON")
         .build_target(link_type.target_name())
         .build();
 
@@ -138,7 +127,7 @@ pub fn main() {
     println!("cargo:include={}", header_path.display());
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", header_path.display()))
-        // We need to include some of the headers from `rusteron`, so update the include path here
+        // We need to include some of the headers from `aeron c client`, so update the include path here
         .clang_arg(format!(
             "-I{}",
             aeron_path.join("aeron-client/src/main/c").display()
@@ -147,7 +136,6 @@ pub fn main() {
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")
         .allowlist_var("AERON_.*")
-        .blocklist_function("aeron_semantic_version_.*")
         .constified_enum_module("aeron_.*_enum")
         .derive_debug(true)
         .generate()
