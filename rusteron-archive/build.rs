@@ -65,6 +65,11 @@ pub fn main() {
         link_type.target_name_base()
     );
 
+    // not 100% sure about this one, have issue that aeron client and archiver has similar function names e.g. version
+    // Allow undefined symbols, and ignore multiple symbol definitions for testing purposes
+    println!("cargo:rustc-link-arg=-Wl,-undefined,dynamic_lookup");
+    println!("cargo:rustc-link-arg=-Wl,-flat_namespace");
+
     if let LinkType::Static = link_type {
         // On Windows, there are some extra libraries needed for static link
         // that aren't included by Aeron.
@@ -85,23 +90,6 @@ pub fn main() {
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")
-        // Disable building shared libraries if static is selected
-        .define(
-            "BUILD_SHARED_LIBS",
-            if link_type == LinkType::Static {
-                "OFF"
-            } else {
-                "ON"
-            },
-        )
-        .define(
-            "AERON_USE_SHARED_LIBS",
-            if link_type == LinkType::Static {
-                "OFF"
-            } else {
-                "ON"
-            },
-        )
         .build_target(link_type.target_name())
         .build();
 
