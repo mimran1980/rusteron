@@ -86,6 +86,7 @@ pub fn main() {
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")
         .define("BUILD_SHARED_LIBS", "ON")
+        .define("AERON_USE_SHARED_LIBS", "ON")
         .build_target(link_type.target_name())
         .build();
 
@@ -126,6 +127,7 @@ pub fn main() {
             aeron_path.join("aeron-client/src/main/c").display()
         ))
         .clang_arg("-DAERON_USE_SHARED_LIBS")
+        .clang_arg("-DBUILD_SHARED_LIBS")
         .header("bindings.h")
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")

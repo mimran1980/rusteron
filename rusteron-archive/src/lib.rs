@@ -33,7 +33,9 @@ mod tests {
 
     #[test]
     pub fn test_failed_connect() {
-        let connect = AeronArchiveAsyncConnect::new(AeronArchiveContext::new().unwrap());
+        let ctx = AeronArchiveContext::new().unwrap();
+        ctx.set_message_timeout_ns(100_000).unwrap();
+        let connect = AeronArchiveAsyncConnect::new(ctx);
         assert_eq!(
             Some(AeronErrorType::NullOrNotConnected.into()),
             connect.err()
