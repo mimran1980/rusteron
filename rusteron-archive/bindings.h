@@ -1,5 +1,5 @@
 #include <stddef.h>
-//#include <client/aeron_archive.h>
+#include <client/aeron_archive.h>
 //#include <concurrent/aeron_atomic.h>
 //#include <concurrent/aeron_blocking_linked_queue.h>
 //#include <concurrent/aeron_broadcast_descriptor.h>
