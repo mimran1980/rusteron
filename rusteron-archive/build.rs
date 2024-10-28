@@ -59,13 +59,11 @@ pub fn main() {
         link_type.link_lib(),
         link_type.target_name()
     );
-    if link_type == LinkType::Static {
-        println!(
-            "cargo:rustc-link-lib={}{}",
-            link_type.link_lib(),
-            link_type.target_name_base()
-        );
-    }
+    println!(
+        "cargo:rustc-link-lib={}{}",
+        link_type.link_lib(),
+        link_type.target_name_base()
+    );
 
     if let LinkType::Static = link_type {
         // On Windows, there are some extra libraries needed for static link
