@@ -23,7 +23,7 @@ release:
   cargo build --all-targets --release
 
 run-aeron-archive:
-    java -cp ./rusteron-archive/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.archive.control.channel=aeron:udp?endpoint=localhost:8010 -Daeron.archive.replication.channel=aeron:udp?endpoint=localhost:0 -Daeron.archive.control.response.channel=aeron:udp?endpoint=localhost:0
+    java -cp ./rusteron-archive/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.archive.control.channel=aeron:udp?endpoint=localhost:8010 -Daeron.archive.replication.channel=aeron:udp?endpoint=localhost:0 -Daeron.archive.control.response.channel=aeron:udp?endpoint=localhost:0 io.aeron.archive.ArchivingMediaDriver
 
 docs:
   cargo clean --doc

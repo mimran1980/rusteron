@@ -42,7 +42,7 @@ mod tests {
         ctx.set_message_timeout_ns(1).unwrap();
         sleep(Duration::from_secs(1));
         println!("trying async connect");
-        let connect = AeronArchiveAsyncConnect::new(ctx);
+        let connect = AeronArchiveAsyncConnect::new(ctx.clone());
         assert_eq!(
             Some(AeronErrorType::NullOrNotConnected.into()),
             connect.err()
