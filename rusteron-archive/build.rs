@@ -135,6 +135,7 @@ pub fn main() {
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")
         .allowlist_var("AERON_.*")
+        .blocklist_function("aeron_semantic_version_.*")
         .constified_enum_module("aeron_.*_enum")
         .derive_debug(true)
         .generate()
