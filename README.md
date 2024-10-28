@@ -130,7 +130,7 @@ Special thanks to the authors of the original [`libaeron-sys`](https://github.co
 ## Links
 
 - [Documentation on docs.rs](https://docs.rs/rusteron-client/)
-- [API Reference](https://mimran1980.github.io/rusteron)
+- [API Reference on github](https://mimran1980.github.io/rusteron)
 - [GitHub Repository](https://github.com/mimran1980/rusteron)
 
 ---

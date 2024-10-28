@@ -79,7 +79,9 @@ pub fn main() {
     let cmake_output = Config::new(&aeron_path)
         .define("BUILD_AERON_DRIVER", "OFF")
         .define("BUILD_AERON_ARCHIVE_API", "ON")
-        .define("CMAKE_OSX_ARCHITECTURES", "arm64") // Explicitly specify arm64
+        // needed for mac os
+        .define("CMAKE_OSX_ARCHITECTURES", "arm64")
+        .define("CMAKE_OSX_DEPLOYMENT_TARGET", "14.0")
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")

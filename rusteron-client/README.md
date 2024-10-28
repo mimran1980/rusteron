@@ -246,6 +246,7 @@ This project is dual-licensed under either the [MIT License](https://opensource.
 ## Links
 
 - [Documentation on docs.rs](https://docs.rs/rusteron-client/)
+- [API Reference on github](https://mimran1980.github.io/rusteron/rusteron_client)
 - [GitHub Repository](https://github.com/mimran1980/rusteron)
 
 Feel free to reach out with any questions or suggestions via GitHub Issues!
