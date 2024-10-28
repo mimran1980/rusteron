@@ -33,12 +33,12 @@ impl LinkType {
             LinkType::Static => "aeron_archive_c_client_static",
         }
     }
-    // fn target_name_base(&self) -> &'static str {
-    //     match self {
-    //         LinkType::Dynamic => "aeron",
-    //         LinkType::Static => "aeron_static",
-    //     }
-    // }
+    fn target_name_base(&self) -> &'static str {
+        match self {
+            LinkType::Dynamic => "aeron",
+            LinkType::Static => "aeron_static",
+        }
+    }
 }
 
 pub fn main() {
@@ -59,11 +59,13 @@ pub fn main() {
         link_type.link_lib(),
         link_type.target_name()
     );
-    // println!(
-    //     "cargo:rustc-link-lib={}{}",
-    //     link_type.link_lib(),
-    //     link_type.target_name_base()
-    // );
+    if link_type == LinkType::Static {
+        println!(
+            "cargo:rustc-link-lib={}{}",
+            link_type.link_lib(),
+            link_type.target_name_base()
+        );
+    }
 
     if let LinkType::Static = link_type {
         // On Windows, there are some extra libraries needed for static link
