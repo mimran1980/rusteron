@@ -125,6 +125,7 @@ pub fn main() {
             "-I{}",
             aeron_path.join("aeron-client/src/main/c").display()
         ))
+        .clang_arg("-DAERON_USE_SHARED_LIBS")
         .header("bindings.h")
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")
