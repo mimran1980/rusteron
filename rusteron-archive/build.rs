@@ -85,8 +85,23 @@ pub fn main() {
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")
-        .define("BUILD_SHARED_LIBS", "ON")
-        .define("AERON_USE_SHARED_LIBS", "ON")
+        // Disable building shared libraries if static is selected
+        .define(
+            "BUILD_SHARED_LIBS",
+            if link_type == LinkType::Static {
+                "OFF"
+            } else {
+                "ON"
+            },
+        )
+        .define(
+            "AERON_USE_SHARED_LIBS",
+            if link_type == LinkType::Static {
+                "OFF"
+            } else {
+                "ON"
+            },
+        )
         .build_target(link_type.target_name())
         .build();
 
@@ -126,8 +141,6 @@ pub fn main() {
             "-I{}",
             aeron_path.join("aeron-client/src/main/c").display()
         ))
-        .clang_arg("-DAERON_USE_SHARED_LIBS")
-        .clang_arg("-DBUILD_SHARED_LIBS")
         .header("bindings.h")
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")
