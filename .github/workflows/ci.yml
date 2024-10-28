@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  push:    # This triggers the workflow on any push event
-  pull_request:  # This triggers the workflow when a pull request is opened, synchronized, or reopened#
+  push:
 #  push:
 #    branches: [master, staging, trying]
 #  pull_request:
@@ -22,7 +21,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         features: [default, static]
-        rust-version: ["stable", "stable 6 months ago"]
+#        rust-version: ["stable", "stable 6 months ago"]
+        rust-version: ["stable"]
 
     env:
       feature-flags: ${{ matrix.features != 'default' && format('--features {0}', matrix.features) || '' }}

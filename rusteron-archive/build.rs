@@ -118,6 +118,11 @@ pub fn main() {
         base_lib_dir.join("binaries/Release").display()
     );
 
+    println!(
+        "cargo:rustc-env=LD_LIBRARY_PATH={}",
+        base_lib_dir.join("lib").display()
+    );
+
     println!("cargo:include={}", header_path.display());
     let bindings = bindgen::Builder::default()
         .clang_arg(format!("-I{}", header_path.display()))
