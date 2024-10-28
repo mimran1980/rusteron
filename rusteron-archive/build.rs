@@ -5,6 +5,7 @@ use rusteron_code_gen::{append_to_file, format_with_rustfmt};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+#[derive(Eq, PartialEq)]
 pub enum LinkType {
     Dynamic,
     Static,
@@ -80,7 +81,6 @@ pub fn main() {
         .define("BUILD_AERON_DRIVER", "OFF")
         .define("BUILD_AERON_ARCHIVE_API", "ON")
         // needed for mac os
-        .define("CMAKE_OSX_ARCHITECTURES", "arm64")
         .define("CMAKE_OSX_DEPLOYMENT_TARGET", "14.0")
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
@@ -124,7 +124,6 @@ pub fn main() {
             "-I{}",
             aeron_path.join("aeron-client/src/main/c").display()
         ))
-        .clang_arg("-DAERON_USE_SHARED_LIBS")
         .header("bindings.h")
         .allowlist_function("aeron_.*")
         .allowlist_type("aeron_.*")
