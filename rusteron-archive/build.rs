@@ -66,7 +66,16 @@ pub fn main() {
     );
 
     if cfg!(target_os = "macos") {
-        println!("cargo:rustc-link-arg=-Wl,-force_load");
+        println!(
+            "cargo:rustc-link-arg=-Wl,-force_load,{}{}",
+            link_type.link_lib(),
+            link_type.target_name()
+        );
+        println!(
+            "cargo:rustc-link-arg=-Wl,-force_load,{}{}",
+            link_type.link_lib(),
+            link_type.target_name_base()
+        );
     } else if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
     } else if cfg!(target_os = "windows") {

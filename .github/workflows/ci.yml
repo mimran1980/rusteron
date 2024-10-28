@@ -56,8 +56,7 @@ jobs:
 #      - name: Check clippy lints
 #        run: cargo clippy --all ${{ env.feature-flags }} -- --deny warnings
 
-      - name: Build
-        run: cargo build ${{ env.feature-flags }}
-
-      - name: Test
-        run: cargo test --all --all-targets ${{ env.feature-flags }}
+      - name: Build and Test
+        run: |
+          cargo build ${{ env.feature-flags }}
+          cargo test --all --all-targets ${{ env.feature-flags }}
