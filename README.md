@@ -31,13 +31,21 @@ Community feedback and contributions are welcome to improve its functionality an
 
 The library is divided into several modules, each focusing on specific parts of Aeron's functionality:
 
-- **rusteron-code-gen**: This module is responsible for generating the Rust wrapper from the raw C bindings. It helps maintain a clean and repeatable way to bridge between the two languages.
+- **[rusteron-code-gen](https://github.com/mimran1980/rusteron/tree/main/rusteron-code-gen)**: This module is
+  responsible for generating the Rust wrapper from the raw C bindings. It helps maintain a clean and repeatable way to
+  bridge between the two languages.
 
-- **rusteron-client**: Provides core client functionalities for interacting with the Aeron protocol, such as establishing connections, subscribing, and publishing. It uses the Aeron C bindings from aeron-client module.
+- **[rusteron-client](https://github.com/mimran1980/rusteron/tree/main/rusteron-client)**: Provides core client
+  functionalities for interacting with the Aeron protocol, such as establishing connections, subscribing, and
+  publishing. It uses the Aeron C bindings from aeron-client module.
 
-- **rusterion-archive**: Extends the Aeron client to include archiving features, such as recording streams and handling replay capabilities. It uses the Aeron C bindings from aeron-archive module.
+- **[rusteron-archive](https://github.com/mimran1980/rusteron/tree/main/rusteron-archive)**: Extends the Aeron client to
+  include archiving features, such as recording streams and handling replay capabilities. It uses the Aeron C bindings
+  from aeron-archive module.
 
-- **rusteron-media-driver**: Implements the Aeron Media Driver, a core component for managing messaging between producers and consumers. It uses the Aeron C bindings from aeron-driver module.
+- **[rusteron-media-driver](https://github.com/mimran1980/rusteron/tree/main/rusteron-media-driver)**: Implements the
+  Aeron Media Driver, a core component for managing messaging between producers and consumers. It uses the Aeron C
+  bindings from aeron-driver module.
 
 ## Installation
 
