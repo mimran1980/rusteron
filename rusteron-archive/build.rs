@@ -54,21 +54,22 @@ pub fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let link_type = LinkType::detect();
+    if cfg!(target_os = "linux") {
+        println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+    }
     println!(
         "cargo:rustc-link-lib={}{}",
         link_type.link_lib(),
         link_type.target_name()
     );
+    if cfg!(target_os = "linux") {
+        println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
+    }
     println!(
         "cargo:rustc-link-lib={}{}",
         link_type.link_lib(),
         link_type.target_name_base()
     );
-
-    // not 100% sure about this one, have issue that aeron client and archiver has similar function names e.g. version
-    // Allow undefined symbols, and ignore multiple symbol definitions for testing purposes
-    println!("cargo:rustc-link-arg=-Wl,-undefined,dynamic_lookup");
-    println!("cargo:rustc-link-arg=-Wl,-flat_namespace");
 
     if let LinkType::Static = link_type {
         // On Windows, there are some extra libraries needed for static link
