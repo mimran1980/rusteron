@@ -54,17 +54,11 @@ pub fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     let link_type = LinkType::detect();
-    if cfg!(target_os = "linux") {
-        println!("cargo:rustc-link-arg=-Wl,--whole-archive");
-    }
     println!(
         "cargo:rustc-link-lib={}{}",
         link_type.link_lib(),
         link_type.target_name()
     );
-    if cfg!(target_os = "linux") {
-        println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
-    }
     println!(
         "cargo:rustc-link-lib={}{}",
         link_type.link_lib(),
@@ -84,6 +78,7 @@ pub fn main() {
     }
 
     let cmake_output = Config::new(&aeron_path)
+        .define("CMAKE_C_FLAGS", "-fcommon")
         .define("BUILD_AERON_DRIVER", "OFF")
         .define("BUILD_AERON_ARCHIVE_API", "ON")
         // needed for mac os
@@ -91,6 +86,7 @@ pub fn main() {
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")
+        .define("BUILD_SHARED_LIBS", "ON")
         .build_target(link_type.target_name())
         .build();
 
