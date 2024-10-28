@@ -224,6 +224,11 @@ Since **rusteron-client** relies on Aeron C bindings, it involves `unsafe` Rust 
 
 Failing to uphold these safety measures can lead to crashes or undefined behaviour.
 
+
+## Building This Project Instructions
+
+For detailed instructions on how to build **rusteron**, please refer to the [HOW_TO_BUILD.md](../HOW_TO_BUILD.md) file.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to open issues, submit pull requests, or suggest new features. We're particularly interested in:

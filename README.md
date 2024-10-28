@@ -46,6 +46,8 @@ Add the following line to your `Cargo.toml` to include the specific **rusteron**
 - **rusteron-archive**: For Aeron client with archive capabilities.
 - **rusteron-media-driver**: For the Aeron media driver.
 
+For detailed instructions on how to build **rusteron-archive**, please refer to the [HOW_TO_BUILD.md](./HOW_TO_BUILD.md) file.
+
 ```toml
 [dependencies]
 rusteron-client = "0.1"

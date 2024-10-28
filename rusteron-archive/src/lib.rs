@@ -19,7 +19,6 @@ include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
     fn version_check() {
@@ -34,9 +33,10 @@ mod tests {
 
     #[test]
     pub fn test_failed_connect() {
-        let result = AeronArchiveAsyncConnect::new(AeronArchiveContext::new().unwrap())
-            .unwrap()
-            .poll_blocking(Duration::from_secs(1));
-        println!("archive id is {}", result.unwrap().get_archive_id());
+        let connect = AeronArchiveAsyncConnect::new(AeronArchiveContext::new().unwrap());
+        assert_eq!(
+            Some(AeronErrorType::NullOrNotConnected.into()),
+            connect.err()
+        );
     }
 }

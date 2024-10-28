@@ -86,6 +86,10 @@ Since **rusteron-media-driver** relies on Aeron C bindings, it involves the use 
 
 Improper use of the media driver can lead to crashes or other undefined behaviours.
 
+## Building This Project Instructions
+
+For detailed instructions on how to build **rusteron**, please refer to the [HOW_TO_BUILD.md](../HOW_TO_BUILD.md) file.
+
 ## Contributing
 
 Contributions are more than welcome! Please see our [contributing guidelines](https://github.com/mimran1980/rusteron/blob/main/CONTRIBUTING.md) for more information on how to get involved.

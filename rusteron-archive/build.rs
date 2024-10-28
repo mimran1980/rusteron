@@ -32,6 +32,12 @@ impl LinkType {
             LinkType::Static => "aeron_archive_c_client_static",
         }
     }
+    fn target_name_base(&self) -> &'static str {
+        match self {
+            LinkType::Dynamic => "aeron",
+            LinkType::Static => "aeron_static",
+        }
+    }
 }
 
 pub fn main() {
@@ -52,6 +58,11 @@ pub fn main() {
         link_type.link_lib(),
         link_type.target_name()
     );
+    println!(
+        "cargo:rustc-link-lib={}{}",
+        link_type.link_lib(),
+        link_type.target_name_base()
+    );
 
     if let LinkType::Static = link_type {
         // On Windows, there are some extra libraries needed for static link
@@ -68,6 +79,7 @@ pub fn main() {
     let cmake_output = Config::new(&aeron_path)
         .define("BUILD_AERON_DRIVER", "OFF")
         .define("BUILD_AERON_ARCHIVE_API", "ON")
+        .define("CMAKE_OSX_ARCHITECTURES", "arm64") // Explicitly specify arm64
         .define("AERON_TESTS", "OFF")
         .define("AERON_BUILD_SAMPLES", "OFF")
         .define("AERON_BUILD_DOCUMENTATION", "OFF")

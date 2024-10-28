@@ -33,6 +33,11 @@ Ensure that you have also set up the necessary Aeron C libraries required by **r
 
 Since **rusteron-archive** relies on Aeron C bindings, it uses `unsafe` Rust code. Users must ensure that resources are managed properly to avoid crashes or undefined behaviour.
 
+
+## Building This Project Instructions
+
+For detailed instructions on how to build **rusteron**, please refer to the [HOW_TO_BUILD.md](../HOW_TO_BUILD.md) file.
+
 ## Contributing
 
 Contributions are welcome! Please see our [contributing guidelines](https://github.com/mimran1980/rusteron/blob/main/CONTRIBUTING.md) for more information on how to get involved.

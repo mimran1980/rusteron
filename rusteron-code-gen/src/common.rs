@@ -183,6 +183,7 @@ impl AeronErrorType {
 ///
 /// The error code is derived from Aeron C API calls.
 /// Use `get_message()` to retrieve a human-readable message, if available.
+#[derive(Eq, PartialEq)]
 pub struct AeronCError {
     pub code: i32,
 }
