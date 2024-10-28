@@ -1,5 +1,6 @@
 # Rusteron
 
+[![Crates.io](https://img.shields.io/crates/v/aeron-rs)](https://crates.io/crates/rusteron-client)
 [![github-ci](https://github.com/mimran1980/rusteron/actions/workflows/ci.yml/badge.svg)](https://github.com/amoskvin/rusteron/actions/workflows/ci.yml)
 [![docs.rs](https://docs.rs/rusteron/badge.svg)](https://docs.rs/rusteron-client/)
 [![github docs](https://custom-icon-badges.demolab.com/badge/docs-blue.svg?logo=log&logoSource=feather)](https://mimran1980.github.io/rusteron)
