@@ -65,6 +65,14 @@ pub fn main() {
         link_type.target_name_base()
     );
 
+    if cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-arg=-Wl,-force_load");
+    } else if cfg!(target_os = "linux") {
+        println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
+    } else if cfg!(target_os = "windows") {
+        println!("cargo:rustc-link-arg=/FORCE:MULTIPLE");
+    }
+
     if let LinkType::Static = link_type {
         // On Windows, there are some extra libraries needed for static link
         // that aren't included by Aeron.
