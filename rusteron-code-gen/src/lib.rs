@@ -3,6 +3,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::all)]
 #![allow(unused_unsafe)]
+#![allow(unused_variables)]
 #![doc = include_str!("../README.md")]
 
 mod common;

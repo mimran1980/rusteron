@@ -1624,6 +1624,7 @@ pub fn generate_rust_code(
         #![allow(non_camel_case_types)]
         #![allow(non_snake_case)]
         #![allow(clippy::all)]
+        #![allow(unused_variables)]
         #![allow(unused_unsafe)]
 ",
             );
