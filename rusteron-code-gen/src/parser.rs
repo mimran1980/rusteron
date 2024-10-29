@@ -293,6 +293,10 @@ fn process_types(mut name_and_type: Vec<Arg>) -> Vec<Arg> {
         let param1 = &name_and_type[i - 1];
         let param2 = &name_and_type[i];
 
+        let is_int = param2.c_type == "usize" || param2.c_type == "i32";
+        let length_field = param2.name == "length"
+            || param2.name == "len"
+            || (param2.name.ends_with("_length") && param2.name.starts_with(&param1.name));
         if param2.is_c_void() && !param1.is_mut_pointer() && param1.c_type.ends_with("_t") {
             // closures
             //         handler: aeron_on_available_counter_t,
@@ -300,11 +304,7 @@ fn process_types(mut name_and_type: Vec<Arg>) -> Vec<Arg> {
             let processing = ArgProcessing::Handler(vec![param1.clone(), param2.clone()]);
             name_and_type[i - 1].processing = processing.clone();
             name_and_type[i].processing = processing.clone();
-        } else if param1.is_c_string()
-            && !param1.is_mut_pointer()
-            && (param2.c_type == "usize" || param2.c_type == "i32")
-            && param2.name.contains("length")
-        {
+        } else if param1.is_c_string() && !param1.is_mut_pointer() && is_int && length_field {
             //     pub stripped_channel: *mut ::std::os::raw::c_char,
             //     pub stripped_channel_length: usize,
             let processing = ArgProcessing::StringWithLength(vec![param1.clone(), param2.clone()]);
@@ -312,8 +312,8 @@ fn process_types(mut name_and_type: Vec<Arg>) -> Vec<Arg> {
             name_and_type[i].processing = processing.clone();
         } else if param1.is_byte_array()
             // && !param1.is_mut_pointer()
-            && (param2.c_type == "usize" || param2.c_type == "i32")
-            && param2.name.contains("length")
+            && is_int
+            && length_field
         {
             //         key_buffer: *const u8,
             //         key_buffer_length: usize,
