@@ -148,7 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let ctx = AeronContext::new()?;
     ctx.set_dir(media_driver_ctx.get_dir())?;
-    let aeron = Aeron::new(ctx)?;
+    let aeron = Aeron::new(&ctx)?;
     aeron.start()?;
     
     // Set up the publication

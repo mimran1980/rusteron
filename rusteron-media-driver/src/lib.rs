@@ -45,7 +45,7 @@ impl AeronDriver {
         let started2 = started.clone();
 
         let handle = std::thread::spawn(move || {
-            let aeron_driver = AeronDriver::new(aeron_context.clone())?;
+            let aeron_driver = AeronDriver::new(&aeron_context)?;
             aeron_driver.start(true)?;
 
             println!(
@@ -114,7 +114,7 @@ mod tests {
         let ctx = AeronContext::new()?;
         ctx.set_dir(&dir)?;
 
-        let client = Aeron::new(ctx.clone())?;
+        let client = Aeron::new(&ctx)?;
         let mut error_count = 0;
 
         let error_handler = Some(Handler::leak(AeronErrorHandlerClosure::from(
@@ -159,14 +159,14 @@ mod tests {
         assert!(Aeron::nano_clock() > 0);
 
         let counter_async =
-            AeronAsyncAddCounter::new(client.clone(), 2543543, "12312312".as_bytes(), "abcd")?;
+            AeronAsyncAddCounter::new(&client, 2543543, "12312312".as_bytes(), "abcd")?;
 
         let counter = counter_async.poll_blocking(Duration::from_secs(15))?;
         unsafe {
             *counter.addr() += 1;
         }
 
-        let result = AeronAsyncAddPublication::new(client.clone(), topic, stream_id)?;
+        let result = AeronAsyncAddPublication::new(&client, topic, stream_id)?;
 
         let publication = result.poll_blocking(std::time::Duration::from_secs(15))?;
 

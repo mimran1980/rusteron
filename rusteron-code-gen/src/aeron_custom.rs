@@ -42,15 +42,15 @@ impl AeronCountersReader {
 
 impl Aeron {
     pub fn new_blocking(
-        context: AeronContext,
+        context: &AeronContext,
         timeout: std::time::Duration,
     ) -> Result<Self, AeronCError> {
-        if let Ok(aeron) = Aeron::new(context.clone()) {
+        if let Ok(aeron) = Aeron::new(&context) {
             return Ok(aeron);
         }
         let time = std::time::Instant::now();
         while time.elapsed() < timeout {
-            if let Ok(aeron) = Aeron::new(context.clone()) {
+            if let Ok(aeron) = Aeron::new(&context) {
                 return Ok(aeron);
             }
             std::thread::sleep(std::time::Duration::from_millis(10));

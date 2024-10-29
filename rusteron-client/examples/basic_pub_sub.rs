@@ -10,7 +10,7 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
     // ctx.set_dir(media_driver_ctx.get_dir())?;
 
     println!("creating client");
-    let aeron = Aeron::new(ctx)?;
+    let aeron = Aeron::new(&ctx)?;
     println!("starting client");
 
     aeron.start()?;

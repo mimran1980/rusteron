@@ -28,6 +28,13 @@ jobs:
           toolchain: stable
           components: clippy, rustfmt
 
+      # aeron archive cmake for some reason starts java
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 

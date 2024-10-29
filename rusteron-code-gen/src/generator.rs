@@ -136,7 +136,11 @@ impl ReturnType {
         }
     }
 
-    pub fn get_new_return_type(&self, convert_errors: bool) -> proc_macro2::TokenStream {
+    pub fn get_new_return_type(
+        &self,
+        convert_errors: bool,
+        use_ref_for_cwrapper: bool,
+    ) -> proc_macro2::TokenStream {
         if let ArgProcessing::Handler(_) = self.original.processing {
             if self.original.name.len() > 0 {
                 if !self.original.is_mut_pointer() {
@@ -177,7 +181,11 @@ impl ReturnType {
             if let Some(wrapper) = self.wrappers.get(type_name) {
                 let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
                     .expect("Invalid class name in wrapper");
-                return quote! { #new_type };
+                if use_ref_for_cwrapper {
+                    return quote! { &#new_type };
+                } else {
+                    return quote! { #new_type };
+                }
             }
         }
         if let Some(wrapper) = self.wrappers.get(&self.original.c_type) {
@@ -438,7 +446,7 @@ impl CWrapper {
                     syn::Ident::new(&method.struct_method_name, proc_macro2::Span::call_site());
                 let return_type_helper =
                     ReturnType::new(method.return_type.clone(), wrappers.clone());
-                let return_type = return_type_helper.get_new_return_type(true);
+                let return_type = return_type_helper.get_new_return_type(true, false);
                 let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 // Filter out arguments that are `*mut` of the struct's type
@@ -473,17 +481,17 @@ impl CWrapper {
                             } else {
                                 let arg_name = arg.as_ident();
                                 let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                                    .get_new_return_type(false);
+                                    .get_new_return_type(false, true);
                                 if arg_type.is_empty() {
                                     None
                                 } else {
-                                    Some(quote! { #arg_name: &#arg_type })
+                                    Some(quote! { #arg_name: #arg_type })
                                 }
                             }
                         } else {
                             let arg_name = arg.as_ident();
                             let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                                .get_new_return_type(false);
+                                .get_new_return_type(false, true);
                             if arg_type.is_empty() {
                                 None
                             } else {
@@ -639,7 +647,7 @@ impl CWrapper {
                 let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
 
                 let mut rt = ReturnType::new(arg.clone(), cwrappers.clone());
-                let mut return_type = rt.get_new_return_type(false);
+                let mut return_type = rt.get_new_return_type(false, false);
                 let handler = if let ArgProcessing::Handler(_) = &arg.processing {
                     true
                 } else {
@@ -653,7 +661,7 @@ impl CWrapper {
                         },
                         cwrappers.clone(),
                     );
-                    return_type = rt.get_new_return_type(false);
+                    return_type = rt.get_new_return_type(false, false);
                 }
                 let converter = rt.handle_c_to_rs_return(quote! { self.#fn_name }, false, true);
 
@@ -741,7 +749,7 @@ impl CWrapper {
                             } else {
                                 let arg_name = arg.as_ident();
                                 let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                                    .get_new_return_type(false);
+                                    .get_new_return_type(false, true);
                                 if arg_type.clone().into_token_stream().is_empty() {
                                     None
                                 } else {
@@ -843,7 +851,7 @@ impl CWrapper {
                     .filter_map(|arg| {
                         let arg_name = arg.as_ident();
                         let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                            .get_new_return_type(false);
+                            .get_new_return_type(false, true);
                         if arg_type.is_empty() {
                             None
                         } else {
@@ -1176,7 +1184,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
-            let type_name = return_type.get_new_return_type(false);
+            let type_name = return_type.get_new_return_type(false, false);
             let field_name = format_ident!("{}", name);
             if type_name.is_empty() {
                 None
@@ -1199,7 +1207,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
-            let type_name = return_type.get_new_return_type(false);
+            let type_name = return_type.get_new_return_type(false, false);
             let field_name = format_ident!("_{}", name);
             if type_name.is_empty() {
                 None
@@ -1222,7 +1230,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
-            let type_name = return_type.get_new_return_type(false);
+            let type_name = return_type.get_new_return_type(false, false);
             if arg.is_c_string() {
                 return Some(quote! { String });
             } else if let ArgProcessing::ByteArrayWithLength(_) = arg.processing {
@@ -1262,8 +1270,8 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
 
             let field_name = format_ident!("{}", name);
-            let return_type =
-                ReturnType::new(arg.clone(), bindings.wrappers.clone()).get_new_return_type(false);
+            let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone())
+                .get_new_return_type(false, false);
             if return_type.is_empty() {
                 None
             } else {
@@ -1423,7 +1431,7 @@ pub fn generate_rust_code(
                     } else {
                         let arg_name = arg.as_ident();
                         let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                            .get_new_return_type(false);
+                            .get_new_return_type(false, true);
                         if arg_type.clone().into_token_stream().is_empty() {
                             None
                         } else {
@@ -1489,7 +1497,7 @@ pub fn generate_rust_code(
                     } else {
                         let arg_name = arg.as_ident();
                         let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                            .get_new_return_type(false);
+                            .get_new_return_type(false, true);
                         if arg_type.clone().into_token_stream().is_empty() {
                             None
                         } else {
@@ -1512,7 +1520,7 @@ pub fn generate_rust_code(
                     } else {
                         let arg_name = arg.as_ident();
                         let arg_type = ReturnType::new(arg.clone(), wrappers.clone())
-                            .get_new_return_type(false);
+                            .get_new_return_type(false, false);
                         if arg_type.clone().into_token_stream().is_empty() {
                             None
                         } else {
@@ -1546,7 +1554,7 @@ pub fn generate_rust_code(
             impl #client_type {
                 #[inline]
                 pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
-                    #async_class_name::new(self.clone(), #(#async_new_args_name_only),*)
+                    #async_class_name::new(self, #(#async_new_args_name_only),*)
                 }
             }
 
@@ -1569,7 +1577,7 @@ pub fn generate_rust_code(
                 }
 
                 pub fn poll(&self) -> Option<#main_class_name> {
-                    if let Ok(publication) = #main_class_name::new(self.clone()) {
+                    if let Ok(publication) = #main_class_name::new(self) {
                         Some(publication)
                     } else {
                         None

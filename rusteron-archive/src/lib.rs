@@ -36,14 +36,13 @@ mod tests {
     pub fn test_failed_connect() -> Result<(), Box<dyn error::Error>> {
         let ctx = AeronArchiveContext::new()?;
         std::env::set_var("AERON_DRIVER_TIMEOUT", "1");
-        let connect = AeronArchiveAsyncConnect::new(ctx.clone());
+        let connect = AeronArchiveAsyncConnect::new(&ctx);
         std::env::remove_var("AERON_DRIVER_TIMEOUT");
 
         assert_eq!(
             Some(AeronErrorType::NullOrNotConnected.into()),
             connect.err()
         );
-        println!("context {:?}", ctx);
         Ok(())
     }
 }

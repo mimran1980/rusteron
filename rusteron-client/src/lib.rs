@@ -77,7 +77,7 @@ mod tests {
         ctx.set_on_new_exclusive_publication(Some(&Handler::leak(AeronNewPublicationLogger)))?;
 
         println!("creating client");
-        let aeron = Aeron::new(ctx)?;
+        let aeron = Aeron::new(&ctx)?;
         println!("starting client");
 
         aeron.start()?;
@@ -185,7 +185,7 @@ mod tests {
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
 
         println!("creating client");
-        let aeron = Aeron::new(ctx)?;
+        let aeron = Aeron::new(&ctx)?;
         println!("starting client");
 
         aeron.start()?;
@@ -316,7 +316,7 @@ mod tests {
         ))))?;
 
         println!("creating client");
-        let aeron = Aeron::new(ctx.clone())?;
+        let aeron = Aeron::new(&ctx)?;
         println!("starting client");
 
         aeron.start()?;

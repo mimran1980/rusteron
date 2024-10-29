@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // aeron_context.set_shared_idle_strategy_init_args(std::ffi::CString::new("busy_spin")?.into_raw())?;
 
     // Create Aeron driver
-    let aeron_driver = AeronDriver::new(aeron_context.clone())?;
+    let aeron_driver = AeronDriver::new(&aeron_context)?;
     aeron_driver.start(true)?;
     // Start the Aeron driver
     println!("Aeron media driver started successfully. Press Ctrl+C to stop.");
@@ -36,12 +36,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ctx = AeronContext::new()?;
         ctx.set_idle_sleep_duration_ns(0)?;
         ctx.set_dir(&dir)?;
-        let client = Aeron::new(ctx)?;
+        let client = Aeron::new(&ctx)?;
         client.start()?;
 
         assert!(Aeron::epoch_clock() > 0);
         assert!(Aeron::nano_clock() > 0);
-        let result = AeronAsyncAddPublication::new(client.clone(), "aeron:ipc", 32)?;
+        let result = AeronAsyncAddPublication::new(&client, "aeron:ipc", 32)?;
 
         loop {
             if let Some(publication) = result.poll() {
