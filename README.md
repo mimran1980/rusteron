@@ -57,10 +57,18 @@ Add the following line to your `Cargo.toml` to include the specific **rusteron**
 
 For detailed instructions on how to build **rusteron-archive**, please refer to the [HOW_TO_BUILD.md](./HOW_TO_BUILD.md) file.
 
+dynamic lib
 ```toml
 [dependencies]
 rusteron-client = "0.1"
 ```
+
+static lib
+```toml
+[dependencies]
+rusteron-client = { version = "0.1", features= ["static"] }
+```
+
 
 Replace `rusteron-client` with `rusteron-archive` or `rusteron-media-driver` as per your requirement.
 

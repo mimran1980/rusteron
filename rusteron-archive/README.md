@@ -17,9 +17,16 @@ The code in **rusteron-archive** is generated as a Rust wrapper around the Aeron
 
 To use **rusteron-archive**, add it to your `Cargo.toml`:
 
+dynamic lib
 ```toml
 [dependencies]
 rusteron-archive = "0.1"
+```
+
+static lib
+```toml
+[dependencies]
+rusteron-archive = { version = "0.1", features= ["static"] }
 ```
 
 Ensure that you have also set up the necessary Aeron C libraries required by **rusteron-archive**.

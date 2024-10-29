@@ -16,9 +16,16 @@ It is recommended to run the media driver using the Aeron Java or C version for 
 
 To use **rusteron-media-driver**, add it to your `Cargo.toml`:
 
+dynamic lib
 ```toml
 [dependencies]
 rusteron-media-driver = "0.1"
+```
+
+static lib
+```toml
+[dependencies]
+rusteron-media-driver = { version = "0.1", features= ["static"] }
 ```
 
 Ensure that you have also set up the necessary Aeron C libraries required by **rusteron-media-driver**.

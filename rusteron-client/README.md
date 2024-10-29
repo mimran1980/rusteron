@@ -123,9 +123,16 @@ The `AeronCError` struct encapsulates the error code and provides methods to ret
 
 Add the following to your `Cargo.toml` file to include **rusteron-client**:
 
+dynamic lib
 ```toml
 [dependencies]
 rusteron-client = "0.1"
+```
+
+static lib
+```toml
+[dependencies]
+rusteron-client = { version = "0.1", features= ["static"] }
 ```
 
 Ensure you have also set up the necessary Aeron C libraries required by **rusteron-client**.
