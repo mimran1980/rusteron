@@ -12,6 +12,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check clippy lints
+        run: cargo clippy --all -- --deny warnings
+
   build:
     name: Build
     runs-on: ${{ matrix.os }}
@@ -21,7 +43,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         features: [default, static]
-#        rust-version: ["stable", "stable 6 months ago"]
+        #        rust-version: ["stable", "stable 6 months ago"]
         rust-version: ["stable"]
 
     env:
@@ -49,12 +71,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-
-#      - name: Check formatting
-#        run: cargo fmt --all -- --check
-#
-#      - name: Check clippy lints
-#        run: cargo clippy --all ${{ env.feature-flags }} -- --deny warnings
 
       - name: Build and Test
         run: |
