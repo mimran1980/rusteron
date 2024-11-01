@@ -93,6 +93,7 @@ bechmark-java-ipc-throughput:
       -Daeron.conductor.idle.strategy=spin \
       -Dagrona.disable.bounds.checks=true \
       -Daeron.sample.messageLength=32 \
+      -Daeron.sample.idleStrategy=org.agrona.concurrent.NoOpIdleStrategy \
       io.aeron.samples.EmbeddedExclusiveIpcThroughput
 
 bechmark-rust-ipc-throughput:
@@ -107,6 +108,41 @@ bechmark-rust-ipc-throughput:
     AERON_RCV_INITIAL_WINDOW_LENGTH=2097152 \
     AERON_DIR=target/aeron \
     cargo run --release --package rusteron-client --example embedded_exclusive_ipc_throughput
+
+
+bechmark-java-embedded-ping-pong:
+    cd ./rusteron-client/aeron; ./gradlew :aeron-samples:jar; cd -
+    java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-1.47.0-SNAPSHOT.jar:./rusteron-client/aeron/aeron-samples/build/libs/aeron-samples-1.47.0-SNAPSHOT.jar \
+      -Daeron.dir=target/aeron \
+      -Daeron.term.buffer.sparse.file=false \
+      -Daeron.pre.touch.mapped.memory=true \
+      -Daeron.socket.so_sndbuf=2m \
+      -Daeron.socket.so_rcvbuf=2m \
+      -Daeron.rcv.initial.window.length=2m \
+      -Daeron.threading.mode=DEDICATED \
+      -Daeron.sender.idle.strategy=noop \
+      -Daeron.receiver.idle.strategy=noop \
+      -Daeron.conductor.idle.strategy=spin \
+      -Dagrona.disable.bounds.checks=true \
+      -Daeron.sample.messageLength=32 \
+      -Daeron.sample.idleStrategy=org.agrona.concurrent.NoOpIdleStrategy \
+      -Daeron.sample.exclusive.publications=false \
+      -Daeron.sample.ping.channel=aeron:udp?endpoint=localhost:20123 \
+      -Daeron.sample.pong.channel=aeron:udp?endpoint=localhost:20124 \
+      io.aeron.samples.EmbeddedPingPong
+
+bechmark-rust-embedded-ping-pong:
+    AERON_THREADING_MODE=DEDICATED \
+    AERON_CONDUCTOR_IDLE_STRATEGY=spin \
+    AERON_SENDER_IDLE_STRATEGY=noop \
+    AERON_RECEIVER_IDLE_STRATEGY=noop \
+    AERON_DIR=target/aeron \
+    AERON_TERM_BUFFER_SPARSE_FILE=false \
+    AERON_SOCKET_SO_SNDBUF=2097152 \
+    AERON_SOCKET_SO_RCVBUF=2097152 \
+    AERON_RCV_INITIAL_WINDOW_LENGTH=2097152 \
+    cargo run --release --package rusteron-client --example embedded_ping_pong
+
 
 
 docs:

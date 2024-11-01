@@ -114,8 +114,14 @@ impl<T: AeronControlledFragmentHandlerCallback> Handler<T> {
 }
 
 impl AeronBufferClaim {
+    #[inline]
     pub fn data_mut(&self) -> &mut [u8] {
         debug_assert!(!self.data.is_null());
         unsafe { std::slice::from_raw_parts_mut(self.data, self.length) }
+    }
+
+    #[inline]
+    pub fn frame_header_mut(&self) -> &mut aeron_header_values_frame_t {
+        unsafe { &mut *self.frame_header.cast::<aeron_header_values_frame_t>() }
     }
 }

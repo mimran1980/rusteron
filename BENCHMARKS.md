@@ -45,7 +45,7 @@ Duration 1001ms - 27,872,288 messages - 891,913,216 payload bytes
 ```
 
 ### Rust IPC Throughput Results with Rust Media Driver
-The results obtained by running the Rust port of the Java benchmark using Rusteron with the Rust media driver on the same M1 MacBook are as follows:
+The results obtained by running the Rust port of the Java benchmark using Rusteron with the Rust media driver (implemented using C bindings in Rust) on the same M1 MacBook are as follows:
 
 ```
 Throughput: 36,859,281 msgs/sec, 1,179,496,981 bytes/sec
@@ -102,16 +102,89 @@ Throughput: 34,825,446 msgs/sec, 1,114,414,268 bytes/sec
 Throughput: 34,024,351 msgs/sec, 1,088,779,219 bytes/sec
 ```
 
+### Ping Pong Benchmark
+
+This section details the Ping Pong benchmark, which is based on the Aeron `EmbeddedPingPong` sample. The benchmark involves a warm-up phase of 100,000 messages followed by the actual benchmark of 10,000,000 messages, with a message size length of 32 bytes. Regular publishers were used, not exclusive publishers. The channels were `aeron:udp?endpoint=localhost:40123` and `aeron:udp?endpoint=localhost:40124`.
+
+#### Rust Ping Pong Results with Rust Media Driver
+The results of the Rust benchmark using the Rust media driver (implemented using C bindings in Rust) are as follows:
+
+```
+PING: pong publisher aeron:udp?endpoint=localhost:20124 1003
+PING: ping subscriber aeron:udp?endpoint=localhost:20123 1002
+PONG: ping publisher aeron:udp?endpoint=localhost:20123 1002
+PONG: pong subscriber aeron:udp?endpoint=localhost:20124 1003
+
+Histogram of RTT latencies in micros:
+# of samples: 10000000
+min: 8.496
+50th percentile: 32.047
+99th percentile: 103.871
+99.9th percentile: 145.791
+max: 32309.247
+avg: 40.506064342799824
+```
+
+#### Rust Ping Pong Results with Java Media Driver
+The results of the Rust benchmark with the Java media driver are as follows:
+
+```
+PING: pong publisher aeron:udp?endpoint=localhost:20124 1003
+PING: ping subscriber aeron:udp?endpoint=localhost:20123 1002
+PONG: ping publisher aeron:udp?endpoint=localhost:20123 1002
+PONG: pong subscriber aeron:udp?endpoint=localhost:20124 1003
+message length 32 bytes
+
+Histogram of RTT latencies in micros:
+# of samples: 10000000
+min: 8.416
+50th percentile: 34.015
+99th percentile: 102.719
+99.9th percentile: 183.935
+max: 82378.751
+avg: 44.14706427200005
+```
+
+#### Java Ping Pong Results
+The results of the Java Ping Pong benchmark are as follows:
+
+```
+Publishing Ping at aeron:udp?endpoint=localhost:20123 on stream id 1002
+Subscribing Ping at aeron:udp?endpoint=localhost:20123 on stream id 1002
+Subscribing Pong at aeron:udp?endpoint=localhost:20124 on stream id 1003
+Publishing Pong at aeron:udp?endpoint=localhost:20124 on stream id 1003
+Message payload length of 32 bytes
+Using exclusive publications: false
+Waiting for new image from Pong...
+Warming up... 10 iterations of 10,000 messages
+Pinging 10,000,000 messages
+
+Histogram of RTT latencies in microseconds.
+       Value     Percentile TotalCount 1/(1-Percentile)
+
+       8.503 0.000000000000          1           1.00
+      24.383 0.500000000000    5041120           2.00
+      59.423 0.990625000000    9906360         106.67
+     100.159 0.999023437500    9990262        1024.00
+#[Mean    =       23.587, StdDeviation   =       52.323]
+#[Max     =    72351.743, Total count    =     10000000]
+#[Buckets =           24, SubBuckets     =         2048]
+```
+
 ## Summary
-From the results above, we observe that the Rust implementation consistently achieves higher throughput compared to the Java version:
-- **Java**: Average throughput of approximately 28 million messages per second (msg size 32 bytes).
-- **Rust with Rust Media Driver**: Average throughput of approximately 36-38 million messages per second (msg size 32 bytes).
-- **Rust with Java Media Driver**: Average throughput of approximately 33-36 million messages per second (msg size 32 bytes).
+From the results above, we observe that the Rust implementation consistently achieves higher throughput compared to the Java version in the Exclusive IPC Throughput benchmark:
+- **Java**: Average throughput of approximately 28 million messages per second.
+- **Rust with Rust Media Driver**: Average throughput of approximately 36-38 million messages per second.
+- **Rust with Java Media Driver**: Average throughput of approximately 33-36 million messages per second.
 
 The Rust implementation shows a noticeable improvement in throughput, with an approximate **30% improvement** over the Java version when using the Rust media driver. This is higher than expected, as Java low latency applications are usually around 10-20% slower compared to implementations in C++ or Rust. This could indicate that there may be a flaw in the benchmark, and the results should be interpreted with caution.
 
-The Rust implementation using the Java media driver also demonstrates a significant improvement, although it is somewhat lower than when using the Rust media driver.
+The Ping Pong benchmark, however, tells a different story. Despite the Rust implementation outperforming Java in Exclusive IPC Throughput, the Java implementation shows faster round-trip times (RTTs) in the Ping Pong benchmark:
+- **Java**: Mean RTT of approximately 23.6 microseconds.
+- **Rust with Rust Media Driver**: Mean RTT of approximately 40.5 microseconds.
+- **Rust with Java Media Driver**: Mean RTT of approximately 44.1 microseconds.
+
+The reasons for Rust being slower in the Ping Pong benchmark, especially considering that it was faster in the Exclusive IPC Throughput benchmark, remain unclear. This discrepancy warrants further investigation, as many factors such as message handling, context switching, and specific media driver optimizations could be influencing the results.
 
 ## Next Steps
 If you have suggestions for further optimizations or would like to contribute to the Rust port (`rusteron`), feel free to open an issue or a pull request on GitHub. We're always looking for ways to push the boundaries of performance!
-
