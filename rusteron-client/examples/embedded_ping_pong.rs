@@ -135,14 +135,23 @@ fn run_ping(
         histogram: Histogram::new(3)?,
     });
     sleep(Duration::from_secs(1));
-    let image = ping_subscription.image_at_index(0);
     for _ in 0..WARMUP_NUMBER_OF_MESSAGES {
-        record_rtt(&pong_publication, &image, &mut buffer, &mut handler);
+        record_rtt(
+            &pong_publication,
+            &ping_subscription,
+            &mut buffer,
+            &mut handler,
+        );
     }
     println!("warmed up");
     handler.histogram.reset();
     for _ in 0..NUMBER_OF_MESSAGES {
-        record_rtt(&pong_publication, &image, &mut buffer, &mut handler);
+        record_rtt(
+            &pong_publication,
+            &ping_subscription,
+            &mut buffer,
+            &mut handler,
+        );
     }
 
     println!("finished sending all pings");
@@ -161,14 +170,12 @@ pub struct PingRoundTripHandler {
 }
 
 impl AeronFragmentHandlerCallback for PingRoundTripHandler {
-    #[inline]
-    fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], _header: AeronHeader) {
-        let time = unsafe {
-            let int_ptr = buffer.as_ptr()
-                // .add(offset)
-                as *const i64;
-            i64::from_le(*int_ptr)
-        };
+    fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], _header: AeronHeader) -> () {
+        let time = i64::from_le_bytes(
+            buffer[0..8]
+                .try_into()
+                .expect("Slice with incorrect length"),
+        );
         // println!("ping received {} {:?}", time, buffer);
         let rtt = Aeron::nano_clock() - time;
         // println!("RTT: {}", rtt);
@@ -180,22 +187,18 @@ impl AeronFragmentHandlerCallback for PingRoundTripHandler {
 #[inline]
 fn record_rtt(
     pong_publication: &AeronPublication,
-    image: &AeronImage,
+    ping_subscription: &AeronSubscription,
     buffer: &mut Vec<u8>,
     handler: &mut Handler<PingRoundTripHandler>,
 ) {
     let now = Aeron::nano_clock();
-    unsafe {
-        std::ptr::copy_nonoverlapping(now.to_le_bytes().as_ptr(), buffer.as_mut_ptr(), 8);
-    }
-    let mut offered_position = -1;
+    buffer[0..8].copy_from_slice(&now.to_le_bytes());
     // println!("time is {} {:?}", i, buffer);
-    while offered_position < 0 {
-        offered_position =
-            pong_publication.offer(buffer, Handlers::no_reserved_value_supplier_handler());
-    }
+    while pong_publication.offer(&buffer, Handlers::no_reserved_value_supplier_handler()) <= 0 {}
 
-    while image.position() < offered_position {
-        let _ = image.poll(Some(handler), FRAGMENT_COUNT_LIMIT);
-    }
+    while ping_subscription
+        .poll(Some(handler), FRAGMENT_COUNT_LIMIT)
+        .unwrap_or_default()
+        == 0
+    {}
 }
