@@ -184,7 +184,7 @@ The Ping Pong benchmark, however, tells a different story. Despite the Rust impl
 - **Rust with Rust Media Driver**: Mean RTT of approximately 40.5 microseconds.
 - **Rust with Java Media Driver**: Mean RTT of approximately 44.1 microseconds.
 
-The reasons for Rust being slower in the Ping Pong benchmark, especially considering that it was faster in the Exclusive IPC Throughput benchmark, remain unclear. This discrepancy warrants further investigation, as many factors such as message handling, context switching, and specific media driver optimizations could be influencing the results.
+The reasons for Rust being slower in the Ping Pong benchmark, especially considering that it was faster in the Exclusive IPC Throughput benchmark, remain unclear. This discrepancy warrants further investigation.
 
 ## Next Steps
 If you have suggestions for further optimizations or would like to contribute to the Rust port (`rusteron`), feel free to open an issue or a pull request on GitHub. We're always looking for ways to push the boundaries of performance!

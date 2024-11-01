@@ -68,8 +68,14 @@ pub fn main() {
     let mut config = Config::new(&aeron_path);
     if std::env::var("PROFILE").unwrap() == "release" {
         config.profile("Release");
-        config.define("CMAKE_CXX_FLAGS_RELEASE", "-O3 -DNDEBUG -march=native");
-        config.define("CMAKE_C_FLAGS_RELEASE", "-O3 -DNDEBUG -march=native");
+        config.define(
+            "CMAKE_CXX_FLAGS_RELEASE",
+            "-O3 -DNDEBUG -march=native -funroll-loops -flto",
+        );
+        config.define(
+            "CMAKE_C_FLAGS_RELEASE",
+            "-O3 -DNDEBUG -march=native -funroll-loops -flto",
+        );
     } else {
         config.profile("Debug");
     }
