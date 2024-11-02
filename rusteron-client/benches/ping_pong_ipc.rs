@@ -8,8 +8,8 @@ use std::time::Duration;
 
 const PING_STREAM_ID: i32 = 1002;
 const PONG_STREAM_ID: i32 = 1003;
-const PING_CHANNEL: &str = "aeron:udp?endpoint=localhost:20123";
-const PONG_CHANNEL: &str = "aeron:udp?endpoint=localhost:20124";
+const PING_CHANNEL: &str = "aeron:ipc";
+const PONG_CHANNEL: &str = "aeron:ipc";
 const MESSAGE_LENGTH: usize = 32;
 const FRAGMENT_COUNT_LIMIT: usize = 10;
 
@@ -59,7 +59,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut handler = Handler::leak(PingRoundTripHandler {});
 
-    c.bench_function("ping_pong_udp_benchmark", |b| {
+    c.bench_function("ping_pong_ipc_benchmark", |b| {
         b.iter(|| {
             record_rtt(
                 &pong_publication,

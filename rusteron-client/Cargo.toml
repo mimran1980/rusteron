@@ -40,3 +40,7 @@ static = ["rusteron-media-driver/static"]
 [[bench]]
 name = "ping_pong"
 harness = false
+
+[[bench]]
+name = "ping_pong_ipc"
+harness = false
