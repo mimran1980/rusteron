@@ -1,4 +1,5 @@
 use crate::AeronErrorType::Unknown;
+#[cfg(debug_assertions)]
 use std::backtrace::Backtrace;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};

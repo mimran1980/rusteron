@@ -52,6 +52,7 @@ fn run_pong(running_pong: Arc<AtomicBool>) -> Result<(), Box<dyn std::error::Err
     let context = AeronContext::new()?;
     let dir = std::env::var("AERON_DIR").expect("AERON_DIR must be set");
     context.set_dir(&dir)?;
+    context.set_idle_sleep_duration_ns(0)?;
     let aeron = Aeron::new(&context)?;
     aeron.start()?;
     let ping_publication = aeron
@@ -109,6 +110,8 @@ fn run_ping(
 ) -> Result<Histogram<u64>, Box<dyn Error>> {
     let context = AeronContext::new()?;
     let dir = std::env::var("AERON_DIR").expect("AERON_DIR must be set");
+    println!("idle sleep {}", context.get_idle_sleep_duration_ns());
+    context.set_idle_sleep_duration_ns(0)?;
     context.set_dir(&dir)?;
     let aeron = Aeron::new(&context)?;
     aeron.start()?;
@@ -170,18 +173,22 @@ pub struct PingRoundTripHandler {
 }
 
 impl AeronFragmentHandlerCallback for PingRoundTripHandler {
-    fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], _header: AeronHeader) -> () {
-        let time = i64::from_le_bytes(
-            buffer[0..8]
-                .try_into()
-                .expect("Slice with incorrect length"),
-        );
+    fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], _header: AeronHeader) {
+        let time = read_i64(buffer);
         // // println!("ping received {} {:?}", time, buffer);
         let rtt = Aeron::nano_clock() - time;
         // // println!("RTT: {}", rtt);
         debug_assert!(rtt >= 0);
         self.histogram.record(rtt as u64).unwrap();
     }
+}
+
+fn read_i64(buffer: &[u8]) -> i64 {
+    i64::from_le_bytes(
+        buffer[0..8]
+            .try_into()
+            .expect("Slice with incorrect length"),
+    )
 }
 
 #[inline]
@@ -192,12 +199,16 @@ fn record_rtt(
     handler: &mut Handler<PingRoundTripHandler>,
 ) {
     let now = Aeron::nano_clock();
-    buffer[0..8].copy_from_slice(&now.to_le_bytes());
-    while pong_publication.offer(&buffer, Handlers::no_reserved_value_supplier_handler()) < 0 {}
+    write_i64(buffer, &now);
+    while pong_publication.offer(buffer, Handlers::no_reserved_value_supplier_handler()) < 0 {}
 
     while ping_subscription
         .poll(Some(handler), FRAGMENT_COUNT_LIMIT)
         .unwrap_or_default()
         == 0
     {}
+}
+
+fn write_i64(buffer: &mut [u8], now: &i64) {
+    buffer[0..8].copy_from_slice(&now.to_le_bytes());
 }

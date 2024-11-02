@@ -20,6 +20,7 @@ itertools = "0.13"
 num-format = "0.4"
 hdrhistogram = "7.5"
 zerocopy = { version = "0.8", features = ["derive", "simd", "alloc"] }
+criterion = "0.5"
 
 [release]
 publish = true

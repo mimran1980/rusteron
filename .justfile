@@ -143,6 +143,21 @@ bechmark-rust-embedded-ping-pong:
     AERON_RCV_INITIAL_WINDOW_LENGTH=2097152 \
     cargo run --release --package rusteron-client --example embedded_ping_pong
 
+bechmark-rust-embedded-ping-pong-profiler:
+    cargo build --features static --release --package rusteron-client --example embedded_ping_pong
+    codesign -s - -vvv --entitlements instruments.plist ./target/release/examples/embedded_ping_pong
+    export AERON_THREADING_MODE=DEDICATED
+    export AERON_CONDUCTOR_IDLE_STRATEGY=spin
+    export AERON_SENDER_IDLE_STRATEGY=noop
+    export AERON_RECEIVER_IDLE_STRATEGY=noop
+    export AERON_DIR=target/aeron
+    export AERON_TERM_BUFFER_SPARSE_FILE=false
+    export AERON_SOCKET_SO_SNDBUF=2097152
+    export AERON_SOCKET_SO_RCVBUF=2097152
+    export AERON_RCV_INITIAL_WINDOW_LENGTH=2097152
+    chmod +x ./target/release/examples/embedded_ping_pong
+    ./target/release/examples/embedded_ping_pong
+
 
 
 docs:

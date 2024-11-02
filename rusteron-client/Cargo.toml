@@ -32,6 +32,11 @@ rusteron-code-gen = {path = "../rusteron-code-gen", version = "0"}
 [dev-dependencies]
 rusteron-media-driver = {path = "../rusteron-media-driver"}
 serial_test = "3.1"
+criterion = {workspace = true}
 
 [features]
 static = ["rusteron-media-driver/static"]
+
+[[bench]]
+name = "ping_pong"
+harness = false
