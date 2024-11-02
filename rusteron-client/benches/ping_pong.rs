@@ -4,7 +4,7 @@ use rusteron_media_driver::{AeronDriver, AeronDriverContext};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const PING_STREAM_ID: i32 = 1002;
 const PONG_STREAM_ID: i32 = 1003;

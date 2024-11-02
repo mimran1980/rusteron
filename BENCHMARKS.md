@@ -137,13 +137,15 @@ message length 32 bytes
 
 Histogram of RTT latencies in micros:
 # of samples: 10000000
-min: 8.416
-50th percentile: 34.015
-99th percentile: 102.719
-99.9th percentile: 183.935
-max: 82378.751
-avg: 44.14706427200005
+min: 8.704
+50th percentile: 23.839
+99th percentile: 47.359
+99.9th percentile: 150.143
+max: 44662.783
+avg: 23.8791763928
 ```
+
+Note the defaults for c/rust media driver vs java is different. C media driver defaults with low latency settings which has a negative impact on my mac for ping pong test.
 
 #### Java Ping Pong Results
 The results of the Java Ping Pong benchmark are as follows:
@@ -179,12 +181,7 @@ From the results above, we observe that the Rust implementation consistently ach
 
 The Rust implementation shows a noticeable improvement in throughput, with an approximate **30% improvement** over the Java version when using the Rust media driver. This is higher than expected, as Java low latency applications are usually around 10-20% slower compared to implementations in C++ or Rust. This could indicate that there may be a flaw in the benchmark, and the results should be interpreted with caution.
 
-The Ping Pong benchmark, however, tells a different story. Despite the Rust implementation outperforming Java in Exclusive IPC Throughput, the Java implementation shows faster round-trip times (RTTs) in the Ping Pong benchmark:
-- **Java**: Mean RTT of approximately 23.6 microseconds.
-- **Rust with Rust Media Driver**: Mean RTT of approximately 40.5 microseconds.
-- **Rust with Java Media Driver**: Mean RTT of approximately 44.1 microseconds.
-
-The reasons for Rust being slower in the Ping Pong benchmark, especially considering that it was faster in the Exclusive IPC Throughput benchmark, remain unclear. This discrepancy warrants further investigation.
+Thπe Ping Pong benchmark results demonstrate that the Java implementation achieves better round-trip time (RTT) latency compared to the Rust implementation with the Rust media driver, primarily due to the default settings used by the Rust/C media driver. The Rust media driver defaults to low latency settings that appear to have a negative impact on performance for this particular benchmark, especially on macOS. However, when using the Java media driver, the Rust implementation performs comparably to Java.
 
 ## Next Steps
 If you have suggestions for further optimizations or would like to contribute to the Rust port (`rusteron`), feel free to open an issue or a pull request on GitHub. We're always looking for ways to push the boundaries of performance!
