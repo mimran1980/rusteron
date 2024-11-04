@@ -9,7 +9,7 @@ homepage = "https://github.com/mimran1980/rusteron"
 keywords = ["ring-buffer", "aeron-rb", "aeron-c-bindings"]
 categories = ["network-programming"]
 documentation = "https://mimran1980.github.io/rusteron/rusteron_client/index.html"
-description = "Provides ring buffers that are used in aeron"
+description = "Provides ring buffer and broadcast functionalities via aeron c bindings, allowing efficient, low-latency message passing between different threads or processes. This module implements Single Producer, Single Consumer (SPSC) ring buffers, Multi-Producer, Single Consumer (MPSC) ring buffers, and broadcast channels."
 readme = "README.md"
 
 [dependencies]
@@ -35,11 +35,3 @@ criterion = {workspace = true}
 
 [features]
 static = []
-
-#[[bench]]
-#name = "ping_pong"
-#harness = false
-
-#[[bench]]
-#name = "ping_pong_ipc"
-#harness = false

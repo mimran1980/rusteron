@@ -47,6 +47,8 @@ The library is divided into several modules, each focusing on specific parts of 
   Aeron Media Driver, a core component for managing messaging between producers and consumers. It uses the Aeron C
   bindings from aeron-driver module.
 
+- **[rusteron-rb](https://github.com/mimran1980/rusteron/tree/main/rusteron-rb)**: Provides ring buffer and broadcast functionalities via aeron c bindings, allowing efficient, low-latency message passing between different threads or processes. This module implements Single Producer, Single Consumer (SPSC) ring buffers, Multi-Producer, Single Consumer (MPSC) ring buffers, and broadcast channels.
+
 ## Installation
 
 Add the following line to your `Cargo.toml` to include the specific **rusteron** module you need in your project. Depending on your use case, you can choose from the following modules:
@@ -69,7 +71,7 @@ static lib
 rusteron-client = { version = "0.1", features= ["static"] }
 ```
 
-Replace `rusteron-client` with `rusteron-archive` or `rusteron-media-driver` as per your requirement.
+Replace `rusteron-client` with `rusteron-archive`/`rusteron-media-driver`/`rusteron-rb` as per your requirement.
 
 ## Usage Example
 
