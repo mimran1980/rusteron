@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let handler = AeronBroadcastReceiverHandlerWrapper::new(Reader);
+    let handler = Handler::leak(Reader {});
     for _ in 0..100 {
         let read = receiver.receive(Some(&handler)).unwrap();
         println!("read {}", read);
