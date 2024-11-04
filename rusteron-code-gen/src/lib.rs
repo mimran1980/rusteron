@@ -20,6 +20,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 pub const CUSTOM_AERON_CODE: &str = include_str!("./aeron_custom.rs");
+pub const CUSTOM_RB_CODE: &str = include_str!("./rb_custom.rs");
 pub const COMMON_CODE: &str = include_str!("./common.rs");
 
 pub fn append_to_file(file_path: &str, code: &str) -> std::io::Result<()> {

@@ -16,6 +16,7 @@ pub mod bindings {
 use bindings::*;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
+include!(concat!(env!("OUT_DIR"), "/rb_custom.rs"));
 
 #[cfg(test)]
 mod tests {

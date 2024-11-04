@@ -158,10 +158,16 @@ pub fn main() {
 
     // include custom aeron code
     let aeron_custom = out_path.join("aeron_custom.rs");
+    let rb_custom = out_path.join("rb_custom.rs");
     let _ = fs::remove_file(aeron_custom.clone());
     append_to_file(
         aeron_custom.to_str().unwrap(),
         rusteron_code_gen::CUSTOM_AERON_CODE,
+    )
+    .unwrap();
+    append_to_file(
+        rb_custom.to_str().unwrap(),
+        rusteron_code_gen::CUSTOM_RB_CODE,
     )
     .unwrap();
 

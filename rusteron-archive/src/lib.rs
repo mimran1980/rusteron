@@ -18,6 +18,7 @@ use bindings::*;
 use std::ffi::{c_char, CStr};
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
+include!(concat!(env!("OUT_DIR"), "/rb_custom.rs"));
 
 unsafe extern "C" fn default_encoded_credentials(
     _clientd: *mut std::os::raw::c_void,
