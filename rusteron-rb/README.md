@@ -14,7 +14,131 @@ The **rusteron-rb** module acts as a Rust wrapper around the Aeron C ring buffer
 - **Broadcast Transmitter**: Send messages to Aeron broadcast channels using `AeronBroadcastTransmitter`.
 - **MPSC Ring Buffer**: Multi-producer, single-consumer ring buffer implementation using `AeronMpscRb`.
 - **SPSC Ring Buffer**: Single-producer, single-consumer ring buffer implementation using `AeronSpscRb`.
-- **Automatic Resource Management**: Resources are automatically managed, ensuring proper cleanup and efficient memory usage.
+
+# Examples
+
+Sure thing! Here are three sections with detailed code examples: one for Single Producer, Single Consumer (SPSC) Ring Buffer, one for Multi-Producer, Single Consumer (MPSC) Ring Buffer, and one for the Broadcast Transmitter and Receiver. These examples are based on your unit tests and will help illustrate the usage for different parts of **rusteron-rb**.
+
+### Single Producer, Single Consumer Ring Buffer
+
+This example demonstrates how to use the `AeronSpscRb` to create a simple single producer, single consumer ring buffer.
+
+```rust
+use rusteron_rb::*;
+use std::error::Error;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let rb = AeronSpscRb::new_with_capacity(1024 * 1024, 1024)?;
+
+    // Producer writes data to the ring buffer
+    for i in 0..100 {
+        let idx = rb.try_claim(i + 1, 4);
+        assert!(idx >= 0);
+        let slot = rb.buffer_at_mut(idx as usize, 4);
+        slot[0] = i as u8;
+        rb.commit(idx)?;
+    }
+
+    // Consumer reads data from the ring buffer
+    struct Reader;
+    impl AeronRingBufferHandlerCallback for Reader {
+        fn handle_aeron_rb_handler(&mut self, msg_type_id: i32, buffer: &[u8]) {
+            println!("msg_type_id: {}, buffer: {:?}", msg_type_id, buffer);
+            assert_eq!(buffer[0], (msg_type_id - 1) as u8);
+        }
+    }
+
+    let handler = AeronRingBufferHandlerWrapper::new(Reader);
+    for _ in 0..10 {
+        let read = rb.read_msgs(&handler, 10);
+        assert_eq!(10, read);
+    }
+
+    Ok(())
+}
+```
+
+### Multi-Producer, Single Consumer Ring Buffer
+
+The following example demonstrates how to use the `AeronMpscRb` for a multi-producer, single consumer scenario, enabling multiple producers to write to the same ring buffer while a single consumer reads from it.
+
+```rust
+use rusteron_rb::*;
+use std::error::Error;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let rb = AeronMpscRb::new_with_capacity(1024 * 1024, 1024)?;
+
+    // Producers write data to the ring buffer
+    for i in 0..100 {
+        let idx = rb.try_claim(i + 1, 4);
+        assert!(idx >= 0);
+        let slot = rb.buffer_at_mut(idx as usize, 4);
+        slot[0] = i as u8;
+        rb.commit(idx)?;
+    }
+
+    // Consumer reads data from the ring buffer
+    struct Reader;
+    impl AeronRingBufferHandlerCallback for Reader {
+        fn handle_aeron_rb_handler(&mut self, msg_type_id: i32, buffer: &[u8]) {
+            println!("msg_type_id: {}, buffer: {:?}", msg_type_id, buffer);
+            assert_eq!(buffer[0], (msg_type_id - 1) as u8);
+        }
+    }
+
+    let handler = AeronRingBufferHandlerWrapper::new(Reader);
+    for _ in 0..10 {
+        let read = rb.read_msgs(&handler, 10);
+        assert_eq!(10, read);
+    }
+
+    Ok(())
+}
+```
+
+### Broadcast Transmitter and Receiver
+
+This example demonstrates how to set up a broadcast transmitter and receiver. The transmitter sends messages that are then received by the receiver, illustrating a simple broadcast communication scenario.
+
+```rust
+use rusteron_rb::*;
+use std::error::Error;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    // Set up broadcast transmitter and receiver
+    let mut vec = vec![0u8; 1024 * 1024 + AERON_BROADCAST_BUFFER_TRAILER_LENGTH];
+    let transmitter = AeronBroadcastTransmitter::from_slice(vec.as_mut_slice(), 1024)?;
+    let receiver = AeronBroadcastReceiver::from_slice(vec.as_mut_slice())?;
+
+    // Transmit messages
+    for i in 0..100 {
+        let mut msg = [0u8; 4];
+        msg[0] = i as u8;
+        let idx = transmitter.transmit_msg(i + 1, &msg).unwrap();
+        println!("sent {}", idx);
+        assert!(idx >= 0);
+    }
+
+    // Receive messages
+    struct Reader;
+    impl AeronBroadcastReceiverHandlerCallback for Reader {
+        fn handle_aeron_broadcast_receiver_handler(&mut self, msg_type_id: i32, buffer: &mut [u8]) {
+            println!("msg_type_id: {}, buffer: {:?}", msg_type_id, buffer);
+            assert_eq!(buffer[0], (msg_type_id - 1) as u8);
+        }
+    }
+
+    let handler = AeronBroadcastReceiverHandlerWrapper::new(Reader);
+    for _ in 0..100 {
+        let read = receiver.receive(Some(&handler)).unwrap();
+        println!("read {}", read);
+        assert!(read > 0);
+    }
+
+    Ok(())
+}
+```
 
 ## Installation
 
