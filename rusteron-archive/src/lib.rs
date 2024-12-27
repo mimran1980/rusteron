@@ -179,7 +179,7 @@ mod tests {
         println!("asked archiver to record {}:{}", archive_uri, stream_id);
 
         // Setup publisher
-        let mut publication = aeron
+        let publication = aeron
             .add_publication(&archive_uri, stream_id, Duration::from_secs(5))
             .expect("Failed to create publication");
 

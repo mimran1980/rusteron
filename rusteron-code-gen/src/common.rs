@@ -1,6 +1,7 @@
 use crate::AeronErrorType::Unknown;
 #[cfg(debug_assertions)]
 use std::backtrace::Backtrace;
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::{any, fmt, ptr};
@@ -74,7 +75,7 @@ impl<T> ManagedCResource<T> {
     pub fn close(&mut self) -> Result<(), AeronCError> {
         if let Some(mut cleanup) = self.cleanup.take() {
             if !self.resource.is_null() {
-                let result = (cleanup)(&mut self.resource);
+                let result = cleanup(&mut self.resource);
                 if result < 0 {
                     return Err(AeronCError::from_code(result));
                 }
@@ -336,19 +337,13 @@ impl ChannelUri {
     pub const MAX_URI_LENGTH: usize = 4095;
 }
 
-enum ParseState {
-    Media,
-    ParamsKey,
-    ParamsValue,
-}
-
 #[derive(Default, Debug)]
 pub struct ChannelUriBuilder {
     media: Option<String>,
     endpoint: Option<String>,
     control_endpoint: Option<String>,
     control_mode: Option<String>,
-    additional_params: Vec<(String, String)>,
+    additional_params: BTreeMap<String, String>,
 }
 
 impl ChannelUriBuilder {
@@ -378,7 +373,7 @@ impl ChannelUriBuilder {
 
     pub fn add_param(mut self, key: &str, value: &str) -> Self {
         self.additional_params
-            .push((key.to_string(), value.to_string()));
+            .insert(key.to_string(), value.to_string());
         self
     }
 

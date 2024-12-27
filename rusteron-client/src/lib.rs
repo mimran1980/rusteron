@@ -15,7 +15,6 @@ pub mod bindings {
 }
 
 use bindings::*;
-use std::time::Duration;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 // include!(concat!(env!("OUT_DIR"), "/rb_custom.rs"));

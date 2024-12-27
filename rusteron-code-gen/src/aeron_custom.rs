@@ -1,7 +1,5 @@
 // code here is included in all modules and extends generated classes
 
-use std::time::Duration;
-
 pub const AERON_IPC_STREAM: &'static str = "aeron:ipc";
 
 unsafe impl Send for AeronSubscription {}
@@ -31,7 +29,7 @@ impl AeronSubscription {
         &mut self,
         client: &Aeron,
         destination: &str,
-        timeout: Duration,
+        timeout: std::time::Duration,
     ) -> Result<(), AeronCError> {
         let result = self.async_add_destination(client, destination)?;
         if result
@@ -74,7 +72,7 @@ impl AeronExclusivePublication {
         &mut self,
         client: &Aeron,
         destination: &str,
-        timeout: Duration,
+        timeout: std::time::Duration,
     ) -> Result<(), AeronCError> {
         let result = self.async_add_destination(client, destination)?;
         if result
@@ -113,7 +111,7 @@ impl AeronPublication {
         &mut self,
         client: &Aeron,
         destination: &str,
-        timeout: Duration,
+        timeout: std::time::Duration,
     ) -> Result<(), AeronCError> {
         let result = self.async_add_destination(client, destination)?;
         if result
