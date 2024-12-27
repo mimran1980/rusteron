@@ -151,6 +151,7 @@ mod tests {
         )
         .expect("Failed to start embedded media driver");
 
+        // important that you have aeron and archive, else you get segfault if you try to use archive if aeron is close
         let (archive, aeron) = _embedded_driver
             .archive_connect()
             .expect("Could not connect to archive client");

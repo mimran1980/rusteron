@@ -327,8 +327,6 @@ pub fn find_unused_udp_port(start_port: u16) -> Option<u16> {
     None
 }
 
-use std::collections::HashMap;
-
 /// Represents the Aeron URI parser and handler.
 pub struct ChannelUri {}
 
