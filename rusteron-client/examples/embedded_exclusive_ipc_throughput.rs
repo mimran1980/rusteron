@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 const BURST_LENGTH: usize = 1_000_000;
 const MESSAGE_LENGTH: usize = 32;
-const CHANNEL: &str = "aeron:ipc";
+const CHANNEL: &str = AERON_IPC_STREAM;
 const STREAM_ID: i32 = 1001;
 
 /// this code is based on Aeron samples EmbeddedExclusiveIpcThroughput

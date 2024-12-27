@@ -1407,6 +1407,13 @@ pub fn generate_rust_code(
                     .fn_name
                     .replace(&format!("{}_", client_class.without_name), "")
             );
+            let client_type_method_name_without_async = format_ident!(
+                "{}",
+                new_method
+                    .fn_name
+                    .replace(&format!("{}_", client_class.without_name), "")
+                    .replace("async_", "")
+            );
 
             let init_args: Vec<proc_macro2::TokenStream> = poll_method
                 .arguments
@@ -1562,6 +1569,14 @@ pub fn generate_rust_code(
                 }
             }
 
+            impl #client_type {
+                #[inline]
+                pub fn #client_type_method_name_without_async #where_clause_async(&self #(
+            , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+                    #async_class_name::new(self, #(#async_new_args_name_only),*)?.poll_blocking(timeout)
+                }
+            }
+
             impl #async_class_name {
                 #[inline]
                 pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
@@ -1704,6 +1719,20 @@ pub fn generate_rust_code(
             pub fn get_inner(&self) -> *mut #type_name {
                 self.inner.get()
             }
+
+
+            // #[inline(always)]
+            // pub fn get_inner_and_disable_drop(&self) -> *mut #type_name {
+            //     unsafe {
+            //         if !*self.inner.borrowed.get() {
+            //             println!("{:?} disabling auto-drop as being used in another place, must be manually dropped", self);
+            //             self.inner.disable_drop();
+            //         }
+            //     }
+            //     self.inner.get()
+            // }
+
+
         }
 
         impl std::ops::Deref for #class_name {

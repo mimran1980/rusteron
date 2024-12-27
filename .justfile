@@ -20,7 +20,7 @@ clean:
 
 # Build the project in debug mode
 build:
-  cargo build --all-targets
+  COPY_BINDINGS=true cargo build --all-targets
 
 # Build the project in release mode
 release:

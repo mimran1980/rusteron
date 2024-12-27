@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn send_message() -> Result<(), AeronCError> {
-        let topic = "aeron:ipc";
+        let topic = AERON_IPC_STREAM;
         let stream_id = 32;
 
         let aeron_context = AeronDriverContext::new()?;

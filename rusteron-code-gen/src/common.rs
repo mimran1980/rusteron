@@ -326,3 +326,90 @@ pub fn find_unused_udp_port(start_port: u16) -> Option<u16> {
 
     None
 }
+
+use std::collections::HashMap;
+
+/// Represents the Aeron URI parser and handler.
+pub struct ChannelUri {}
+
+impl ChannelUri {
+    pub const AERON_SCHEME: &'static str = "aeron";
+    pub const SPY_QUALIFIER: &'static str = "aeron-spy";
+    pub const MAX_URI_LENGTH: usize = 4095;
+}
+
+enum ParseState {
+    Media,
+    ParamsKey,
+    ParamsValue,
+}
+
+#[derive(Default, Debug)]
+pub struct ChannelUriBuilder {
+    media: Option<String>,
+    endpoint: Option<String>,
+    control_endpoint: Option<String>,
+    control_mode: Option<String>,
+    additional_params: Vec<(String, String)>,
+}
+
+impl ChannelUriBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn media(mut self, media: &str) -> Self {
+        self.media = Some(media.to_string());
+        self
+    }
+
+    pub fn endpoint(mut self, endpoint: &str) -> Self {
+        self.endpoint = Some(endpoint.to_string());
+        self
+    }
+
+    pub fn control_endpoint(mut self, control_endpoint: &str) -> Self {
+        self.control_endpoint = Some(control_endpoint.to_string());
+        self
+    }
+
+    pub fn control_mode(mut self, control_mode: &str) -> Self {
+        self.control_mode = Some(control_mode.to_string());
+        self
+    }
+
+    pub fn add_param(mut self, key: &str, value: &str) -> Self {
+        self.additional_params
+            .push((key.to_string(), value.to_string()));
+        self
+    }
+
+    pub fn build(self) -> Result<String, String> {
+        if self.media.is_none() {
+            return Err("Media must be specified".to_string());
+        }
+
+        let mut uri = format!("aeron:{}?", self.media.unwrap());
+
+        if let Some(endpoint) = self.endpoint {
+            uri.push_str(&format!("endpoint={}|", endpoint));
+        }
+
+        if let Some(control_endpoint) = self.control_endpoint {
+            uri.push_str(&format!("control-endpoint={}|", control_endpoint));
+        }
+
+        if let Some(control_mode) = self.control_mode {
+            uri.push_str(&format!("control-mode={}|", control_mode));
+        }
+
+        for (key, value) in self.additional_params {
+            uri.push_str(&format!("{}={}|", key, value));
+        }
+
+        // Remove the trailing '|' character
+        uri.pop();
+
+        Ok(uri)
+    }
+}

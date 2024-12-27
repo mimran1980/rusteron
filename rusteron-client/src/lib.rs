@@ -13,7 +13,9 @@
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
+
 use bindings::*;
+use std::time::Duration;
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 // include!(concat!(env!("OUT_DIR"), "/rb_custom.rs"));
@@ -92,13 +94,13 @@ mod tests {
         aeron.start()?;
         println!("client started");
         let publisher = aeron
-            .async_add_publication("aeron:ipc", 123)?
+            .async_add_publication(AERON_IPC_STREAM, 123)?
             .poll_blocking(Duration::from_secs(5))?;
         println!("created publisher");
 
         let subscription = aeron
             .async_add_subscription(
-                "aeron:ipc",
+                AERON_IPC_STREAM,
                 123,
                 Handlers::no_available_image_handler(),
                 Handlers::no_unavailable_image_handler(),
@@ -223,13 +225,13 @@ mod tests {
         aeron.start()?;
         println!("client started");
         let publisher = aeron
-            .async_add_publication("aeron:ipc", 123)?
+            .async_add_publication(AERON_IPC_STREAM, 123)?
             .poll_blocking(Duration::from_secs(5))?;
         println!("created publisher");
 
         let subscription = aeron
             .async_add_subscription(
-                "aeron:ipc",
+                AERON_IPC_STREAM,
                 123,
                 Handlers::no_available_image_handler(),
                 Handlers::no_unavailable_image_handler(),

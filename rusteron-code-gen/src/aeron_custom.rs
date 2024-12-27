@@ -1,5 +1,9 @@
 // code here is included in all modules and extends generated classes
 
+use std::time::Duration;
+
+pub const AERON_IPC_STREAM: &'static str = "aeron:ipc";
+
 unsafe impl Send for AeronSubscription {}
 unsafe impl Sync for AeronSubscription {}
 unsafe impl Send for AeronPublication {}
@@ -12,6 +16,126 @@ unsafe impl Sync for AeronCounter {}
 impl AeronCounter {
     pub fn addr_atomic(&self) -> &std::sync::atomic::AtomicI64 {
         unsafe { std::sync::atomic::AtomicI64::from_ptr(self.addr()) }
+    }
+}
+
+impl AeronSubscription {
+    pub fn async_add_destination(
+        &mut self,
+        client: &Aeron,
+        destination: &str,
+    ) -> Result<AeronAsyncDestination, AeronCError> {
+        AeronAsyncDestination::aeron_subscription_async_add_destination(client, self, destination)
+    }
+    pub fn add_destination(
+        &mut self,
+        client: &Aeron,
+        destination: &str,
+        timeout: Duration,
+    ) -> Result<(), AeronCError> {
+        let result = self.async_add_destination(client, destination)?;
+        if result
+            .aeron_subscription_async_destination_poll()
+            .unwrap_or_default()
+            > 0
+        {
+            return Ok(());
+        }
+        let time = std::time::Instant::now();
+        while time.elapsed() < timeout {
+            if result
+                .aeron_subscription_async_destination_poll()
+                .unwrap_or_default()
+                > 0
+            {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        println!("failed async poll for {:?}", self);
+        Err(AeronErrorType::TimedOut.into())
+    }
+}
+
+impl AeronExclusivePublication {
+    pub fn async_add_destination(
+        &mut self,
+        client: &Aeron,
+        destination: &str,
+    ) -> Result<AeronAsyncDestination, AeronCError> {
+        AeronAsyncDestination::aeron_exclusive_publication_async_add_destination(
+            client,
+            self,
+            destination,
+        )
+    }
+
+    pub fn add_destination(
+        &mut self,
+        client: &Aeron,
+        destination: &str,
+        timeout: Duration,
+    ) -> Result<(), AeronCError> {
+        let result = self.async_add_destination(client, destination)?;
+        if result
+            .aeron_subscription_async_destination_poll()
+            .unwrap_or_default()
+            > 0
+        {
+            return Ok(());
+        }
+        let time = std::time::Instant::now();
+        while time.elapsed() < timeout {
+            if result
+                .aeron_subscription_async_destination_poll()
+                .unwrap_or_default()
+                > 0
+            {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        println!("failed async poll for {:?}", self);
+        Err(AeronErrorType::TimedOut.into())
+    }
+}
+
+impl AeronPublication {
+    pub fn async_add_destination(
+        &mut self,
+        client: &Aeron,
+        destination: &str,
+    ) -> Result<AeronAsyncDestination, AeronCError> {
+        AeronAsyncDestination::aeron_publication_async_add_destination(client, self, destination)
+    }
+
+    pub fn add_destination(
+        &mut self,
+        client: &Aeron,
+        destination: &str,
+        timeout: Duration,
+    ) -> Result<(), AeronCError> {
+        let result = self.async_add_destination(client, destination)?;
+        if result
+            .aeron_subscription_async_destination_poll()
+            .unwrap_or_default()
+            > 0
+        {
+            return Ok(());
+        }
+        let time = std::time::Instant::now();
+        while time.elapsed() < timeout {
+            if result
+                .aeron_subscription_async_destination_poll()
+                .unwrap_or_default()
+                > 0
+            {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        println!("failed async poll for {:?}", self);
+        Err(AeronErrorType::TimedOut.into())
     }
 }
 

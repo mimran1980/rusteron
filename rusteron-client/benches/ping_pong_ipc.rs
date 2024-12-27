@@ -8,8 +8,8 @@ use std::time::Duration;
 
 const PING_STREAM_ID: i32 = 1002;
 const PONG_STREAM_ID: i32 = 1003;
-const PING_CHANNEL: &str = "aeron:ipc";
-const PONG_CHANNEL: &str = "aeron:ipc";
+const PING_CHANNEL: &str = AERON_IPC_STREAM;
+const PONG_CHANNEL: &str = AERON_IPC_STREAM;
 const MESSAGE_LENGTH: usize = 32;
 const FRAGMENT_COUNT_LIMIT: usize = 10;
 
