@@ -23,6 +23,8 @@ hdrhistogram = "7.5"
 zerocopy = { version = "0.8", features = ["derive", "simd", "alloc"] }
 criterion = "0.5"
 serial_test = "3.2"
+regex = "1.11"
+log = "0.4"
 
 [release]
 publish = true

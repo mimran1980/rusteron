@@ -17,19 +17,25 @@ exclude = [
     "**/aeron/**/build/**",
 ]
 
+[dependencies]
+regex = { workspace = true}
+log = { workspace = true}
+
 [build-dependencies]
 bindgen = {  workspace = true }
 cmake = {  workspace = true }
 dunce = {  workspace = true }
 pkg-config = {  workspace = true }
-syn = {  workspace = true }
 proc-macro2 = {  workspace = true }
 quote = {  workspace = true }
 itertools = {  workspace = true }
+regex = { workspace = true}
+log = { workspace = true}
 rusteron-code-gen = {path = "../rusteron-code-gen", version = "0"}
 
 [dev-dependencies]
 serial_test = { workspace = true }
+env_logger = "0.11"
 
 [features]
 static = []

@@ -17,6 +17,10 @@ ctrlc = { workspace = true }
 num-format = {  workspace = true }
 hdrhistogram = { workspace = true}
 zerocopy = { workspace = true }
+log = { workspace = true}
+regex = { workspace = true}
+
+
 
 [build-dependencies]
 bindgen = {  workspace = true }
@@ -28,11 +32,14 @@ proc-macro2 = {  workspace = true }
 quote = {  workspace = true }
 itertools = {  workspace = true }
 rusteron-code-gen = {path = "../rusteron-code-gen", version = "0"}
+log = { workspace = true}
+regex = { workspace = true}
 
 [dev-dependencies]
 rusteron-media-driver = {path = "../rusteron-media-driver"}
 serial_test = { workspace = true }
 criterion = {workspace = true}
+env_logger = "0.11"
 
 [features]
 static = ["rusteron-media-driver/static"]

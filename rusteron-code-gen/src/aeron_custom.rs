@@ -48,6 +48,7 @@ impl AeronSubscription {
             {
                 return Ok(());
             }
+            #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         println!("failed async poll for {:?}", self);
@@ -91,6 +92,7 @@ impl AeronExclusivePublication {
             {
                 return Ok(());
             }
+            #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         println!("failed async poll for {:?}", self);
@@ -130,6 +132,7 @@ impl AeronPublication {
             {
                 return Ok(());
             }
+            #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         println!("failed async poll for {:?}", self);
@@ -179,6 +182,7 @@ impl Aeron {
             if let Ok(aeron) = Aeron::new(&context) {
                 return Ok(aeron);
             }
+            #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         println!("failed to create aeron client for {:?}", context);

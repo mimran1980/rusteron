@@ -22,6 +22,7 @@ include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::error;
     use serial_test::serial;
     use std::error;
     use std::io::Write;
@@ -33,6 +34,7 @@ mod tests {
     #[test]
     #[serial]
     fn version_check() -> Result<(), Box<dyn error::Error>> {
+        env_logger::init();
         let major = unsafe { crate::aeron_version_major() };
         let minor = unsafe { crate::aeron_version_minor() };
         let patch = unsafe { crate::aeron_version_patch() };
@@ -44,7 +46,7 @@ mod tests {
         let ctx = AeronContext::new()?;
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
+            error!("aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
 
@@ -58,6 +60,7 @@ mod tests {
     #[test]
     #[serial]
     pub fn simple_large_send() -> Result<(), Box<dyn error::Error>> {
+        env_logger::init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
         media_driver_ctx.set_dir_delete_on_start(true)?;
@@ -74,7 +77,7 @@ mod tests {
         assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
+            error!("aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
@@ -131,7 +134,7 @@ mod tests {
                                 // ignore
                             }
                             _ => {
-                                eprintln!(
+                                error!(
                                     "ERROR: failed to send message {:?}",
                                     AeronCError::from_code(result as i32)
                                 );
@@ -153,7 +156,7 @@ mod tests {
                 count_copy.fetch_add(1, Ordering::SeqCst);
                 if msg.len() != string_len {
                     stop2.store(true, Ordering::SeqCst);
-                    eprintln!(
+                    error!(
                         "ERROR: message was {} was expecting {} [header={:?}]",
                         msg.len(),
                         string_len,
@@ -196,6 +199,7 @@ mod tests {
     #[test]
     #[serial]
     pub fn try_claim() -> Result<(), Box<dyn error::Error>> {
+        env_logger::init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
         media_driver_ctx.set_dir_delete_on_start(true)?;
@@ -212,7 +216,7 @@ mod tests {
         assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
+            error!("aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;
@@ -257,7 +261,7 @@ mod tests {
                     let result = publisher.try_claim(string_len, &buffer);
 
                     if result < msg.len() as i64 {
-                        eprintln!(
+                        error!(
                             "ERROR: failed to send message {:?}",
                             AeronCError::from_code(result as i32)
                         );
@@ -279,7 +283,7 @@ mod tests {
                 count_copy.fetch_add(1, Ordering::SeqCst);
                 if msg.len() != string_len {
                     stop2.store(true, Ordering::SeqCst);
-                    eprintln!(
+                    error!(
                         "ERROR: message was {} was expecting {} [header={:?}]",
                         msg.len(),
                         string_len,
@@ -321,6 +325,7 @@ mod tests {
     #[test]
     #[serial]
     pub fn counters() -> Result<(), Box<dyn error::Error>> {
+        env_logger::init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
         media_driver_ctx.set_dir_delete_on_start(true)?;
@@ -337,7 +342,7 @@ mod tests {
         assert_eq!(media_driver_ctx.get_dir(), ctx.get_dir());
         let mut error_count = 1;
         let error_handler = AeronErrorHandlerClosure::from(|error_code, msg| {
-            eprintln!("ERROR: aeron error {}: {}", error_code, msg);
+            error!("ERROR: aeron error {}: {}", error_code, msg);
             error_count += 1;
         });
         ctx.set_error_handler(Some(&Handler::leak(error_handler)))?;

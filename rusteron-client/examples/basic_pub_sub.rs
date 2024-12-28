@@ -1,3 +1,4 @@
+use log::error;
 use rusteron_client::*;
 use std::cell::Cell;
 use std::error;
@@ -41,7 +42,7 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
                 Handlers::no_reserved_value_supplier_handler(),
             ) < 1
             {
-                eprintln!("failed to send message");
+                error!("failed to send message");
             }
         })
     };

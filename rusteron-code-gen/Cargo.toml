@@ -14,7 +14,8 @@ syn = { version = "2.0", features = ["full"] }
 proc-macro2 = "1.0"
 quote = "1.0"
 itertools = "0.13"
-regex = "1.11.1"
+regex = "1.11"
+log = "0.4"
 
 [dev-dependencies]
 trybuild = "1.0"

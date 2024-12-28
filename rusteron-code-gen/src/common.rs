@@ -4,7 +4,7 @@ use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
-use std::{any, fmt, ptr};
+use std::{any, fmt, panic, process, ptr};
 
 /// A custom struct for managing C resources with automatic cleanup.
 ///
@@ -200,12 +200,25 @@ impl AeronCError {
         {
             if code < 0 {
                 let backtrace = Backtrace::capture();
-                eprintln!(
+                log::error!(
                     "Aeron C error code: {}, kind: '{:?}' - {:#?}",
                     code,
                     AeronErrorType::from_code(code),
                     backtrace
                 );
+
+                let backtrace = format!("{:?}", backtrace);
+                // Regular expression to match the function, file, and line
+                let re =
+                    regex::Regex::new(r#"fn: "([^"]+)", file: "([^"]+)", line: (\d+)"#).unwrap();
+
+                // Extract and print in IntelliJ format with function
+                for cap in re.captures_iter(&backtrace) {
+                    let function = &cap[1];
+                    let file = &cap[2];
+                    let line = &cap[3];
+                    log::warn!("ERROR: {file}:{line} in {function}");
+                }
             }
         }
         AeronCError { code }

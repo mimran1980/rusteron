@@ -1613,6 +1613,7 @@ pub fn generate_rust_code(
                         if let Some(publication) = self.poll() {
                             return Ok(publication);
                         }
+                        #[cfg(debug_assertions)]
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
                     println!("failed async poll for {:?}", self);

@@ -1,24 +1,72 @@
-use crate::{Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext, AeronContext};
+use crate::{
+    Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext,
+    AeronArchiveRecordingSignal, AeronContext, AeronIdleStrategyFuncClosure, Handler,
+};
+use log::{error, warn};
+use regex::Regex;
+use std::backtrace::Backtrace;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use std::{fs, io};
+use std::{fs, io, panic, process};
 
 pub struct EmbeddedArchiveMediaDriverProcess {
     child: Child,
     pub aeron_dir: String,
     pub archive_dir: String,
-    pub request_control_channel: String,
-    pub response_control_channel: String,
+    pub control_request_channel: String,
+    pub control_response_channel: String,
+    pub recording_events_channel: String,
 }
 
 impl EmbeddedArchiveMediaDriverProcess {
+    /// Builds the Aeron Archive project and starts an embedded Aeron Archive Media Driver process.
+    ///
+    /// This function ensures that the necessary Aeron `.jar` files are built using Gradle. If the required
+    /// `.jar` files are not found in the expected directory, it runs the Gradle build tasks to generate them.
+    /// Once the build is complete, it invokes the `start` function to initialize and run the Aeron Archive Media Driver.
+    ///
+    /// # Parameters
+    /// - `aeron_dir`: The directory for the Aeron media driver to use for its IPC mechanisms.
+    /// - `archive_dir`: The directory where the Aeron Archive will store its recordings and metadata.
+    /// - `control_request_channel`: The channel URI used for sending control requests to the Aeron Archive.
+    /// - `control_response_channel`: The channel URI used for receiving control responses from the Aeron Archive.
+    /// - `recording_events_channel`: The channel URI used for receiving recording event notifications from the Aeron Archive.
+    ///
+    /// # Returns
+    /// On success, returns an instance of `EmbeddedArchiveMediaDriverProcess` encapsulating the child process
+    /// and configuration used. Returns an `io::Result` if the process fails to start or the build fails.
+    ///
+    /// # Errors
+    /// Returns an `io::Result::Err` if:
+    /// - The Gradle build fails to execute or complete.
+    /// - The required `.jar` files are still not found after building.
+    /// - The `start` function encounters an error starting the process.
+    ///
+    /// # Example
+    /// ```
+    /// use rusteron_archive::testing::EmbeddedArchiveMediaDriverProcess;
+    /// let driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
+    ///     "/tmp/aeron-dir",
+    ///     "/tmp/archive-dir",
+    ///     "aeron:udp?endpoint=localhost:8010",
+    ///     "aeron:udp?endpoint=localhost:8011",
+    ///     "aeron:udp?endpoint=localhost:8012",
+    /// ).expect("Failed to build and start Aeron Archive Media Driver");
+    /// ```
+    ///
+    /// # Notes
+    /// - This function assumes the presence of a Gradle wrapper script (`gradlew` or `gradlew.bat`)
+    ///   in the `aeron` directory relative to the project's root (`CARGO_MANIFEST_DIR`).
+    /// - The required `.jar` files will be generated in `aeron/aeron-all/build/libs` if not already present.
+    /// - The `build_and_start` function is a convenience wrapper for automating the build and initialization process.
     pub fn build_and_start(
         aeron_dir: &str,
         archive_dir: &str,
-        request_control_channel: &str,
-        response_control_channel: &str,
+        control_request_channel: &str,
+        control_response_channel: &str,
+        recording_events_channel: &str,
     ) -> io::Result<Self> {
         let path = std::path::MAIN_SEPARATOR;
         let gradle = if cfg!(target_os = "windows") {
@@ -47,8 +95,9 @@ impl EmbeddedArchiveMediaDriverProcess {
         return Self::start(
             &aeron_dir,
             archive_dir,
-            request_control_channel,
-            response_control_channel,
+            control_request_channel,
+            control_response_channel,
+            recording_events_channel,
         );
     }
 
@@ -65,10 +114,34 @@ impl EmbeddedArchiveMediaDriverProcess {
                         if let Ok(archive_context) =
                             AeronArchiveContext::new_with_no_credentials_supplier(
                                 &aeron,
-                                &self.request_control_channel,
-                                &self.response_control_channel,
+                                &self.control_request_channel,
+                                &self.control_response_channel,
+                                &self.recording_events_channel,
                             )
                         {
+                            let signal_consumer = Handler::leak(
+                                crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
+                                    |signal: AeronArchiveRecordingSignal| {
+                                        println!("Recording signal received: {:?}", signal);
+                                    },
+                                ),
+                            );
+                            archive_context
+                                .set_recording_signal_consumer(Some(&signal_consumer))
+                                .expect("Failed to set recording signal consumer");
+                            let error_handler = Handler::leak(
+                                crate::AeronErrorHandlerClosure::from(|code, msg| {
+                                    error!("err code: {}, msg: {}", code, msg);
+                                }),
+                            );
+                            archive_context
+                                .set_error_handler(Some(&error_handler))
+                                .expect("unable to set error handler");
+                            archive_context
+                                .set_idle_strategy(Some(&Handler::leak(
+                                    AeronIdleStrategyFuncClosure::from(|work_count| {}),
+                                )))
+                                .expect("unable to set idle strategy");
                             if let Ok(connect) = AeronArchiveAsyncConnect::new(&archive_context) {
                                 if let Ok(archive) = connect.poll_blocking(Duration::from_secs(10))
                                 {
@@ -80,7 +153,7 @@ impl EmbeddedArchiveMediaDriverProcess {
                                 };
                             }
                         }
-                        eprintln!("aeron error: {}", aeron.errmsg());
+                        error!("aeron error: {}", aeron.errmsg());
                     }
                 }
             }
@@ -97,11 +170,51 @@ impl EmbeddedArchiveMediaDriverProcess {
         ));
     }
 
+    /// Starts an embedded Aeron Archive Media Driver process with the specified configurations.
+    ///
+    /// This function cleans and recreates the Aeron and archive directories, configures the JVM to run
+    /// the Aeron Archive Media Driver, and starts the process with the specified control channels.
+    /// It ensures that the environment is correctly prepared for Aeron communication.
+    ///
+    /// # Parameters
+    /// - `aeron_dir`: The directory for the Aeron media driver to use for its IPC mechanisms.
+    /// - `archive_dir`: The directory where the Aeron Archive will store its recordings and metadata.
+    /// - `control_request_channel`: The channel URI used for sending control requests to the Aeron Archive.
+    /// - `control_response_channel`: The channel URI used for receiving control responses from the Aeron Archive.
+    /// - `recording_events_channel`: The channel URI used for receiving recording event notifications from the Aeron Archive.
+    ///
+    /// # Returns
+    /// On success, returns an instance of `EmbeddedArchiveMediaDriverProcess` encapsulating the child process
+    /// and configuration used. Returns an `io::Result` if the process fails to start.
+    ///
+    /// # Errors
+    /// Returns an `io::Result::Err` if:
+    /// - Cleaning or creating the directories fails.
+    /// - The required `.jar` files are missing or not found.
+    /// - The Java process fails to start.
+    ///
+    /// # Example
+    /// ```
+    /// use rusteron_archive::testing::EmbeddedArchiveMediaDriverProcess;
+    /// let driver = EmbeddedArchiveMediaDriverProcess::start(
+    ///     "/tmp/aeron-dir",
+    ///     "/tmp/archive-dir",
+    ///     "aeron:udp?endpoint=localhost:8010",
+    ///     "aeron:udp?endpoint=localhost:8011",
+    ///     "aeron:udp?endpoint=localhost:8012",
+    /// ).expect("Failed to start Aeron Archive Media Driver");
+    /// ```
+    ///
+    /// # Notes
+    /// - The Aeron `.jar` files must be available under the directory `aeron/aeron-all/build/libs` relative
+    ///   to the project's root (`CARGO_MANIFEST_DIR`).
+    /// - The function configures the JVM with properties for Aeron, such as enabling event logging and disabling bounds checks.
     pub fn start(
         aeron_dir: &str,
         archive_dir: &str,
-        request_control_channel: &str,
-        response_control_channel: &str,
+        control_request_channel: &str,
+        control_response_channel: &str,
+        recording_events_channel: &str,
     ) -> io::Result<Self> {
         Self::clean_directory(aeron_dir)?;
         Self::clean_directory(archive_dir)?;
@@ -168,10 +281,17 @@ impl EmbeddedArchiveMediaDriverProcess {
             "-Dagrona.disable.bounds.checks=true",
             &format!(
                 "-Daeron.archive.control.channel={}",
-                request_control_channel
+                control_request_channel
+            ),
+            &format!(
+                "-Daeron.archive.control.response.channel={}",
+                control_response_channel
+            ),
+            &format!(
+                "-Daeron.archive.recording.events.channel={}",
+                recording_events_channel
             ),
             "-Daeron.archive.replication.channel=aeron:udp?endpoint=localhost:0",
-            "-Daeron.archive.control.response.channel=aeron:udp?endpoint=localhost:0",
             "io.aeron.archive.ArchivingMediaDriver",
         ];
 
@@ -195,8 +315,9 @@ impl EmbeddedArchiveMediaDriverProcess {
             child,
             aeron_dir: aeron_dir.to_string(),
             archive_dir: archive_dir.to_string(),
-            request_control_channel: request_control_channel.to_string(),
-            response_control_channel: response_control_channel.to_string(),
+            control_request_channel: control_request_channel.to_string(),
+            control_response_channel: control_response_channel.to_string(),
+            recording_events_channel: recording_events_channel.to_string(),
         })
     }
 
@@ -208,23 +329,73 @@ impl EmbeddedArchiveMediaDriverProcess {
         }
         Ok(())
     }
+
+    pub fn kill_all_java_processes() -> io::Result<ExitStatus> {
+        if cfg!(not(target_os = "windows")) {
+            return Ok(std::process::Command::new("pkill")
+                .args(["-9", "java"])
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()?
+                .wait()?);
+        }
+        Ok(ExitStatus::default())
+    }
 }
 
 // Use the Drop trait to ensure process cleanup and directory removal after test completion
 impl Drop for EmbeddedArchiveMediaDriverProcess {
     fn drop(&mut self) {
-        eprintln!("WARN: stopping aeron archive media driver!!!!");
+        warn!("WARN: stopping aeron archive media driver!!!!");
         // Attempt to kill the Java process if it’s still running
         if let Err(e) = self.child.kill() {
-            eprintln!("Failed to kill Java process: {}", e);
+            error!("Failed to kill Java process: {}", e);
         }
 
         // Clean up directories after the process has terminated
         if let Err(e) = Self::clean_directory(&self.aeron_dir) {
-            eprintln!("Failed to clean up Aeron directory: {}", e);
+            error!("Failed to clean up Aeron directory: {}", e);
         }
         if let Err(e) = Self::clean_directory(&self.archive_dir) {
-            eprintln!("Failed to clean up Archive directory: {}", e);
+            error!("Failed to clean up Archive directory: {}", e);
         }
     }
+}
+
+pub fn set_panic_hook() {
+    panic::set_hook(Box::new(|info| {
+        // Get the backtrace
+        let backtrace = Backtrace::force_capture();
+        error!("Stack trace: {backtrace:#?}");
+
+        let backtrace = format!("{:?}", backtrace);
+        // Regular expression to match the function, file, and line
+        let re = Regex::new(r#"fn: "([^"]+)", file: "([^"]+)", line: (\d+)"#).unwrap();
+
+        // Extract and print in IntelliJ format with function
+        for cap in re.captures_iter(&backtrace) {
+            let function = &cap[1];
+            let file = &cap[2];
+            let line = &cap[3];
+            println!("{file}:{line} in {function}");
+        }
+
+        error!("Panic occurred: {:#?}", info);
+
+        if let Some(payload) = info.payload().downcast_ref::<&str>() {
+            error!("Panic message: {}", payload);
+        } else if let Some(payload) = info.payload().downcast_ref::<String>() {
+            error!("Panic message: {}", payload);
+        } else {
+            // If it's not a &str or String, try to print it as Debug
+            error!(
+                "Panic with non-standard payload: {:?}",
+                info.payload().type_id()
+            );
+        }
+
+        warn!("shutdown");
+
+        process::abort();
+    }))
 }
