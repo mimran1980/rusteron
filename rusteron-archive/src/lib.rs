@@ -120,7 +120,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
-        env_logger::init();
+        env_logger::Builder::new()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Info)
+            .init();
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
         let id = Aeron::nano_clock();
@@ -303,7 +306,10 @@ mod tests {
     // #[test]
     // #[serial]
     // pub fn test_failed_connect() -> Result<(), Box<dyn error::Error>> {
-    // env_logger::init();
+    //         env_logger::Builder::new()
+    //         .is_test(true)
+    //         .filter_level(log::LevelFilter::Info)
+    //         .init();
     //     let ctx = AeronArchiveContext::new()?;
     //     std::env::set_var("AERON_DRIVER_TIMEOUT", "1");
     //     let connect = AeronArchiveAsyncConnect::new(&ctx);
@@ -320,7 +326,10 @@ mod tests {
 
     #[test]
     fn test_replay_merge() -> Result<(), AeronCError> {
-        env_logger::init();
+        env_logger::Builder::new()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Info)
+            .init();
         let id = Aeron::nano_clock();
         let aeron_dir = format!("target/aeron/{}/shm", id);
         let archive_dir = format!("target/aeron/{}/archive", id);
@@ -511,7 +520,10 @@ mod tests {
     #[test]
     #[serial]
     pub fn test_aeron_archive() -> Result<(), Box<dyn error::Error>> {
-        env_logger::init();
+        env_logger::Builder::new()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Info)
+            .init();
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
 
