@@ -4,7 +4,7 @@ use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
-use std::{any, fmt, panic, process, ptr};
+use std::{any, fmt, ptr};
 
 /// A custom struct for managing C resources with automatic cleanup.
 ///
@@ -50,7 +50,7 @@ impl<T> ManagedCResource<T> {
             cleanup_struct,
             borrowed: false,
         };
-        println!("created c resource: {:?}", result);
+        log::info!("created c resource: {:?}", result);
         Ok(result)
     }
 
@@ -92,11 +92,11 @@ impl<T> Drop for ManagedCResource<T> {
         if !self.resource.is_null() && !self.borrowed {
             let resource = self.resource.clone();
             // Ensure the clean-up function is called when the resource is dropped.
-            println!("closing c resource: {:?}", self);
+            log::info!("closing c resource: {:?}", self);
             let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
 
             if self.cleanup_struct {
-                println!("closing rust struct resource: {:?}", self);
+                log::info!("closing rust struct resource: {:?}", self);
                 unsafe {
                     let _ = Box::from_raw(resource);
                 }

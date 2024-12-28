@@ -15,6 +15,7 @@ pub mod bindings {
 }
 
 use bindings::*;
+use log::info;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{sleep, JoinHandle};
@@ -45,12 +46,12 @@ impl AeronDriver {
         let started = Arc::new(AtomicBool::new(false));
         let started2 = started.clone();
 
-        println!("Starting media driver [dir={}]", aeron_context.get_dir());
+        info!("Starting media driver [dir={}]", aeron_context.get_dir());
         let handle = std::thread::spawn(move || {
             let aeron_driver = AeronDriver::new(&aeron_context)?;
             aeron_driver.start(true)?;
 
-            println!(
+            info!(
                 "Aeron driver started [dir={}]",
                 aeron_driver.context().get_dir()
             );
@@ -64,7 +65,7 @@ impl AeronDriver {
                 }
             }
 
-            println!("stopping media driver");
+            info!("stopping media driver");
 
             Ok::<_, AeronCError>(())
         });
@@ -76,7 +77,7 @@ impl AeronDriver {
         if handle.is_finished() {
             panic!("failed to start media driver {:?}", handle.join())
         }
-        println!("started media driver");
+        info!("started media driver");
 
         (stop_copy, handle)
     }
@@ -85,6 +86,7 @@ impl AeronDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::error;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
@@ -101,6 +103,7 @@ mod tests {
 
     #[test]
     fn send_message() -> Result<(), AeronCError> {
+        env_logger::init();
         let topic = AERON_IPC_STREAM;
         let stream_id = 32;
 
@@ -115,7 +118,7 @@ mod tests {
         //     .context()
         //     .print_configuration();
         // aeron_driver.main_do_work()?;
-        println!("aeron dir: {:?}", aeron_context.get_dir());
+        info!("aeron dir: {:?}", aeron_context.get_dir());
 
         let dir = aeron_context.get_dir().to_string();
         let ctx = AeronContext::new()?;
@@ -126,7 +129,7 @@ mod tests {
 
         let error_handler = Some(Handler::leak(AeronErrorHandlerClosure::from(
             |error_code, msg| {
-                eprintln!("Aeron error {}: {}", error_code, msg);
+                error!("Aeron error {}: {}", error_code, msg);
                 error_count += 1;
             },
         )));
@@ -140,7 +143,7 @@ mod tests {
                 registration_id: i64,
                 counter_id: i32,
             ) -> () {
-                println!("new counter counters_reader={counters_reader:?} registration_id={registration_id} counter_id={counter_id}");
+                info!("new counter counters_reader={counters_reader:?} registration_id={registration_id} counter_id={counter_id}");
             }
         }
 
@@ -153,7 +156,7 @@ mod tests {
                 session_id: i32,
                 correlation_id: i64,
             ) -> () {
-                println!("on new publication {async_:?} {channel} {stream_id} {session_id} {correlation_id}")
+                info!("on new publication {async_:?} {channel} {stream_id} {session_id} {correlation_id}")
             }
         }
         let handler = Some(Handler::leak(Test {}));
@@ -161,7 +164,7 @@ mod tests {
         ctx.set_on_new_publication(handler.as_ref())?;
 
         client.start()?;
-        println!("aeron driver started");
+        info!("aeron driver started");
         assert!(Aeron::epoch_clock() > 0);
         assert!(Aeron::nano_clock() > 0);
 
@@ -179,9 +182,9 @@ mod tests {
 
         let _sub: AeronAsyncAddSubscription = AeronAsyncAddSubscription::new_zeroed()?;
 
-        println!("publication channel: {:?}", publication.channel());
-        println!("publication stream_id: {:?}", publication.stream_id());
-        println!("publication status: {:?}", publication.channel_status());
+        info!("publication channel: {:?}", publication.channel());
+        info!("publication stream_id: {:?}", publication.stream_id());
+        info!("publication status: {:?}", publication.channel_status());
 
         // client.main_do_work();
         // let claim = AeronBufferClaim::default();

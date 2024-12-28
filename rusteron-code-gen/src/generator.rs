@@ -832,7 +832,7 @@ impl CWrapper {
                 pub fn new_zeroed() -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
                         move |ctx_field| {
-                            println!("creating zeroed empty resource {}", stringify!(#type_name));
+                            log::info!("creating zeroed empty resource {}", stringify!(#type_name));
                             let inst: #type_name = unsafe { std::mem::zeroed() };
                             let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
                             unsafe { *ctx_field = inner_ptr };
@@ -1293,7 +1293,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
         pub struct #logger_type_name;
         impl #closure_type_name for #logger_type_name {
             fn #handle_method_name(&mut self, #(#closure_unused_args),*) -> #closure_return_type {
-                println!("{}", stringify!(#handle_method_name));
+                log::info!("{}", stringify!(#handle_method_name));
                 #logger_return_type
             }
         }
@@ -1616,7 +1616,7 @@ pub fn generate_rust_code(
                         #[cfg(debug_assertions)]
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
-                    println!("failed async poll for {:?}", self);
+                    log::info!("failed async poll for {:?}", self);
                     Err(AeronErrorType::TimedOut.into())
                 }
             }
@@ -1726,7 +1726,7 @@ pub fn generate_rust_code(
             // pub fn get_inner_and_disable_drop(&self) -> *mut #type_name {
             //     unsafe {
             //         if !*self.inner.borrowed.get() {
-            //             println!("{:?} disabling auto-drop as being used in another place, must be manually dropped", self);
+            //             log::info!("{:?} disabling auto-drop as being used in another place, must be manually dropped", self);
             //             self.inner.disable_drop();
             //         }
             //     }

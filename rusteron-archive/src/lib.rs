@@ -100,13 +100,13 @@ impl AeronArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::info;
 
     use crate::testing::EmbeddedArchiveMediaDriverProcess;
     use serial_test::serial;
     use std::cell::Cell;
     use std::error;
     use std::error::Error;
-    use std::future::Future;
     use std::thread::sleep;
     use std::time::{Duration, Instant};
 
@@ -127,7 +127,7 @@ mod tests {
         let aeron_dir = format!("target/aeron/{}/shm", id);
         let archive_dir = format!("target/aeron/{}/archive", id);
 
-        println!("starting archive media driver");
+        info!("starting archive media driver");
         let media_driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
             &aeron_dir,
             &format!("{}/archive", aeron_dir),
@@ -137,13 +137,13 @@ mod tests {
         )
         .expect("Failed to start embedded media driver");
 
-        println!("connecting to archive");
+        info!("connecting to archive");
         // important that you have aeron and archive, else you get segfault if you try to use archive if aeron is close
         let (archive, aeron) = media_driver
             .archive_connect()
             .expect("Could not connect to archive client");
 
-        println!("connected to archive");
+        info!("connected to archive");
         assert!(!aeron.is_closed());
 
         let live_uri = EXAMPLE_LIVE_CHANNEL;
@@ -159,7 +159,7 @@ mod tests {
             }
             sleep(Duration::from_millis(100));
         }
-        println!("asked archiver to record {}:{}", live_uri, stream_id);
+        info!("asked archiver to record {}:{}", live_uri, stream_id);
 
         // Setup publisher
         let publication = aeron
@@ -183,23 +183,23 @@ mod tests {
             //     }
             //     i+=1;
             //     thread::sleep(Duration::from_millis(10));
-            //     println!("offer price update: {}", i);
+            //     info!("offer price update: {}", i);
             // }
         });
 
         // TODO add reply-merge subscription here
-        println!("publisher thread started");
+        info!("publisher thread started");
 
         let list_recording_handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
                 |d: AeronArchiveRecordingDescriptor| {
-                    println!("descriptor {:?}", d);
+                    info!("descriptor {:?}", d);
                 },
             ),
         );
         loop {
             archive.poll_for_recording_signals()?;
-            println!(
+            info!(
                 "{:?}",
                 archive.list_recordings_for_uri(
                     0,
@@ -231,11 +231,11 @@ mod tests {
         )?;
         let session_id = replay_session_id as i32;
 
-        println!("replay session id {}", replay_session_id);
-        println!("session id {}", session_id);
+        info!("replay session id {}", replay_session_id);
+        info!("session id {}", session_id);
         let channel_replay = format!("{}?session-id={}", replay_uri, session_id);
-        println!("archive id: {}", archive.get_archive_id());
-        println!("channel replay: {}", channel_replay);
+        info!("archive id: {}", archive.get_archive_id());
+        info!("channel replay: {}", channel_replay);
         let subscription = aeron
             .async_add_subscription(
                 &channel_replay,
@@ -249,7 +249,7 @@ mod tests {
             let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
                 |buffer: Vec<u8>, header: AeronHeader| {
                     let message = String::from_utf8_lossy(buffer.as_slice());
-                    println!("Replayed message: {}", message);
+                    info!("Replayed message: {}", message);
                 },
             ));
             // Simulate replaying last 24 hours of data
@@ -266,7 +266,7 @@ mod tests {
             let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
                 |buffer: Vec<u8>, header: AeronHeader| {
                     let message = String::from_utf8_lossy(buffer.as_slice());
-                    println!("Live message: {}", message);
+                    info!("Live message: {}", message);
                 },
             ));
 
@@ -363,7 +363,7 @@ mod tests {
         let stream_id = 1001;
 
         archive.start_recording(&archive_uri, stream_id, SOURCE_LOCATION_LOCAL, true)?;
-        println!("asked archiver to record {}:{}", archive_uri, stream_id);
+        info!("asked archiver to record {}:{}", archive_uri, stream_id);
 
         // Setup publisher
         let publication = aeron
@@ -387,7 +387,7 @@ mod tests {
                 }
                 i += 1;
                 thread::sleep(Duration::from_millis(10));
-                // println!("offer price update: {}", i);
+                // info!("offer price update: {}", i);
             }
         });
 
@@ -415,7 +415,7 @@ mod tests {
             let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
                 |buffer: Vec<u8>, header: AeronHeader| {
                     let message = String::from_utf8_lossy(buffer.as_slice());
-                    println!("Replayed message: {}", message);
+                    info!("Replayed message: {}", message);
                 },
             ));
             // Simulate replaying last 24 hours of data
@@ -432,7 +432,7 @@ mod tests {
             let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
                 |buffer: Vec<u8>, header: AeronHeader| {
                     let message = String::from_utf8_lossy(buffer.as_slice());
-                    println!("Live message: {}", message);
+                    info!("Live message: {}", message);
                 },
             ));
 
@@ -520,7 +520,7 @@ mod tests {
         archive_context.set_recording_signal_consumer(Some(&Handler::leak(
             crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
                 |signal: AeronArchiveRecordingSignal| {
-                    println!("signal {:?}", signal);
+                    info!("signal {:?}", signal);
                     found_recording_signal.set(true);
                 },
             ),
@@ -528,7 +528,7 @@ mod tests {
         let signal_consumer =
             Handler::leak(crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
                 |signal: AeronArchiveRecordingSignal| {
-                    println!("Recording signal received: {:?}", signal);
+                    info!("Recording signal received: {:?}", signal);
                 },
             ));
         archive_context
@@ -540,7 +540,7 @@ mod tests {
 
         assert!(!aeron.is_closed());
 
-        println!("connected to aeron");
+        info!("connected to aeron");
 
         let archive_connector = AeronArchiveAsyncConnect::new(&archive_context.clone())?;
         let archive = archive_connector
@@ -556,7 +556,7 @@ mod tests {
             archive.start_recording(channel, stream_id, SOURCE_LOCATION_LOCAL, true)?;
 
         assert!(subscription_id >= 0);
-        println!("subscription id {}", subscription_id);
+        info!("subscription id {}", subscription_id);
 
         let publication = aeron
             .async_add_exclusive_publication(channel, stream_id)?
@@ -584,19 +584,19 @@ mod tests {
                     panic!("{}", err);
                 }
             }
-            println!("sent message {i}");
+            info!("sent message {i}");
         }
         archive.stop_recording_channel_and_stream(channel, stream_id)?;
         drop(publication);
 
-        println!("list recordings");
+        info!("list recordings");
         let found_recording_id = Cell::new(-1);
         let start_pos = Cell::new(-1);
         let end_pos = Cell::new(-1);
         let handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
                 |d: AeronArchiveRecordingDescriptor| {
-                    println!("found recording {:#?}", d);
+                    info!("found recording {:#?}", d);
                     if d.stop_position > d.start_position && d.stop_position > 0 {
                         found_recording_id.set(d.recording_id);
                         start_pos.set(d.start_position);
@@ -614,7 +614,7 @@ mod tests {
             }
         }
         assert!(start.elapsed() < Duration::from_secs(5));
-        println!("start replay");
+        info!("start replay");
         let params = AeronArchiveReplayParams::new(
             0,
             i32::MAX,
@@ -623,18 +623,18 @@ mod tests {
             0,
             0,
         )?;
-        println!("replay params {:#?}", params);
+        info!("replay params {:#?}", params);
         let replay_stream_id = 45;
         let replay_session_id =
             archive.start_replay(found_recording_id.get(), channel, replay_stream_id, &params)?;
         let session_id = replay_session_id as i32;
 
-        println!("replay session id {}", replay_session_id);
-        println!("session id {}", session_id);
+        info!("replay session id {}", replay_session_id);
+        info!("session id {}", session_id);
         let channel_replay = format!("{}?session-id={}", channel, session_id);
-        println!("archive id: {}", archive.get_archive_id());
+        info!("archive id: {}", archive.get_archive_id());
 
-        println!("add subscription {}", channel_replay);
+        info!("add subscription {}", channel_replay);
         let subscription = aeron
             .async_add_subscription(
                 &channel_replay,
@@ -662,8 +662,8 @@ mod tests {
             start.elapsed() < Duration::from_secs(10),
             "messages not received {count:?}"
         );
-        println!("aeron {:?}", aeron);
-        println!("ctx {:?}", archive_context);
+        info!("aeron {:?}", aeron);
+        info!("ctx {:?}", archive_context);
         assert_eq!(11, count.get());
         Ok(())
     }

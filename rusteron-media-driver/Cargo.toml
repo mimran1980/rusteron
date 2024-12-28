@@ -17,6 +17,8 @@ ctrlc = { workspace = true }
 log = { workspace = true}
 regex = { workspace = true}
 
+[dev-dependencies]
+env_logger = "0.11"
 
 [build-dependencies]
 bindgen = {  workspace = true }

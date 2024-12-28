@@ -51,7 +51,7 @@ impl AeronSubscription {
             #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        println!("failed async poll for {:?}", self);
+        log::info!("failed async poll for {:?}", self);
         Err(AeronErrorType::TimedOut.into())
     }
 }
@@ -95,7 +95,7 @@ impl AeronExclusivePublication {
             #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        println!("failed async poll for {:?}", self);
+        log::info!("failed async poll for {:?}", self);
         Err(AeronErrorType::TimedOut.into())
     }
 }
@@ -135,7 +135,7 @@ impl AeronPublication {
             #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        println!("failed async poll for {:?}", self);
+        log::info!("failed async poll for {:?}", self);
         Err(AeronErrorType::TimedOut.into())
     }
 }
@@ -185,7 +185,7 @@ impl Aeron {
             #[cfg(debug_assertions)]
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        println!("failed to create aeron client for {:?}", context);
+        log::info!("failed to create aeron client for {:?}", context);
         Err(AeronErrorType::TimedOut.into())
     }
 }

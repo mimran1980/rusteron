@@ -1,3 +1,4 @@
+use log::info;
 use rusteron_media_driver::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -19,17 +20,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let aeron_driver = AeronDriver::new(&aeron_context)?;
     aeron_driver.start(true)?;
     // Start the Aeron driver
-    println!("Aeron media driver started successfully. Press Ctrl+C to stop.");
+    info!("Aeron media driver started successfully. Press Ctrl+C to stop.");
 
     aeron_driver.conductor().context().print_configuration();
     aeron_driver.main_do_work()?;
-    println!("aeron dir: {:?}", aeron_context.get_dir());
+    info!("aeron dir: {:?}", aeron_context.get_dir());
 
     // Poll for work until Ctrl+C is pressed
     while running.load(Ordering::Acquire) {
         aeron_driver.main_idle_strategy(aeron_driver.main_do_work()?);
     }
-    println!("Received signal to stop the media driver.");
-    println!("Aeron media driver stopped successfully.");
+    info!("Received signal to stop the media driver.");
+    info!("Aeron media driver stopped successfully.");
     Ok(())
 }

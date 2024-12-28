@@ -38,7 +38,7 @@ pub fn parse_bindings(out: &PathBuf) -> CBinding {
                     if let ArgProcessing::Handler(args) = &arg.processing {
                         let handler = args.get(0).unwrap();
                         if !handlers.iter().any(|h| h.type_name == handler.c_type) {
-                            println!("replacing {} back to default", method_debug);
+                            log::info!("replacing {} back to default", method_debug);
                             // arg.processing = ArgProcessing::Default;
                         }
                     }

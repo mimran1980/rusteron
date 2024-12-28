@@ -2,6 +2,7 @@ use crate::{
     Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext,
     AeronArchiveRecordingSignal, AeronContext, AeronIdleStrategyFuncClosure, Handler,
 };
+use log::info;
 use log::{error, warn};
 use regex::Regex;
 use std::backtrace::Backtrace;
@@ -75,7 +76,7 @@ impl EmbeddedArchiveMediaDriverProcess {
             "./gradlew"
         };
         let dir = format!("{}{path}aeron", env!("CARGO_MANIFEST_DIR"),);
-        println!("running {} in {}", gradle, dir);
+        info!("running {} in {}", gradle, dir);
 
         if !Path::new(&dir).join("aeron-all/build/libs").exists() {
             Command::new(&gradle)
@@ -122,7 +123,7 @@ impl EmbeddedArchiveMediaDriverProcess {
                             let signal_consumer = Handler::leak(
                                 crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
                                     |signal: AeronArchiveRecordingSignal| {
-                                        println!("Recording signal received: {:?}", signal);
+                                        info!("Recording signal received: {:?}", signal);
                                     },
                                 ),
                             );
@@ -147,7 +148,7 @@ impl EmbeddedArchiveMediaDriverProcess {
                                 {
                                     let i = archive.get_archive_id();
                                     assert!(i > 0);
-                                    println!("aeron archive media driver is up [connected with archive id {i}]");
+                                    info!("aeron archive media driver is up [connected with archive id {i}]");
                                     sleep(Duration::from_millis(100));
                                     return Ok((archive, aeron));
                                 };
@@ -157,7 +158,7 @@ impl EmbeddedArchiveMediaDriverProcess {
                     }
                 }
             }
-            println!("waiting for aeron to start up aeron");
+            info!("waiting for aeron to start up aeron");
         }
 
         assert!(
@@ -295,7 +296,7 @@ impl EmbeddedArchiveMediaDriverProcess {
             "io.aeron.archive.ArchivingMediaDriver",
         ];
 
-        println!(
+        info!(
             "starting archive media driver [\n\tjava {}\n]",
             args.join(" ")
         );
@@ -306,7 +307,7 @@ impl EmbeddedArchiveMediaDriverProcess {
             .stderr(Stdio::inherit())
             .spawn()?;
 
-        println!(
+        info!(
             "started archive media driver [{:?}",
             fs::read_dir(aeron_dir)?.collect::<Vec<_>>()
         );
@@ -322,7 +323,7 @@ impl EmbeddedArchiveMediaDriverProcess {
     }
 
     fn clean_directory(dir: &str) -> io::Result<()> {
-        println!("cleaning directory {}", dir);
+        info!("cleaning directory {}", dir);
         let path = Path::new(dir);
         if path.exists() {
             fs::remove_dir_all(path)?;
@@ -377,7 +378,7 @@ pub fn set_panic_hook() {
             let function = &cap[1];
             let file = &cap[2];
             let line = &cap[3];
-            println!("{file}:{line} in {function}");
+            info!("{file}:{line} in {function}");
         }
 
         error!("Panic occurred: {:#?}", info);
