@@ -11,7 +11,7 @@ The code in **rusteron-archive** is generated as a Rust wrapper around the Aeron
 ## Project Status
 
 - **Current Focus**: Our primary focus is currently on **rusteron-client**. However, developers can run a unit test in **rusteron-archive** that demonstrates recording and replaying from the archive.
-- **Alpha Version**: **rusteron-archive** is in an alpha stage, and developers are encouraged to experiment with it, but it is not recommended for production use at this point.
+- **Alpha Version**: **rusteron-archive** is in beta stage, and developers are encouraged to experiment with it, but it is not recommended for production use at this point.
 
 ## Installation
 
@@ -38,6 +38,7 @@ Ensure that you have also set up the necessary Aeron C libraries required by **r
 
 ## Safety Considerations
 
+**Resource Management for AeronArchive**: The current implementation has a critical limitation: the `Aeron` object must be kept alive explicitly. The `AeronArchive` does not take ownership or manage its lifetime correctly. Instead of passing the `Aeron` instance through the constructor, the `set_aeron` function is used, which can lead to potential segmentation faults if the `Aeron` instance is prematurely dropped. Extra caution is required to ensure the `Aeron` instance remains valid during the lifetime of the `AeronArchive`.
 Since **rusteron-archive** relies on Aeron C bindings, it uses `unsafe` Rust code. Users must ensure that resources are managed properly to avoid crashes or undefined behaviour.
 
 ## Example Usage: Recording and Replaying a Stream with Aeron Archive

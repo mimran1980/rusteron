@@ -29,6 +29,32 @@ pub const SOURCE_LOCATION_LOCAL: aeron_archive_source_location_en =
 pub const SOURCE_LOCATION_REMOTE: aeron_archive_source_location_en =
     SourceLocation::AERON_ARCHIVE_SOURCE_LOCATION_REMOTE;
 
+pub struct RecordingPos;
+impl RecordingPos {
+    pub fn find_counter_id_by_session(
+        counter_reader: &AeronCountersReader,
+        session_id: i32,
+    ) -> i32 {
+        unsafe {
+            aeron_archive_recording_pos_find_counter_id_by_session_id(
+                counter_reader.get_inner(),
+                session_id,
+            )
+        }
+    }
+    pub fn find_counter_id_by_recording_id(
+        counter_reader: &AeronCountersReader,
+        recording_id: i64,
+    ) -> i32 {
+        unsafe {
+            aeron_archive_recording_pos_find_counter_id_by_recording_id(
+                counter_reader.get_inner(),
+                recording_id,
+            )
+        }
+    }
+}
+
 unsafe extern "C" fn default_encoded_credentials(
     _clientd: *mut std::os::raw::c_void,
 ) -> *mut aeron_archive_encoded_credentials_t {
@@ -100,7 +126,7 @@ impl AeronArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log::info;
+    use log::{error, info};
 
     use crate::testing::EmbeddedArchiveMediaDriverProcess;
     use serial_test::serial;
@@ -115,7 +141,7 @@ mod tests {
     pub const ARCHIVE_RECORDING_EVENTS: &str = "aeron:udp?endpoint=localhost:8012";
 
     pub const EXAMPLE_LIVE_CHANNEL: &str = "aeron:udp?endpoint=localhost:8020";
-    pub const EXAMPLE_REPLAY_CHANNEL: &str = "aeron:udp?endpoint=localhost:8030";
+    pub const EPHEMERAL_CHANNEL: &str = "aeron:udp?endpoint=localhost:0";
 
     #[test]
     #[serial]
@@ -150,13 +176,15 @@ mod tests {
         assert!(!aeron.is_closed());
 
         let live_uri = EXAMPLE_LIVE_CHANNEL;
-        let replay_uri = EXAMPLE_REPLAY_CHANNEL;
+        let replay_uri = EPHEMERAL_CHANNEL;
         let stream_id = 1001;
 
         while archive
             .start_recording(live_uri, stream_id, SOURCE_LOCATION_LOCAL, true)
-            .is_err()
+            .unwrap_or(-1)
+            < 0
         {
+            error!("failed to start recording");
             if let Some(err) = archive.poll_for_error() {
                 panic!("{}", err);
             }
@@ -174,39 +202,40 @@ mod tests {
 
         // Spawn a thread to simulate the publisher
         let publisher_thread = thread::spawn(move || {
-            // let mut i = 0;
-            // loop {
-            //     let message = format!("price update: {}", i);
-            //     while publication.offer(
-            //         message.as_bytes(),
-            //         Handlers::no_reserved_value_supplier_handler(),
-            //     ) <= 0
-            //     {
-            //         thread::sleep(Duration::from_micros(10));
-            //     }
-            //     i+=1;
-            //     thread::sleep(Duration::from_millis(10));
-            //     info!("offer price update: {}", i);
-            // }
+            let mut i = 0;
+            loop {
+                let message = format!("price update: {}", i);
+                while publication.offer(
+                    message.as_bytes(),
+                    Handlers::no_reserved_value_supplier_handler(),
+                ) <= 0
+                {
+                    thread::sleep(Duration::from_micros(10));
+                }
+                i += 1;
+                thread::sleep(Duration::from_millis(100));
+                info!("offer price update: {}", i);
+            }
         });
 
         // TODO add reply-merge subscription here
         info!("publisher thread started");
 
+        let recording_id = Cell::new(-1);
         let list_recording_handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
                 |d: AeronArchiveRecordingDescriptor| {
                     info!("descriptor {:?}", d);
+                    recording_id.set(d.recording_id);
                 },
             ),
         );
-        loop {
-            archive.poll_for_recording_signals()?;
+        while recording_id.get() < 0 {
             info!(
-                "{:?}",
+                "list_recordings_for_uri {:?}",
                 archive.list_recordings_for_uri(
                     0,
-                    0,
+                    1,
                     live_uri,
                     stream_id,
                     Some(&list_recording_handler)
@@ -217,8 +246,6 @@ mod tests {
             }
         }
 
-        let recording_id = archive.find_last_matching_recording(0, live_uri, stream_id, -1)?;
-        assert!(recording_id >= 0, "invalid recording id {recording_id}");
         let replay_subscription = aeron.add_subscription(
             replay_uri,
             stream_id,
@@ -226,9 +253,14 @@ mod tests {
             Handlers::no_unavailable_image_handler(),
             Duration::from_secs(5),
         )?;
+
+        // change from empheme port to real port
+        let replay_uri = replay_subscription.try_resolve_channel_endpoint_uri()?;
+        info!("replay uri: {}", replay_uri);
+
         let replay_session_id = archive.start_replay(
-            recording_id,
-            replay_uri,
+            recording_id.get(),
+            &replay_uri,
             stream_id,
             &AeronArchiveReplayParams::new(0, i32::MAX, 0, i64::MAX, 0, 0)?,
         )?;
@@ -528,27 +560,6 @@ mod tests {
             .expect("failed to kill all java processes");
 
         let (aeron, archive_context, media_driver) = start_aeron_archive()?;
-        let found_recording_signal = Cell::new(false);
-        archive_context.set_recording_signal_consumer(Some(&Handler::leak(
-            crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
-                |signal: AeronArchiveRecordingSignal| {
-                    info!("signal {:?}", signal);
-                    found_recording_signal.set(true);
-                },
-            ),
-        )))?;
-        let signal_consumer =
-            Handler::leak(crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
-                |signal: AeronArchiveRecordingSignal| {
-                    info!("Recording signal received: {:?}", signal);
-                },
-            ));
-        archive_context
-            .set_recording_signal_consumer(Some(&signal_consumer))
-            .expect("Failed to set recording signal consumer");
-        archive_context.set_idle_strategy(Some(&Handler::leak(
-            AeronIdleStrategyFuncClosure::from(|work_count| {}),
-        )))?;
 
         assert!(!aeron.is_closed());
 
@@ -574,16 +585,6 @@ mod tests {
             .async_add_exclusive_publication(channel, stream_id)?
             .poll_blocking(Duration::from_secs(5))?;
 
-        let start = Instant::now();
-        while !found_recording_signal.get() && start.elapsed().as_secs() < 5 {
-            sleep(Duration::from_millis(50));
-            archive.poll_for_recording_signals()?;
-            if let Some(err) = archive.poll_for_error() {
-                panic!("{}", err);
-            }
-        }
-        assert!(start.elapsed().as_secs() < 5);
-
         for i in 0..11 {
             while publication.offer(
                 "123456".as_bytes(),
@@ -598,6 +599,31 @@ mod tests {
             }
             info!("sent message {i}");
         }
+
+        // since this is single threaded need to make sure it did write to archiver, usually not required in multi-proccess app
+        let stop_position = publication.position();
+        info!(
+            "publication stop position {} [publication={:?}]",
+            stop_position,
+            publication.get_constants()
+        );
+        let counters_reader = aeron.counters_reader();
+        let session_id = publication.get_constants()?.session_id;
+        let counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
+
+        info!("counter id {counter_id}, session id {session_id}");
+        while counters_reader.get_counter_value(counter_id) < stop_position {
+            info!(
+                "current archive publication stop position {}",
+                counters_reader.get_counter_value(counter_id)
+            );
+            sleep(Duration::from_millis(50));
+        }
+        info!(
+            "found archive publication stop position {}",
+            counters_reader.get_counter_value(counter_id)
+        );
+
         archive.stop_recording_channel_and_stream(channel, stream_id)?;
         drop(publication);
 

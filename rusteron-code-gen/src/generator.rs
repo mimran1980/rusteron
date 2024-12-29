@@ -1616,7 +1616,7 @@ pub fn generate_rust_code(
                         #[cfg(debug_assertions)]
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
-                    log::info!("failed async poll for {:?}", self);
+                    log::error!("failed async poll for {:?}", self);
                     Err(AeronErrorType::TimedOut.into())
                 }
             }
