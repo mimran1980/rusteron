@@ -350,72 +350,262 @@ impl ChannelUri {
     pub const MAX_URI_LENGTH: usize = 4095;
 }
 
+/// Common constants and utilities for Aeron context.
+///
+/// This module provides configuration properties, default values, and a builder for creating Aeron URIs.
+
+pub const DRIVER_TIMEOUT_MS_DEFAULT: u64 = 10_000;
+pub const AERON_DIR_PROP_NAME: &str = "aeron.dir";
+pub const AERON_IPC_CHANNEL: &str = "aeron:ipc";
+pub const AERON_UDP_CHANNEL: &str = "aeron:udp";
+pub const SPY_PREFIX: &str = "aeron-spy:";
+pub const TAG_PREFIX: &str = "tag:";
+
+/// Enum for media types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Media {
+    Ipc,
+    Udp,
+}
+
+impl Media {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Media::Ipc => "ipc",
+            Media::Udp => "udp",
+        }
+    }
+}
+
+/// Enum for control modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ControlMode {
+    Manual,
+    Dynamic,
+}
+
+impl ControlMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ControlMode::Manual => "manual",
+            ControlMode::Dynamic => "dynamic",
+        }
+    }
+}
+
+/// Builder for constructing Aeron URIs.
 #[derive(Default, Debug)]
 pub struct ChannelUriBuilder {
-    media: Option<String>,
+    prefix: Option<String>,
+    media: Option<Media>,
     endpoint: Option<String>,
+    network_interface: Option<String>,
     control_endpoint: Option<String>,
-    control_mode: Option<String>,
+    control_mode: Option<ControlMode>,
+    tags: Option<String>,
+    reliable: Option<bool>,
+    ttl: Option<u8>,
+    mtu: Option<u32>,
+    term_length: Option<u32>,
+    initial_term_id: Option<i32>,
+    term_id: Option<i32>,
+    term_offset: Option<u32>,
+    session_id: Option<i32>,
+    linger: Option<u64>,
+    sparse: Option<bool>,
     additional_params: BTreeMap<String, String>,
 }
 
 impl ChannelUriBuilder {
+    /// Create a new builder.
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn media(mut self, media: &str) -> Self {
-        self.media = Some(media.to_string());
+    /// Set the prefix (e.g., "aeron-spy").
+    pub fn prefix(mut self, prefix: &str) -> Self {
+        self.prefix = Some(prefix.to_string());
         self
     }
 
+    /// Set the media type.
+    pub fn media(mut self, media: Media) -> Self {
+        self.media = Some(media);
+        self
+    }
+
+    /// Set the endpoint (address:port).
     pub fn endpoint(mut self, endpoint: &str) -> Self {
         self.endpoint = Some(endpoint.to_string());
         self
     }
 
+    /// Set the network interface.
+    pub fn network_interface(mut self, network_interface: &str) -> Self {
+        self.network_interface = Some(network_interface.to_string());
+        self
+    }
+
+    /// Set the control endpoint (address:port).
     pub fn control_endpoint(mut self, control_endpoint: &str) -> Self {
         self.control_endpoint = Some(control_endpoint.to_string());
         self
     }
 
-    pub fn control_mode(mut self, control_mode: &str) -> Self {
-        self.control_mode = Some(control_mode.to_string());
+    /// Set the control mode.
+    pub fn control_mode(mut self, control_mode: ControlMode) -> Self {
+        self.control_mode = Some(control_mode);
         self
     }
 
+    /// Set tags for the channel.
+    pub fn tags(mut self, tags: &str) -> Self {
+        self.tags = Some(tags.to_string());
+        self
+    }
+
+    /// Set the reliable flag.
+    pub fn reliable(mut self, reliable: bool) -> Self {
+        self.reliable = Some(reliable);
+        self
+    }
+
+    /// Set the Time To Live (TTL).
+    pub fn ttl(mut self, ttl: u8) -> Self {
+        self.ttl = Some(ttl);
+        self
+    }
+
+    /// Set the Maximum Transmission Unit (MTU).
+    pub fn mtu(mut self, mtu: u32) -> Self {
+        self.mtu = Some(mtu);
+        self
+    }
+
+    /// Set the term length.
+    pub fn term_length(mut self, term_length: u32) -> Self {
+        self.term_length = Some(term_length);
+        self
+    }
+
+    /// Set the initial term ID.
+    pub fn initial_term_id(mut self, initial_term_id: i32) -> Self {
+        self.initial_term_id = Some(initial_term_id);
+        self
+    }
+
+    /// Set the term ID.
+    pub fn term_id(mut self, term_id: i32) -> Self {
+        self.term_id = Some(term_id);
+        self
+    }
+
+    /// Set the term offset.
+    pub fn term_offset(mut self, term_offset: u32) -> Self {
+        self.term_offset = Some(term_offset);
+        self
+    }
+
+    /// Set the session ID.
+    pub fn session_id(mut self, session_id: i32) -> Self {
+        self.session_id = Some(session_id);
+        self
+    }
+
+    /// Set the linger timeout.
+    pub fn linger(mut self, linger: u64) -> Self {
+        self.linger = Some(linger);
+        self
+    }
+
+    /// Set the sparse flag.
+    pub fn sparse(mut self, sparse: bool) -> Self {
+        self.sparse = Some(sparse);
+        self
+    }
+
+    /// Add a custom parameter to the URI.
     pub fn add_param(mut self, key: &str, value: &str) -> Self {
         self.additional_params
             .insert(key.to_string(), value.to_string());
         self
     }
 
+    /// Build the Aeron URI as a string.
     pub fn build(self) -> Result<String, String> {
-        if self.media.is_none() {
-            return Err("Media must be specified".to_string());
+        let media = self
+            .media
+            .map(|m| m.as_str())
+            .ok_or_else(|| "Media must be specified".to_string())?;
+        let mut uri = String::new();
+
+        if let Some(prefix) = self.prefix {
+            uri.push_str(&format!("{}:", prefix));
         }
 
-        let mut uri = format!("aeron:{}?", self.media.unwrap());
+        uri.push_str(&format!("aeron:{}?", media));
 
         if let Some(endpoint) = self.endpoint {
-            uri.push_str(&format!("endpoint={}|", endpoint));
+            uri.push_str(&format!("endpoint={}||", endpoint));
         }
 
         if let Some(control_endpoint) = self.control_endpoint {
-            uri.push_str(&format!("control-endpoint={}|", control_endpoint));
+            uri.push_str(&format!("control-endpoint={}||", control_endpoint));
         }
 
         if let Some(control_mode) = self.control_mode {
-            uri.push_str(&format!("control-mode={}|", control_mode));
+            uri.push_str(&format!("control-mode={}||", control_mode.as_str()));
+        }
+
+        if let Some(tags) = self.tags {
+            uri.push_str(&format!("tags={}||", tags));
+        }
+
+        if let Some(reliable) = self.reliable {
+            uri.push_str(&format!("reliable={}||", reliable));
+        }
+
+        if let Some(ttl) = self.ttl {
+            uri.push_str(&format!("ttl={}||", ttl));
+        }
+
+        if let Some(mtu) = self.mtu {
+            uri.push_str(&format!("mtu={}||", mtu));
+        }
+
+        if let Some(term_length) = self.term_length {
+            uri.push_str(&format!("term-length={}||", term_length));
+        }
+
+        if let Some(initial_term_id) = self.initial_term_id {
+            uri.push_str(&format!("initial-term-id={}||", initial_term_id));
+        }
+
+        if let Some(term_id) = self.term_id {
+            uri.push_str(&format!("term-id={}||", term_id));
+        }
+
+        if let Some(term_offset) = self.term_offset {
+            uri.push_str(&format!("term-offset={}||", term_offset));
+        }
+
+        if let Some(session_id) = self.session_id {
+            uri.push_str(&format!("session-id={}||", session_id));
+        }
+
+        if let Some(linger) = self.linger {
+            uri.push_str(&format!("linger={}||", linger));
+        }
+
+        if let Some(sparse) = self.sparse {
+            uri.push_str(&format!("sparse={}||", sparse));
         }
 
         for (key, value) in self.additional_params {
-            uri.push_str(&format!("{}={}|", key, value));
+            uri.push_str(&format!("{}={}||", key, value));
         }
 
-        // Remove the trailing '|' character
         uri.pop();
-
         Ok(uri)
     }
 }

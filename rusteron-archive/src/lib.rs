@@ -133,12 +133,15 @@ mod tests {
     use std::cell::Cell;
     use std::error;
     use std::error::Error;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
     use std::thread::sleep;
     use std::time::{Duration, Instant};
 
     pub const ARCHIVE_CONTROL_REQUEST: &str = "aeron:udp?endpoint=localhost:8010";
     pub const ARCHIVE_CONTROL_RESPONSE: &str = "aeron:udp?endpoint=localhost:8011";
-    pub const ARCHIVE_RECORDING_EVENTS: &str = "aeron:udp?endpoint=localhost:8012";
+    pub const ARCHIVE_RECORDING_EVENTS: &str =
+        "aeron:udp?control-mode=dynamic|control=localhost:8012";
 
     pub const EXAMPLE_LIVE_CHANNEL: &str = "aeron:udp?endpoint=localhost:8020";
     pub const EPHEMERAL_CHANNEL: &str = "aeron:udp?endpoint=localhost:0";
@@ -150,6 +153,8 @@ mod tests {
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
             .init();
+        let mut running = Arc::new(AtomicBool::new(true));
+        let mut running_copy = running.clone();
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
         let id = Aeron::nano_clock();
@@ -196,6 +201,7 @@ mod tests {
         let publication = aeron
             .add_publication(&live_uri, stream_id, Duration::from_secs(5))
             .expect("Failed to create publication");
+
         while !publication.is_connected() {
             thread::sleep(Duration::from_millis(100));
         }
@@ -203,18 +209,19 @@ mod tests {
         // Spawn a thread to simulate the publisher
         let publisher_thread = thread::spawn(move || {
             let mut i = 0;
-            loop {
-                let message = format!("price update: {}", i);
+            while running.load(Ordering::Acquire) {
+                let message = format!("{}", i).repeat(10);
                 while publication.offer(
                     message.as_bytes(),
                     Handlers::no_reserved_value_supplier_handler(),
                 ) <= 0
                 {
-                    thread::sleep(Duration::from_micros(10));
+                    thread::sleep(Duration::from_millis(10));
                 }
                 i += 1;
-                thread::sleep(Duration::from_millis(100));
-                info!("offer price update: {}", i);
+                if i % 1_000_000 == 0 {
+                    info!("offer price update: {}", i);
+                }
             }
         });
 
@@ -225,7 +232,7 @@ mod tests {
         let list_recording_handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
                 |d: AeronArchiveRecordingDescriptor| {
-                    info!("descriptor {:?}", d);
+                    info!("found descriptor {:?}", d);
                     recording_id.set(d.recording_id);
                 },
             ),
@@ -235,50 +242,45 @@ mod tests {
                 "list_recordings_for_uri {:?}",
                 archive.list_recordings_for_uri(
                     0,
-                    1,
+                    1000,
                     live_uri,
                     stream_id,
                     Some(&list_recording_handler)
                 )
             );
-            if let Some(e) = archive.poll_for_error() {
-                panic!("{}", e);
-            }
         }
 
-        let replay_subscription = aeron.add_subscription(
-            replay_uri,
-            stream_id,
-            Handlers::no_available_image_handler(),
-            Handlers::no_unavailable_image_handler(),
-            Duration::from_secs(5),
-        )?;
+        // change from ephemeral port to real port
+        let replay_uri = aeron
+            .add_subscription(
+                replay_uri,
+                stream_id,
+                Handlers::no_available_image_handler(),
+                Handlers::no_unavailable_image_handler(),
+                Duration::from_secs(5),
+            )?
+            .try_resolve_channel_endpoint_uri()?;
+        info!("resolved replay uri: {}", replay_uri);
 
-        // change from empheme port to real port
-        let replay_uri = replay_subscription.try_resolve_channel_endpoint_uri()?;
-        info!("replay uri: {}", replay_uri);
-
-        let replay_session_id = archive.start_replay(
-            recording_id.get(),
-            &replay_uri,
-            stream_id,
-            &AeronArchiveReplayParams::new(0, i32::MAX, 0, i64::MAX, 0, 0)?,
-        )?;
+        let replay_params = AeronArchiveReplayParams::new_zeroed()?;
+        replay_params.init()?;
+        let replay_session_id =
+            archive.start_replay(recording_id.get(), &replay_uri, stream_id, &replay_params)?;
         let session_id = replay_session_id as i32;
 
+        info!("recording id {:?}", recording_id);
         info!("replay session id {}", replay_session_id);
         info!("session id {}", session_id);
-        let channel_replay = format!("{}?session-id={}", replay_uri, session_id);
+        let channel_replay = format!("{replay_uri}|session-id={session_id}");
         info!("archive id: {}", archive.get_archive_id());
         info!("channel replay: {}", channel_replay);
-        let subscription = aeron
-            .async_add_subscription(
-                &channel_replay,
-                stream_id,
-                Some(&Handler::leak(AeronAvailableImageLogger)),
-                Some(&Handler::leak(AeronUnavailableImageLogger)),
-            )?
-            .poll_blocking(Duration::from_secs(10))?;
+        let subscription = aeron.add_subscription(
+            &channel_replay,
+            stream_id,
+            Some(&Handler::leak(AeronAvailableImageLogger)),
+            Some(&Handler::leak(AeronUnavailableImageLogger)),
+            Duration::from_secs(5),
+        )?;
 
         let replay_thread = thread::spawn(move || {
             let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
@@ -315,6 +317,9 @@ mod tests {
                     thread::sleep(Duration::from_millis(10));
                 }
             }
+
+            info!("Live subscription done");
+            running_copy.store(false, Ordering::SeqCst);
         });
 
         publisher_thread.join().expect("Publisher thread failed");
@@ -392,11 +397,11 @@ mod tests {
         assert!(!aeron.is_closed());
 
         let archive_uri = ChannelUriBuilder::new()
-            .media("udp")
+            .media(Media::Udp)
             .control_endpoint("localhost:40123")
-            .control_mode("manual")
+            .control_mode(ControlMode::Dynamic)
             .endpoint("localhost:40234")
-            .add_param("reliable", "true")
+            .reliable(true)
             .build()
             .expect("Failed to build URI");
         let live_uri = "aeron:udp?endpoint=localhost:40124";

@@ -190,3 +190,8 @@ create-sym-link:
     rm -rfv target/aeron
     mkdir -p target/aeron
     ls -l target/aeron
+
+
+# e.g just aeron-archive-tool ./rusteron-archive/target/aeron/784454882946541/shm/archive describe/dump/errors
+aeron-archive-tool dir action:
+    java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar io.aeron.archive.ArchiveTool {{dir}} {{action}}

@@ -270,9 +270,9 @@ impl EmbeddedArchiveMediaDriverProcess {
             &format!("-Daeron.dir={}", aeron_dir),
             &format!("-Daeron.archive.dir={}", archive_dir),
             "-Daeron.spies.simulate.connection=true",
-            // "-Daeron.event.log=all", // this will only work if agent is built
+            "-Daeron.event.log=admin", // this will only work if agent is built
             "-Daeron.event.archive.log=all",
-            // "-Daeron.event.cluster.log=all",
+            "-Daeron.event.cluster.log=all",
             // "-Daeron.term.buffer.sparse.file=false",
             // "-Daeron.pre.touch.mapped.memory=true",
             // "-Daeron.threading.mode=DEDICATED",
