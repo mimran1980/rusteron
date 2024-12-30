@@ -1,3 +1,4 @@
+/**/
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -151,6 +152,10 @@ mod tests {
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
         pub const STREAM_ID: i32 = 1033;
         pub const MESSAGE_PREFIX: &str = "Message-Prefix-";
+        pub const CONTROL_ENDPOINT: &str = "localhost:23265";
+        pub const RECORDING_ENDPOINT: &str = "localhost:23266";
+        pub const LIVE_ENDPOINT: &str = "localhost:23267";
+        pub const REPLAY_ENDPOINT: &str = "localhost:0";
 
         env_logger::Builder::new()
             .is_test(true)
@@ -185,7 +190,7 @@ mod tests {
         assert!(!aeron.is_closed());
 
         let publication = aeron.add_publication(
-            "aeron:udp?control=localhost:23265|control-mode=dynamic|term-length=65536|fc=min",
+            &format!("aeron:udp?control={CONTROL_ENDPOINT}|control-mode=dynamic|term-length=65536|fc=min"),
             STREAM_ID,
             Duration::from_secs(5),
         )?;
@@ -199,7 +204,7 @@ mod tests {
 
         let session_id = publication.session_id();
         let recording_channel = format!(
-            "aeron:udp?endpoint=localhost:23266|control=localhost:23265|session-id={session_id}"
+            "aeron:udp?endpoint={RECORDING_ENDPOINT}|control={CONTROL_ENDPOINT}|session-id={session_id}"
         );
         info!("recording channel {}", recording_channel);
         archive.start_recording(&recording_channel, STREAM_ID, SOURCE_LOCATION_REMOTE, true)?;
@@ -225,6 +230,7 @@ mod tests {
                 if message_count % 10_000 == 0 {
                     info!("Published {} messages", message_count);
                 }
+                // slow down publishing so can catch up
                 if message_count > 100_000 {
                     thread::sleep(Duration::from_micros(200));
                 }
@@ -234,10 +240,11 @@ mod tests {
         let replay_channel = format!("aeron:udp?session-id={session_id}");
         info!("replay channel {}", replay_channel);
 
-        let replay_destination = "aeron:udp?endpoint=localhost:0";
+        let replay_destination = format!("aeron:udp?endpoint={REPLAY_ENDPOINT}");
         info!("replay destination {}", replay_destination);
 
-        let live_destination = "aeron:udp?endpoint=localhost:23267|control=localhost:23265";
+        let live_destination =
+            format!("aeron:udp?endpoint={LIVE_ENDPOINT}|control={CONTROL_ENDPOINT}");
         info!("live destination {}", live_destination);
 
         let counters_reader = aeron.counters_reader();
@@ -289,8 +296,8 @@ mod tests {
             &subscription,
             &archive,
             &replay_channel,
-            replay_destination,
-            live_destination,
+            &replay_destination,
+            &live_destination,
             recording_id,
             start_position,
             Aeron::nano_clock(),
@@ -306,11 +313,11 @@ mod tests {
             live_destination
         );
 
-        info!("Waiting for subscription to connect...");
-        while !subscription.is_connected() {
-            thread::sleep(Duration::from_millis(100));
-        }
-        info!("Subscription connected");
+        // info!("Waiting for subscription to connect...");
+        // while !subscription.is_connected() {
+        //     thread::sleep(Duration::from_millis(100));
+        // }
+        // info!("Subscription connected");
 
         let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
             |buffer: Vec<u8>, header: AeronHeader| {
