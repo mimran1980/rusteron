@@ -78,20 +78,18 @@ impl EmbeddedArchiveMediaDriverProcess {
         let dir = format!("{}{path}aeron", env!("CARGO_MANIFEST_DIR"),);
         info!("running {} in {}", gradle, dir);
 
-        if !Path::new(&dir).join("aeron-all/build/libs").exists() {
-            Command::new(&gradle)
-                .current_dir(dir)
-                .args([
-                    ":aeron-agent:jar",
-                    ":aeron-samples:jar",
-                    ":aeron-archive:jar",
-                    ":aeron-all:build",
-                ])
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()?
-                .wait()?;
-        }
+        Command::new(&gradle)
+            .current_dir(dir)
+            .args([
+                ":aeron-agent:jar",
+                ":aeron-samples:jar",
+                ":aeron-archive:jar",
+                ":aeron-all:build",
+            ])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()?
+            .wait()?;
 
         return Self::start(
             &aeron_dir,
