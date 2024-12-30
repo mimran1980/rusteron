@@ -277,7 +277,7 @@ mod tests {
                 },
             ),
         );
-        archive.list_recordings(0, 1000, Some(&list_recordings_handler))?;
+        assert!(archive.list_recordings(0, 1000, Some(&list_recordings_handler))? > 0);
 
         let recording_id = recording_id.get();
         let start_position = start_position.get();
