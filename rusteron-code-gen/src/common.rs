@@ -356,8 +356,8 @@ impl ChannelUri {
 
 pub const DRIVER_TIMEOUT_MS_DEFAULT: u64 = 10_000;
 pub const AERON_DIR_PROP_NAME: &str = "aeron.dir";
-pub const AERON_IPC_CHANNEL: &str = "aeron:ipc";
-pub const AERON_UDP_CHANNEL: &str = "aeron:udp";
+pub const AERON_IPC_MEDIA: &str = "aeron:ipc";
+pub const AERON_UDP_MEDIA: &str = "aeron:udp";
 pub const SPY_PREFIX: &str = "aeron-spy:";
 pub const TAG_PREFIX: &str = "tag:";
 

@@ -57,6 +57,7 @@ let request_port = find_unused_udp_port(8000).expect("Could not find port");
 let response_port = find_unused_udp_port(request_port + 1).expect("Could not find port");
 let request_control_channel = &format!("aeron:udp?endpoint=localhost:{}", request_port);
 let response_control_channel = &format!("aeron:udp?endpoint=localhost:{}", response_port);
+let recording_events_channel = &format!("aeron:udp?endpoint=localhost:{}", response_port+1);
 assert_ne!(request_control_channel, response_control_channel);
 
 let error_handler = Handler::leak(AeronErrorHandlerClosure::from(|error_code, msg| {
@@ -77,6 +78,7 @@ let archive_context = AeronArchiveContext::new_with_no_credentials_supplier(
     &aeron,
     request_control_channel,
     response_control_channel,
+    recording_events_channel,
 )?;
 let found_recording_signal = Cell::new(false);
 archive_context.set_recording_signal_consumer(Some(&Handler::leak(
