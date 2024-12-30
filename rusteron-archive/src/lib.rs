@@ -149,12 +149,19 @@ mod tests {
     #[test]
     #[serial]
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
+        pub const CONTROL_ENDPOINT: &str = "localhost:23265";
+        pub const RECORDING_ENDPOINT: &str = "localhost:23266";
+        pub const LIVE_ENDPOINT: &str = "localhost:23267";
+        pub const REPLAY_ENDPOINT: &str = "localhost:0";
+        pub const STREAM_ID: i32 = 1033;
+        pub const GROUP_TAG: i64 = 99901;
+        pub const MESSAGE_PREFIX: &str = "Message-Prefix-";
+
         env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
             .init();
-        let mut running = Arc::new(AtomicBool::new(true));
-        let mut running_copy = running.clone();
+
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
         let id = Aeron::nano_clock();
@@ -172,45 +179,57 @@ mod tests {
         .expect("Failed to start embedded media driver");
 
         info!("connecting to archive");
-        // important that you have aeron and archive, else you get segfault if you try to use archive if aeron is close
         let (archive, aeron) = media_driver
             .archive_connect()
             .expect("Could not connect to archive client");
 
+        let running = Arc::new(AtomicBool::new(true));
+        let running_clone = Arc::clone(&running);
+
         info!("connected to archive");
         assert!(!aeron.is_closed());
 
-        let live_uri = EXAMPLE_LIVE_CHANNEL;
-        let replay_uri = EPHEMERAL_CHANNEL;
-        let stream_id = 1001;
+        let publication_channel = ChannelUriBuilder::new()
+            .media(Media::Udp)
+            .control_endpoint(CONTROL_ENDPOINT)
+            .control_mode(ControlMode::Dynamic)
+            .term_length(64 * 1024)
+            .build()
+            .unwrap();
 
-        while archive
-            .start_recording(live_uri, stream_id, SOURCE_LOCATION_LOCAL, true)
-            .unwrap_or(-1)
-            < 0
-        {
-            error!("failed to start recording");
-            if let Some(err) = archive.poll_for_error() {
-                panic!("{}", err);
-            }
-            sleep(Duration::from_millis(100));
-        }
-        info!("asked archiver to record {}:{}", live_uri, stream_id);
+        info!("publication channel: {:?}", publication_channel);
 
-        // Setup publisher
-        let publication = aeron
-            .add_publication(&live_uri, stream_id, Duration::from_secs(5))
-            .expect("Failed to create publication");
+        let live_destination = ChannelUriBuilder::new()
+            .media(Media::Udp)
+            .endpoint(LIVE_ENDPOINT)
+            .control_endpoint(CONTROL_ENDPOINT)
+            .build()
+            .unwrap();
+
+        info!("recording channel: {:?}", live_destination);
+
+        let replay_channel = ChannelUriBuilder::new()
+            .media(Media::Udp)
+            .endpoint(REPLAY_ENDPOINT)
+            .build()
+            .unwrap();
+
+        info!("subscription channel: {:?}", replay_channel);
+
+        archive.start_recording(&live_destination, STREAM_ID, SOURCE_LOCATION_LOCAL, true)?;
+
+        let publication =
+            aeron.add_publication(&live_destination, STREAM_ID, Duration::from_secs(5))?;
 
         while !publication.is_connected() {
             thread::sleep(Duration::from_millis(100));
         }
 
-        // Spawn a thread to simulate the publisher
         let publisher_thread = thread::spawn(move || {
-            let mut i = 0;
+            let mut message_count = 0;
+
             while running.load(Ordering::Acquire) {
-                let message = format!("{}", i).repeat(10);
+                let message = format!("{}{}", MESSAGE_PREFIX, message_count);
                 while publication.offer(
                     message.as_bytes(),
                     Handlers::no_reserved_value_supplier_handler(),
@@ -218,17 +237,16 @@ mod tests {
                 {
                     thread::sleep(Duration::from_millis(10));
                 }
-                i += 1;
-                if i % 1_000_000 == 0 {
-                    info!("offer price update: {}", i);
+                message_count += 1;
+                if message_count % 10_000 == 0 {
+                    info!("Published {} messages", message_count);
                 }
             }
         });
 
-        // TODO add reply-merge subscription here
-        info!("publisher thread started");
+        info!("replay channel: {:?}", replay_channel);
 
-        let recording_id = Cell::new(-1);
+        let recording_id = std::cell::Cell::new(-1);
         let list_recording_handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
                 |d: AeronArchiveRecordingDescriptor| {
@@ -237,93 +255,53 @@ mod tests {
                 },
             ),
         );
+
         while recording_id.get() < 0 {
             info!(
                 "list_recordings_for_uri {:?}",
                 archive.list_recordings_for_uri(
                     0,
                     1000,
-                    live_uri,
-                    stream_id,
-                    Some(&list_recording_handler)
+                    &live_destination,
+                    STREAM_ID,
+                    Some(&list_recording_handler),
                 )
             );
         }
 
-        // change from ephemeral port to real port
-        let replay_uri = aeron
-            .add_subscription(
-                replay_uri,
-                stream_id,
-                Handlers::no_available_image_handler(),
-                Handlers::no_unavailable_image_handler(),
-                Duration::from_secs(5),
-            )?
-            .try_resolve_channel_endpoint_uri()?;
-        info!("resolved replay uri: {}", replay_uri);
-
-        let replay_params = AeronArchiveReplayParams::new_zeroed()?;
-        replay_params.init()?;
-        let replay_session_id =
-            archive.start_replay(recording_id.get(), &replay_uri, stream_id, &replay_params)?;
-        let session_id = replay_session_id as i32;
-
-        info!("recording id {:?}", recording_id);
-        info!("replay session id {}", replay_session_id);
-        info!("session id {}", session_id);
-        let channel_replay = format!("{replay_uri}|session-id={session_id}");
-        info!("archive id: {}", archive.get_archive_id());
-        info!("channel replay: {}", channel_replay);
         let subscription = aeron.add_subscription(
-            &channel_replay,
-            stream_id,
-            Some(&Handler::leak(AeronAvailableImageLogger)),
-            Some(&Handler::leak(AeronUnavailableImageLogger)),
+            &replay_channel,
+            STREAM_ID,
+            Handlers::no_available_image_handler(),
+            Handlers::no_unavailable_image_handler(),
             Duration::from_secs(5),
         )?;
 
-        let replay_thread = thread::spawn(move || {
-            let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
-                |buffer: Vec<u8>, header: AeronHeader| {
-                    let message = String::from_utf8_lossy(buffer.as_slice());
-                    info!("Replayed message: {}", message);
-                },
-            ));
-            // Simulate replaying last 24 hours of data
-            for _ in 0..1000 {
-                while subscription
-                    .poll(Some(&handler), 10)
-                    .expect("Failed to poll fragments")
-                    <= 0
-                {
-                    thread::sleep(Duration::from_millis(10));
-                }
-            }
+        let replay_merge = AeronArchiveReplayMerge::new(
+            &subscription,
+            &archive,
+            &replay_channel,
+            &replay_channel,
+            LIVE_ENDPOINT,
+            recording_id.get(),
+            0, // start position
+            Aeron::nano_clock(),
+            10_000, // merge progress timeout
+        )?;
 
-            let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
-                |buffer: Vec<u8>, header: AeronHeader| {
-                    let message = String::from_utf8_lossy(buffer.as_slice());
-                    info!("Live message: {}", message);
-                },
-            ));
+        let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
+            |buffer: Vec<u8>, header: AeronHeader| {
+                let message = String::from_utf8_lossy(buffer.as_slice());
+                info!("Replayed message: {}", message);
+            },
+        ));
+        while !replay_merge.is_merged() {
+            replay_merge.poll(Some(&handler), 10)?;
+            thread::sleep(Duration::from_millis(100));
+        }
 
-            // Merge into the live stream
-            for _ in 0..100 {
-                while subscription
-                    .poll(Some(&handler), 10)
-                    .expect("Failed to poll fragments")
-                    <= 0
-                {
-                    thread::sleep(Duration::from_millis(10));
-                }
-            }
-
-            info!("Live subscription done");
-            running_copy.store(false, Ordering::SeqCst);
-        });
-
-        publisher_thread.join().expect("Publisher thread failed");
-        replay_thread.join().expect("Replay thread failed");
+        running_clone.store(false, Ordering::Release);
+        publisher_thread.join().unwrap();
 
         Ok(())
     }

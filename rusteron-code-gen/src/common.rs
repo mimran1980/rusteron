@@ -546,63 +546,63 @@ impl ChannelUriBuilder {
         uri.push_str(&format!("aeron:{}?", media));
 
         if let Some(endpoint) = self.endpoint {
-            uri.push_str(&format!("endpoint={}||", endpoint));
+            uri.push_str(&format!("endpoint={}|", endpoint));
         }
 
         if let Some(control_endpoint) = self.control_endpoint {
-            uri.push_str(&format!("control-endpoint={}||", control_endpoint));
+            uri.push_str(&format!("control-endpoint={}|", control_endpoint));
         }
 
         if let Some(control_mode) = self.control_mode {
-            uri.push_str(&format!("control-mode={}||", control_mode.as_str()));
+            uri.push_str(&format!("control-mode={}|", control_mode.as_str()));
         }
 
         if let Some(tags) = self.tags {
-            uri.push_str(&format!("tags={}||", tags));
+            uri.push_str(&format!("tags={}|", tags));
         }
 
         if let Some(reliable) = self.reliable {
-            uri.push_str(&format!("reliable={}||", reliable));
+            uri.push_str(&format!("reliable={}|", reliable));
         }
 
         if let Some(ttl) = self.ttl {
-            uri.push_str(&format!("ttl={}||", ttl));
+            uri.push_str(&format!("ttl={}|", ttl));
         }
 
         if let Some(mtu) = self.mtu {
-            uri.push_str(&format!("mtu={}||", mtu));
+            uri.push_str(&format!("mtu={}|", mtu));
         }
 
         if let Some(term_length) = self.term_length {
-            uri.push_str(&format!("term-length={}||", term_length));
+            uri.push_str(&format!("term-length={}|", term_length));
         }
 
         if let Some(initial_term_id) = self.initial_term_id {
-            uri.push_str(&format!("initial-term-id={}||", initial_term_id));
+            uri.push_str(&format!("initial-term-id={}|", initial_term_id));
         }
 
         if let Some(term_id) = self.term_id {
-            uri.push_str(&format!("term-id={}||", term_id));
+            uri.push_str(&format!("term-id={}|", term_id));
         }
 
         if let Some(term_offset) = self.term_offset {
-            uri.push_str(&format!("term-offset={}||", term_offset));
+            uri.push_str(&format!("term-offset={}|", term_offset));
         }
 
         if let Some(session_id) = self.session_id {
-            uri.push_str(&format!("session-id={}||", session_id));
+            uri.push_str(&format!("session-id={}|", session_id));
         }
 
         if let Some(linger) = self.linger {
-            uri.push_str(&format!("linger={}||", linger));
+            uri.push_str(&format!("linger={}|", linger));
         }
 
         if let Some(sparse) = self.sparse {
-            uri.push_str(&format!("sparse={}||", sparse));
+            uri.push_str(&format!("sparse={}|", sparse));
         }
 
         for (key, value) in self.additional_params {
-            uri.push_str(&format!("{}={}||", key, value));
+            uri.push_str(&format!("{}={}|", key, value));
         }
 
         uri.pop();
