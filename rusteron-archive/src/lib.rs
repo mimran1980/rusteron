@@ -126,7 +126,7 @@ impl AeronArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log::{error, info};
+    use log::{debug, error, info};
 
     use crate::testing::EmbeddedArchiveMediaDriverProcess;
     use serial_test::serial;
@@ -149,12 +149,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
-        pub const CONTROL_ENDPOINT: &str = "localhost:23265";
-        pub const RECORDING_ENDPOINT: &str = "localhost:23266";
-        pub const LIVE_ENDPOINT: &str = "localhost:23267";
-        pub const REPLAY_ENDPOINT: &str = "localhost:0";
         pub const STREAM_ID: i32 = 1033;
-        pub const GROUP_TAG: i64 = 99901;
         pub const MESSAGE_PREFIX: &str = "Message-Prefix-";
 
         env_logger::Builder::new()
@@ -186,45 +181,34 @@ mod tests {
         let running = Arc::new(AtomicBool::new(true));
         let running_clone = Arc::clone(&running);
 
-        info!("connected to archive");
+        info!("connected to archive, adding publication");
         assert!(!aeron.is_closed());
 
-        let publication_channel = ChannelUriBuilder::new()
-            .media(Media::Udp)
-            .control_endpoint(CONTROL_ENDPOINT)
-            .control_mode(ControlMode::Dynamic)
-            .term_length(64 * 1024)
-            .build()
-            .unwrap();
+        let publication = aeron.add_publication(
+            "aeron:udp?control=localhost:23265|control-mode=dynamic|term-length=65536|fc=min",
+            STREAM_ID,
+            Duration::from_secs(5),
+        )?;
 
-        info!("publication channel: {:?}", publication_channel);
+        info!(
+            "publication {} [status={:?}]",
+            publication.channel(),
+            publication.channel_status()
+        );
+        assert_eq!(1, publication.channel_status());
 
-        let live_destination = ChannelUriBuilder::new()
-            .media(Media::Udp)
-            .endpoint(LIVE_ENDPOINT)
-            .control_endpoint(CONTROL_ENDPOINT)
-            .build()
-            .unwrap();
+        let session_id = publication.session_id();
+        let recording_channel = format!(
+            "aeron:udp?endpoint=localhost:23266|control=localhost:23265|session-id={session_id}"
+        );
+        info!("recording channel {}", recording_channel);
+        archive.start_recording(&recording_channel, STREAM_ID, SOURCE_LOCATION_REMOTE, true)?;
 
-        info!("recording channel: {:?}", live_destination);
-
-        let replay_channel = ChannelUriBuilder::new()
-            .media(Media::Udp)
-            .endpoint(REPLAY_ENDPOINT)
-            .build()
-            .unwrap();
-
-        info!("subscription channel: {:?}", replay_channel);
-
-        archive.start_recording(&live_destination, STREAM_ID, SOURCE_LOCATION_LOCAL, true)?;
-
-        let publication =
-            aeron.add_publication(&live_destination, STREAM_ID, Duration::from_secs(5))?;
-
+        info!("waiting for publisher to be connected");
         while !publication.is_connected() {
             thread::sleep(Duration::from_millis(100));
         }
-
+        info!("publisher to be connected");
         let publisher_thread = thread::spawn(move || {
             let mut message_count = 0;
 
@@ -241,36 +225,60 @@ mod tests {
                 if message_count % 10_000 == 0 {
                     info!("Published {} messages", message_count);
                 }
+                if message_count > 100_000 {
+                    thread::sleep(Duration::from_micros(200));
+                }
             }
         });
 
-        info!("replay channel: {:?}", replay_channel);
+        let replay_channel = format!("aeron:udp?session-id={session_id}");
+        info!("replay channel {}", replay_channel);
 
-        let recording_id = std::cell::Cell::new(-1);
-        let list_recording_handler = Handler::leak(
+        let replay_destination = "aeron:udp?endpoint=localhost:0";
+        info!("replay destination {}", replay_destination);
+
+        let live_destination = "aeron:udp?endpoint=localhost:23267|control=localhost:23265";
+        info!("live destination {}", live_destination);
+
+        let counters_reader = aeron.counters_reader();
+        let mut counter_id = -1;
+
+        while counter_id < 0 {
+            counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
+        }
+        info!(
+            "counter id {} {:?}",
+            counter_id,
+            counters_reader.get_counter_label(counter_id, 1024)
+        );
+        info!(
+            "counter id {} position={:?}",
+            counter_id,
+            counters_reader.get_counter_value(counter_id)
+        );
+
+        let recording_id = Cell::new(0);
+        let start_position = Cell::new(0);
+
+        let list_recordings_handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
-                |d: AeronArchiveRecordingDescriptor| {
-                    info!("found descriptor {:?}", d);
-                    recording_id.set(d.recording_id);
+                |descriptor: AeronArchiveRecordingDescriptor| {
+                    info!("Recording descriptor: {:?}", descriptor);
+                    recording_id.set(descriptor.recording_id);
+                    start_position.set(descriptor.start_position);
+                    assert_eq!(descriptor.session_id, session_id);
                 },
             ),
         );
+        archive.list_recordings(0, 1000, Some(&list_recordings_handler))?;
 
-        while recording_id.get() < 0 {
-            info!(
-                "list_recordings_for_uri {:?}",
-                archive.list_recordings_for_uri(
-                    0,
-                    1000,
-                    &live_destination,
-                    STREAM_ID,
-                    Some(&list_recording_handler),
-                )
-            );
-        }
+        let recording_id = recording_id.get();
+        let start_position = start_position.get();
 
+        let subscribe_channel = format!("aeron:udp?control-mode=manual|session-id={session_id}");
+        info!("subscribe channel {}", subscribe_channel);
         let subscription = aeron.add_subscription(
-            &replay_channel,
+            &subscribe_channel,
             STREAM_ID,
             Handlers::no_available_image_handler(),
             Handlers::no_unavailable_image_handler(),
@@ -281,13 +289,28 @@ mod tests {
             &subscription,
             &archive,
             &replay_channel,
-            &replay_channel,
-            LIVE_ENDPOINT,
-            recording_id.get(),
-            0, // start position
+            replay_destination,
+            live_destination,
+            recording_id,
+            start_position,
             Aeron::nano_clock(),
             10_000, // merge progress timeout
         )?;
+
+        info!(
+            "ReplayMerge initialization: recordingId={}, startPosition={}, replayChannel={}, replayDestination={}, liveDestination={}",
+            recording_id,
+            start_position,
+            replay_channel,
+            replay_destination,
+            live_destination
+        );
+
+        info!("Waiting for subscription to connect...");
+        while !subscription.is_connected() {
+            thread::sleep(Duration::from_millis(100));
+        }
+        info!("Subscription connected");
 
         let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
             |buffer: Vec<u8>, header: AeronHeader| {
@@ -296,9 +319,27 @@ mod tests {
             },
         ));
         while !replay_merge.is_merged() {
-            replay_merge.poll(Some(&handler), 10)?;
-            thread::sleep(Duration::from_millis(100));
+            debug!(
+                "ReplayMerge state: image_position={} is_live_added={} is_merged={} has_failed={}",
+                replay_merge.image().position(),
+                replay_merge.is_live_added(),
+                replay_merge.is_merged(),
+                replay_merge.has_failed()
+            );
+            assert!(!replay_merge.has_failed());
+            if replay_merge.poll(Some(&handler), 10)? == 0 {
+                if let Some(err) = archive.poll_for_error() {
+                    panic!("{}", err);
+                }
+                if aeron.errmsg().len() > 0 && "no error" != aeron.errmsg() {
+                    panic!("{}", aeron.errmsg());
+                }
+                archive.poll_for_recording_signals()?;
+
+                thread::sleep(Duration::from_millis(100));
+            }
         }
+        assert!(!replay_merge.has_failed());
 
         running_clone.store(false, Ordering::Release);
         publisher_thread.join().unwrap();

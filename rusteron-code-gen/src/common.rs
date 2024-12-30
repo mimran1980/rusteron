@@ -550,7 +550,7 @@ impl ChannelUriBuilder {
         }
 
         if let Some(control_endpoint) = self.control_endpoint {
-            uri.push_str(&format!("control-endpoint={}|", control_endpoint));
+            uri.push_str(&format!("control={}|", control_endpoint));
         }
 
         if let Some(control_mode) = self.control_mode {
