@@ -102,6 +102,17 @@ impl EmbeddedArchiveMediaDriverProcess {
         );
     }
 
+    pub fn run_aeron_stats(&self) -> std::io::Result<Child> {
+        let main_dir = env!("CARGO_MANIFEST_DIR");
+        let dir = format!("{}/{}", main_dir, &self.aeron_dir);
+        info!("running 'just aeron-stat {}'", dir);
+        Command::new("just")
+            .args(["aeron-stat", dir.as_str()])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()
+    }
+
     pub fn archive_connect(&self) -> Result<(AeronArchive, Aeron), io::Error> {
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(30) {

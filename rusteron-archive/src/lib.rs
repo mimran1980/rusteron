@@ -313,6 +313,10 @@ mod tests {
             live_destination
         );
 
+        media_driver
+            .run_aeron_stats()
+            .expect("Failed to run aeron stats");
+
         // info!("Waiting for subscription to connect...");
         // while !subscription.is_connected() {
         //     thread::sleep(Duration::from_millis(100));
