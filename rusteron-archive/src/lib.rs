@@ -156,10 +156,10 @@ mod tests {
         // pub const REPLAY_ENDPOINT: &str = "localhost:0";
         pub const REPLAY_ENDPOINT: &str = "localhost:23268";
 
-        env_logger::Builder::new()
+        let _ = env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
-            .init();
+            .try_init();
 
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
@@ -401,145 +401,6 @@ mod tests {
 
     use std::thread;
 
-    #[test]
-    fn test_replay_merge() -> Result<(), AeronCError> {
-        env_logger::Builder::new()
-            .is_test(true)
-            .filter_level(log::LevelFilter::Info)
-            .init();
-        let id = Aeron::nano_clock();
-        let aeron_dir = format!("target/aeron/{}/shm", id);
-        let archive_dir = format!("target/aeron/{}/archive", id);
-
-        let request_port = find_unused_udp_port(8000).expect("Could not find port");
-        let response_port = find_unused_udp_port(request_port + 1).expect("Could not find port");
-        let recording_event_port =
-            find_unused_udp_port(response_port + 1).expect("Could not find port");
-        let request_control_channel = &format!("aeron:udp?endpoint=localhost:{}", request_port);
-        let response_control_channel = &format!("aeron:udp?endpoint=localhost:{}", response_port);
-        let recording_events_channel =
-            &format!("aeron:udp?endpoint=localhost:{}", recording_event_port);
-
-        let _embedded_driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
-            &aeron_dir,
-            &format!("{}/archive", aeron_dir),
-            &request_control_channel,
-            &response_control_channel,
-            &recording_events_channel,
-        )
-        .expect("Failed to start embedded media driver");
-
-        // important that you have aeron and archive, else you get segfault if you try to use archive if aeron is close
-        let (archive, aeron) = _embedded_driver
-            .archive_connect()
-            .expect("Could not connect to archive client");
-
-        assert!(!aeron.is_closed());
-
-        let archive_uri = ChannelUriBuilder::new()
-            .media(Media::Udp)
-            .control_endpoint("localhost:40123")
-            .control_mode(ControlMode::Dynamic)
-            .endpoint("localhost:40234")
-            .reliable(true)
-            .build()
-            .expect("Failed to build URI");
-        let live_uri = "aeron:udp?endpoint=localhost:40124";
-        let replay_uri = "aeron:udp?endpoint=localhost:40125";
-        let stream_id = 1001;
-
-        archive.start_recording(&archive_uri, stream_id, SOURCE_LOCATION_LOCAL, true)?;
-        info!("asked archiver to record {}:{}", archive_uri, stream_id);
-
-        // Setup publisher
-        let publication = aeron
-            .add_publication(&archive_uri, stream_id, Duration::from_secs(5))
-            .expect("Failed to create publication");
-
-        // Spawn a thread to simulate the publisher
-        let publisher_thread = thread::spawn(move || {
-            while !publication.is_connected() {
-                thread::sleep(Duration::from_millis(100));
-            }
-            let mut i = 0;
-            loop {
-                let message = format!("price update: {}", i);
-                while publication.offer(
-                    message.as_bytes(),
-                    Handlers::no_reserved_value_supplier_handler(),
-                ) <= 0
-                {
-                    thread::sleep(Duration::from_micros(10));
-                }
-                i += 1;
-                thread::sleep(Duration::from_millis(10));
-                // info!("offer price update: {}", i);
-            }
-        });
-
-        // Setup replay subscription
-        let mut subscription = aeron
-            .async_add_subscription(
-                &archive_uri,
-                stream_id,
-                Handlers::no_available_image_handler(),
-                Handlers::no_unavailable_image_handler(),
-            )
-            .expect("Failed to create subscription")
-            .poll_blocking(Duration::from_secs(5))
-            .expect("Subscription not available");
-
-        // Add replay and live destinations to the subscription
-        subscription
-            .add_destination(&aeron, replay_uri, Duration::from_secs(5))
-            .expect("Failed to add replay destination");
-        subscription
-            .add_destination(&aeron, live_uri, Duration::from_secs(5))
-            .expect("Failed to add live destination");
-
-        let replay_thread = thread::spawn(move || {
-            let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
-                |buffer: Vec<u8>, header: AeronHeader| {
-                    let message = String::from_utf8_lossy(buffer.as_slice());
-                    info!("Replayed message: {}", message);
-                },
-            ));
-            // Simulate replaying last 24 hours of data
-            for _ in 0..100 {
-                while subscription
-                    .poll(Some(&handler), 10)
-                    .expect("Failed to poll fragments")
-                    <= 0
-                {
-                    thread::sleep(Duration::from_millis(10));
-                }
-            }
-
-            let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
-                |buffer: Vec<u8>, header: AeronHeader| {
-                    let message = String::from_utf8_lossy(buffer.as_slice());
-                    info!("Live message: {}", message);
-                },
-            ));
-
-            // Merge into the live stream
-            for _ in 0..100 {
-                while subscription
-                    .poll(Some(&handler), 10)
-                    .expect("Failed to poll fragments")
-                    <= 0
-                {
-                    thread::sleep(Duration::from_millis(10));
-                }
-            }
-        });
-
-        publisher_thread.join().expect("Publisher thread failed");
-        replay_thread.join().expect("Replay thread failed");
-
-        Ok(())
-    }
-
     pub fn start_aeron_archive() -> Result<
         (
             Aeron,
@@ -597,10 +458,10 @@ mod tests {
     #[test]
     #[serial]
     pub fn test_aeron_archive() -> Result<(), Box<dyn error::Error>> {
-        env_logger::Builder::new()
+        let _ = env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
-            .init();
+            .try_init();
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
 

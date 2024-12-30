@@ -34,10 +34,10 @@ mod tests {
     #[test]
     #[serial]
     fn version_check() -> Result<(), Box<dyn error::Error>> {
-        env_logger::Builder::new()
+        let _ = env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
-            .init();
+            .try_init();
         let major = unsafe { crate::aeron_version_major() };
         let minor = unsafe { crate::aeron_version_minor() };
         let patch = unsafe { crate::aeron_version_patch() };
@@ -63,10 +63,10 @@ mod tests {
     #[test]
     #[serial]
     pub fn simple_large_send() -> Result<(), Box<dyn error::Error>> {
-        env_logger::Builder::new()
+        let _ = env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
-            .init();
+            .try_init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
         media_driver_ctx.set_dir_delete_on_start(true)?;
@@ -205,10 +205,10 @@ mod tests {
     #[test]
     #[serial]
     pub fn try_claim() -> Result<(), Box<dyn error::Error>> {
-        env_logger::Builder::new()
+        let _ = env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
-            .init();
+            .try_init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
         media_driver_ctx.set_dir_delete_on_start(true)?;
@@ -334,10 +334,10 @@ mod tests {
     #[test]
     #[serial]
     pub fn counters() -> Result<(), Box<dyn error::Error>> {
-        env_logger::Builder::new()
+        let _ = env_logger::Builder::new()
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
-            .init();
+            .try_init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
         media_driver_ctx.set_dir_delete_on_start(true)?;
