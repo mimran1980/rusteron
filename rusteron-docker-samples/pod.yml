@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dummy-example
+spec:
+  containers:
+    - name: aeron-media-driver
+      image: aeron-media-driver:latest
+      volumeMounts:
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: shared-data
+          mountPath: /data
+      env:
+        - name: "AERON_THREADING_MODE"
+          value: "DEDICATED"
+        - name: "AERON_SENDER_IDLE_STRATEGY"
+          value: "backoff"
+        - name: "AERON_RECEIVER_IDLE_STRATEGY"
+          value: "backoff"
+        - name: "AERON_CONDUCTOR_IDLE_STRATEGY"
+          value: "backoff"
+        - name: "AERON_ARCHIVE_DIR"
+          value: "/data"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8010"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8011"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8012"
+
+    - name: ticker-writer
+      image: rusteron-dummy-example:latest
+      args: [ "ticker_writer" ]
+      ports:
+        - containerPort: 9123
+          protocol: UDP
+      volumeMounts:
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: shared-data
+          mountPath: /data
+      env:
+        - name: "AERON_THREADING_MODE"
+          value: "DEDICATED"
+        - name: "AERON_ARCHIVE_DIR"
+          value: "/data"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8010"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8011"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8012"
+
+    - name: ticker-reader
+      image: rusteron-dummy-example:latest
+      args: [ "ticker_reader" ]
+      volumeMounts:
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: shared-data
+          mountPath: /data
+      env:
+        - name: "AERON_THREADING_MODE"
+          value: "DEDICATED"
+        - name: "AERON_ARCHIVE_DIR"
+          value: "/data"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8010"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8011"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8012"
+
+  volumes:
+    - name: shared-memory
+      emptyDir:
+        medium: Memory
+    - name: shared-data
+      hostPath:
+        path: ./target/data

@@ -6,6 +6,7 @@ members = [
     "rusteron-media-driver",
     "rusteron-client",
 ]
+exclude = ["rusteron-docker-samples/rusteron-dummy-example"]
 resolver = "2"
 
 [workspace.dependencies]

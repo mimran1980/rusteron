@@ -16,6 +16,13 @@ fix:
 
 # Clean the project by removing the target directory
 clean:
+  rm -rf rusteron-archive/target
+  rm -rf rusteron-client/target
+  rm -rf rusteron-media-driver/target
+  cd rusteron-archive/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
+  cd rusteron-client/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
+  cd rusteron-media-driver/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
+  cd rusteron-rb/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
   cargo clean
 
 # Build the project in debug mode
@@ -200,3 +207,6 @@ aeron-archive-tool dir action:
 aeron-stat dir:
     java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.dir={{dir}} io.aeron.samples.AeronStat
 
+build-docker-samples:
+    cd rusteron-docker-samples/rusteron-dummy-example && cargo build --release && cd ..
+    cd rusteron-docker-samples && just build
