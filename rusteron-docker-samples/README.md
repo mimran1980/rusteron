@@ -54,7 +54,7 @@ kubectl get pods
 
 To remove the pod, use:
 ```bash
-kubectl delete pod dummy-example
+just clean
 ```
 
 ## About This Example
