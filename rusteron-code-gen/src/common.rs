@@ -333,17 +333,19 @@ impl<T> DerefMut for Handler<T> {
 }
 
 pub fn find_unused_udp_port(start_port: u16) -> Option<u16> {
-    use std::net::UdpSocket;
-
     let end_port = u16::MAX;
 
     for port in start_port..=end_port {
-        if UdpSocket::bind(("127.0.0.1", port)).is_ok() {
+        if is_udp_port_available(port) {
             return Some(port);
         }
     }
 
     None
+}
+
+pub fn is_udp_port_available(port: u16) -> bool {
+    std::net::UdpSocket::bind(("127.0.0.1", port)).is_ok()
 }
 
 /// Represents the Aeron URI parser and handler.
