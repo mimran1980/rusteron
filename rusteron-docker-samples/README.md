@@ -70,4 +70,3 @@ This is not a production-ready setup but may serve as inspiration for structurin
 
 - If using Docker Desktop, ensure Kubernetes is enabled under **Settings > Kubernetes**.
 - The `just` tool is used for simplifying repetitive tasks. Install `just` from [its GitHub page](https://github.com/casey/just) if you don't already have it.
-```

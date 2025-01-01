@@ -10,3 +10,5 @@ build:
 deploy:
     kubectl apply -f pod.yml
 
+clean:
+    kubectl delete pod dummy-example
