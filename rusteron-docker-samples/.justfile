@@ -1,3 +1,7 @@
+# List all available tasks
+list:
+    just --list
+
 build:
     docker build -t aeron-media-driver aeron-media-driver
     docker build -t rusteron-dummy-example rusteron-dummy-example
