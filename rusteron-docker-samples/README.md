@@ -1,6 +1,3 @@
-Here’s a draft for your `README.md`:
-
-```markdown
 # Dummy Example for Docker and Kubernetes Configuration
 
 This repository contains a simple dummy example demonstrating how your Docker and Kubernetes configuration might look. It is not intended as a best-practice guide but rather as a source of inspiration if you're stuck and need a starting point.
