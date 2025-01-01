@@ -211,7 +211,10 @@ impl AeronCError {
                     let line = &cap[3];
                     if file.starts_with("./") {
                         file = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), &file[2..]);
+                    } else if file.starts_with("/rustc/") {
+                        file = file.split("/").last().unwrap().to_string();
                     }
+                    // log in intellij friendly error format so can hyperlink to source code in stack trace
                     lines.push_str(&format!(" {file}:{line} in {function}\n"));
                 });
 
