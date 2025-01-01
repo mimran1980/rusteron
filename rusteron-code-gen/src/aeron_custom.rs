@@ -2,6 +2,7 @@
 
 pub const AERON_IPC_STREAM: &'static str = "aeron:ipc";
 
+unsafe impl Send for AeronCountersReader {}
 unsafe impl Send for AeronSubscription {}
 unsafe impl Sync for AeronSubscription {}
 unsafe impl Send for AeronPublication {}

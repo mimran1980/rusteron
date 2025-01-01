@@ -201,11 +201,11 @@ create-sym-link:
 
 # e.g just aeron-archive-tool ./rusteron-archive/target/aeron/784454882946541/shm/archive describe/dump/errors
 aeron-archive-tool dir action:
-    java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar io.aeron.archive.ArchiveTool {{dir}} {{action}}
+    java --add-opens java.base/jdk.internal.misc=ALL-UNNAMED -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar io.aeron.archive.ArchiveTool {{dir}} {{action}}
 
 # e.g just aeron-archive-tool ./rusteron-archive/target/aeron/784454882946541/shm
 aeron-stat dir:
-    java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.dir={{dir}} io.aeron.samples.AeronStat
+    java --add-opens java.base/jdk.internal.misc=ALL-UNNAMED -cp ./rusteron-archive/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.dir={{dir}} io.aeron.samples.AeronStat
 
 build-docker-samples:
     cd rusteron-docker-samples/rusteron-dummy-example && cargo build --release && cd ..

@@ -50,7 +50,7 @@ impl<T> ManagedCResource<T> {
             cleanup_struct,
             borrowed: false,
         };
-        log::info!("created c resource: {:?}", result);
+        log::debug!("created c resource: {:?}", result);
         Ok(result)
     }
 
@@ -92,11 +92,11 @@ impl<T> Drop for ManagedCResource<T> {
         if !self.resource.is_null() && !self.borrowed {
             let resource = self.resource.clone();
             // Ensure the clean-up function is called when the resource is dropped.
-            log::info!("closing c resource: {:?}", self);
+            log::debug!("closing c resource: {:?}", self);
             let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
 
             if self.cleanup_struct {
-                log::info!("closing rust struct resource: {:?}", resource);
+                log::debug!("closing rust struct resource: {:?}", resource);
                 unsafe {
                     let _ = Box::from_raw(resource);
                 }
@@ -200,25 +200,27 @@ impl AeronCError {
         {
             if code < 0 {
                 let backtrace = Backtrace::capture();
-                log::error!(
-                    "Aeron C error code: {}, kind: '{:?}' - {:#?}",
-                    code,
-                    AeronErrorType::from_code(code),
-                    backtrace
-                );
-
                 let backtrace = format!("{:?}", backtrace);
-                // Regular expression to match the function, file, and line
+
                 let re =
                     regex::Regex::new(r#"fn: "([^"]+)", file: "([^"]+)", line: (\d+)"#).unwrap();
-
-                // Extract and print in IntelliJ format with function
-                for cap in re.captures_iter(&backtrace) {
+                let mut lines = String::new();
+                re.captures_iter(&backtrace).for_each(|cap| {
                     let function = &cap[1];
-                    let file = &cap[2];
+                    let mut file = cap[2].to_string();
                     let line = &cap[3];
-                    log::warn!("ERROR: {file}:{line} in {function}");
-                }
+                    if file.starts_with("./") {
+                        file = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), &file[2..]);
+                    }
+                    lines.push_str(&format!(" {file}:{line} in {function}\n"));
+                });
+
+                log::error!(
+                    "Aeron C error code: {}, kind: '{:?}'\n{}",
+                    code,
+                    AeronErrorType::from_code(code),
+                    lines
+                );
             }
         }
         AeronCError { code }
