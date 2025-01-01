@@ -5,9 +5,9 @@ This repository contains a simple dummy example demonstrating how your Docker an
 ## Overview
 
 The example consists of:
-1. **Aeron Media Driver**: A container running the Aeron media driver.
-2. **Ticker Writer**: A dummy application acting as a writer.
-3. **Ticker Reader**: A dummy application acting as a reader.
+1. **Aeron Media Driver**: A container running the aeron archive media driver.
+2. **Ticker Writer**: A dummy application acting as a writer. It just publishes and archives binance ticker json messages.
+3. **Ticker Reader**: A dummy application acting as a reader. It just periodically publishes stats about the archive and live ticker channel.
 
 The setup uses:
 - **Docker** for building container images.
