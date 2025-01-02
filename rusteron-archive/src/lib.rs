@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     #[serial]
-    #[ignore] // TODO need to fix test, doesn't receive any response back
+    // #[ignore] // TODO need to fix test, doesn't receive any response back
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
         pub const STREAM_ID: i32 = 1033;
         pub const MESSAGE_PREFIX: &str = "Message-Prefix-";
@@ -160,6 +160,11 @@ mod tests {
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
             .try_init();
+
+        assert!(is_udp_port_available(23265));
+        assert!(is_udp_port_available(23266));
+        assert!(is_udp_port_available(23267));
+        assert!(is_udp_port_available(23268));
 
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
@@ -213,8 +218,11 @@ mod tests {
             thread::sleep(Duration::from_millis(100));
         }
         info!("publisher to be connected");
+        let counters_reader = aeron.counters_reader();
         let publisher_thread = thread::spawn(move || {
             let mut message_count = 0;
+            let mut counter_id = -1;
+            let session_id = publication.get_constants().unwrap().session_id;
 
             while running.load(Ordering::Acquire) {
                 let message = format!("{}{}", MESSAGE_PREFIX, message_count);
@@ -235,9 +243,19 @@ mod tests {
                 }
                 // slow down publishing so can catch up
                 if message_count > 100_000 {
-                    thread::sleep(Duration::from_micros(200));
+                    while counter_id < 0 {
+                        counter_id =
+                            RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
+                    }
+
+                    // ensure archiver is caught up
+                    while counters_reader.get_counter_value(counter_id) < publication.position() {
+                        thread::sleep(Duration::from_micros(1));
+                    }
+                    thread::sleep(Duration::from_micros(100));
                 }
             }
+            info!("Publisher thread terminated");
         });
 
         sleep(Duration::from_secs(5));
@@ -269,8 +287,8 @@ mod tests {
             counters_reader.get_counter_value(counter_id)
         );
 
-        let recording_id = Cell::new(0);
-        let start_position = Cell::new(0);
+        let recording_id = Cell::new(-1);
+        let start_position = Cell::new(-1);
 
         let list_recordings_handler = Handler::leak(
             crate::AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
@@ -283,6 +301,7 @@ mod tests {
             ),
         );
         assert!(archive.list_recordings(0, 1000, Some(&list_recordings_handler))? > 0);
+        assert!(recording_id.get() >= 0);
 
         let recording_id = recording_id.get();
         let start_position = start_position.get();
@@ -338,6 +357,32 @@ mod tests {
                 info!("Replayed message: {}", message);
             },
         ));
+
+        info!("about to start_replay");
+        let params = AeronArchiveReplayParams::new(
+            0,
+            0,
+            0,
+            i64::MAX,
+            0,
+            subscription.get_constants()?.registration_id,
+        )?;
+        let replay_session_id =
+            archive.start_replay(recording_id, &replay_destination, STREAM_ID, &params)?;
+        info!("replay session id {}", replay_session_id);
+        info!("replay session id {}", replay_session_id as i32);
+        // aeron.add_subscription(&format!("{replay_destination}|session-id={}", replay_session_id as i32), STREAM_ID,
+        // Handlers::no_available_image_handler(),
+        // Handlers::no_unavailable_image_handler(),
+        // Duration::from_secs(5))?;
+        assert!(replay_session_id > 0, "Replay failed to start");
+        if let Some(err) = archive.poll_for_error() {
+            panic!("{}", err);
+        }
+        if aeron.errmsg().len() > 0 && "no error" != aeron.errmsg() {
+            panic!("{}", aeron.errmsg());
+        }
+
         while !replay_merge.is_merged() {
             debug!(
                 "ReplayMerge state: image={:?}, is_live_added={} is_merged={} has_failed={}",

@@ -5,7 +5,6 @@ use rusteron_dummy_example::{
     archive_connect, download_ws, init_logger, JsonMesssageHandler, TICKER_CHANNEL,
     TICKER_STREAM_ID,
 };
-use std::fmt::Debug;
 use std::time::Duration;
 use tokio::time::Instant;
 
@@ -27,7 +26,7 @@ async fn main() -> websocket_lite::Result<()> {
         "xrpusdt",
     ];
 
-    let mut id = 0;
+    let id = 0;
     let url = "wss://stream.binance.com/ws";
 
     let mut params = vec![];

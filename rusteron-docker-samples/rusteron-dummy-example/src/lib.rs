@@ -61,65 +61,94 @@ pub fn init_logger() {
 
 pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
     let start = Instant::now();
+    let signal_consumer =
+        Handler::leak(crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
+            |signal: AeronArchiveRecordingSignal| {
+                info!("Recording signal received: {:?}", signal);
+            },
+        ));
+
+    let error_handler = Handler::leak(crate::AeronErrorHandlerClosure::from(|code, msg| {
+        error!("err code: {}, msg: {}", code, msg);
+    }));
+
     while start.elapsed() < Duration::from_secs(30) {
-        if let Ok(aeron_context) = AeronContext::new() {
-            if let Ok(aeron) = Aeron::new(&aeron_context) {
-                if aeron.start().is_ok() {
-                    if let Ok(archive_context) =
-                        AeronArchiveContext::new_with_no_credentials_supplier(
-                            &aeron,
-                            &std::env::var("AERON_ARCHIVE_CONTROL_CHANNEL").expect("missing environment variable AERON_ARCHIVE_CONTROL_CHANNEL"),
-                            &std::env::var("AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL").expect("missing environment variable AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"),
-                            &std::env::var("AERON_ARCHIVE_REPLICATION_CHANNEL").expect("missing environment variable AERON_ARCHIVE_REPLICATION_CHANNEL"),
-                        )
-                    {
-                        let signal_consumer = Handler::leak(
-                            crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
-                                |signal: AeronArchiveRecordingSignal| {
-                                    info!("Recording signal received: {:?}", signal);
-                                },
-                            ),
+        match AeronContext::new() {
+            Ok(aeron_context) => match Aeron::new(&aeron_context) {
+                Ok(aeron) => match aeron.start() {
+                    Ok(_) => {
+                        info!(
+                            "Successfully connected to aeron client [{}]",
+                            aeron.version_full()
                         );
+                        let archive_context = AeronArchiveContext::new_with_no_credentials_supplier(
+                                    &aeron,
+                                    &std::env::var("AERON_ARCHIVE_CONTROL_CHANNEL").expect("missing environment variable AERON_ARCHIVE_CONTROL_CHANNEL"),
+                                    &std::env::var("AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL").expect("missing environment variable AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"),
+                                    &std::env::var("AERON_ARCHIVE_REPLICATION_CHANNEL").expect("missing environment variable AERON_ARCHIVE_REPLICATION_CHANNEL"),
+                                ).expect("error creating archive context");
+
                         archive_context
                             .set_recording_signal_consumer(Some(&signal_consumer))
                             .expect("Failed to set recording signal consumer");
-                        let error_handler = Handler::leak(
-                            crate::AeronErrorHandlerClosure::from(|code, msg| {
-                                error!("err code: {}, msg: {}", code, msg);
-                            }),
-                        );
                         archive_context
                             .set_error_handler(Some(&error_handler))
                             .expect("unable to set error handler");
                         archive_context
                             .set_idle_strategy(Some(&Handler::leak(
-                                AeronIdleStrategyFuncClosure::from(|work_count| {}),
+                                AeronIdleStrategyFuncClosure::from(|_work_count| {}),
                             )))
                             .expect("unable to set idle strategy");
                         if let Ok(connect) = AeronArchiveAsyncConnect::new(&archive_context) {
-                            if let Ok(archive) = connect.poll_blocking(Duration::from_secs(10))
-                            {
-                                let i = archive.get_archive_id();
-                                assert!(i > 0);
-                                info!("aeron archive media driver is up [connected with archive id {i}]");
-                                sleep(Duration::from_millis(100));
-                                return Ok((archive, aeron));
-                            };
+                            match connect.poll_blocking(Duration::from_secs(10)) {
+                                Ok(archive) => {
+                                    let i = archive.get_archive_id();
+                                    assert!(i > 0);
+                                    info!("aeron archive media driver is up [connected with archive id {i}]");
+                                    return Ok((archive, aeron));
+                                }
+                                Err(e) => {
+                                    error!("Failed to poll and connect to Aeron archive: {:?}", e);
+                                }
+                            }
+                        } else {
+                            error!(
+                                "Failed to create AeronArchiveAsyncConnect with the given context"
+                            );
                         }
                     }
-                    error!("aeron error: {}", aeron.errmsg());
+                    Err(e) => {
+                        error!("error creating archive context: {:?}", e);
+                        error!("aeron error: {}", aeron.errmsg());
+                    }
+                },
+                Err(e) => {
+                    error!(
+                        "error creating aeron client [aeron_dir={:?}, error={:?}]",
+                        aeron_context.get_dir(),
+                        e
+                    );
+
+                    if let Ok(entries) = std::fs::read_dir("/dev/shm") {
+                        info!("/dev/shm has {} files", entries.count());
+                    } else {
+                        error!("Unable to read directory /dev/shm");
+                    }
                 }
+            },
+            Err(e) => {
+                error!("error creating aeron context: {:?}", e);
             }
         }
-        info!("waiting for aeron to start up aeron");
+        info!("waiting for aeron to start up, retrying...");
     }
 
     assert!(
-        start.elapsed() < Duration::from_secs(30),
+        start.elapsed() < Duration::from_secs(60),
         "failed to start up aeron media driver"
     );
 
-    return Err(std::io::Error::other(
+    Err(std::io::Error::other(
         "unable to start up aeron media driver client",
-    ));
+    ))
 }

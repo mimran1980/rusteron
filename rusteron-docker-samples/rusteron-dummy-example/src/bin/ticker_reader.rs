@@ -1,17 +1,10 @@
-use log::{error, info, warn};
+use log::{error, info};
 use rusteron_archive::*;
-use rusteron_dummy_example::model::Subscribe;
-use rusteron_dummy_example::{
-    archive_connect, download_ws, init_logger, JsonMesssageHandler, TICKER_CHANNEL,
-    TICKER_STREAM_ID,
-};
+use rusteron_dummy_example::{archive_connect, init_logger, TICKER_CHANNEL, TICKER_STREAM_ID};
 use signal_hook::consts::*;
-use std::cell::Cell;
-use std::error::Error;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 use tokio::time::Instant;
 use websocket_lite::Result;
@@ -173,7 +166,7 @@ impl AeronArchiveRecordingDescriptorConsumerFuncCallback for RecorderDescriptorR
     fn handle_aeron_archive_recording_descriptor_consumer_func(
         &mut self,
         recording_descriptor: AeronArchiveRecordingDescriptor,
-    ) -> () {
+    ) {
         info!("found recording {:?}", recording_descriptor);
         if recording_descriptor.stop_position > 0 {
             self.last_recording_with_stop_position = Some(recording_descriptor);
@@ -209,71 +202,5 @@ impl AeronFragmentHandlerCallback for MessageCountHandler {
     fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], _header: AeronHeader) {
         self.count += 1;
         self.bytes += buffer.len();
-    }
-}
-
-struct AeronRecorder {
-    publication: AeronExclusivePublication,
-    published_count: usize,
-}
-
-impl AeronRecorder {
-    pub fn new(archive: AeronArchive, aeron: Aeron) -> websocket_lite::Result<Self> {
-        let channel = TICKER_CHANNEL;
-        let stream_id = TICKER_STREAM_ID;
-        let subscription_id =
-            archive.start_recording(channel, stream_id, SOURCE_LOCATION_REMOTE, true)?;
-        info!("started recording ticker stream [subscriptionId={subscription_id}");
-
-        let publication = aeron
-            .async_add_exclusive_publication(channel, stream_id)?
-            .poll_blocking(Duration::from_secs(60))?;
-
-        info!(
-            "created exclusive ticker publication [sessionId={}]",
-            publication.get_constants()?.session_id
-        );
-
-        Ok(Self {
-            publication,
-            published_count: 0,
-        })
-    }
-}
-
-impl JsonMesssageHandler for AeronRecorder {
-    fn on_msg(&mut self, msg: &str) {
-        let mut result = self.publication.offer(
-            msg.as_bytes(),
-            Handlers::no_reserved_value_supplier_handler(),
-        );
-        if result <= 0 {
-            // this is poor way to handle back pressure, just for simple example
-            let duration = Duration::from_millis(100);
-            let start = Instant::now();
-
-            while start.elapsed() < duration && result <= 0 {
-                result = self.publication.offer(
-                    msg.as_bytes(),
-                    Handlers::no_reserved_value_supplier_handler(),
-                );
-            }
-
-            if result <= 0 {
-                warn!(
-                    "failed to publish [error={:?}, payload={}]",
-                    AeronCError::from_code(result as i32),
-                    msg
-                )
-            }
-        }
-
-        if result > 0 {
-            self.published_count += 1;
-
-            if self.published_count % 1000 == 0 {
-                info!("published {} ticker messages so far", self.published_count);
-            }
-        }
     }
 }

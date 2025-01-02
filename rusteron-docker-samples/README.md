@@ -1,72 +1,71 @@
 # Dummy Example for Docker and Kubernetes Configuration
 
-This repository contains a simple dummy example demonstrating how your Docker and Kubernetes configuration might look. It is not intended as a best-practice guide but rather as a source of inspiration if you're stuck and need a starting point.
+This repository provides a simple example to demonstrate containerization and orchestration using **Docker**, **Podman**, and **Kubernetes**. While not intended as production-ready, it serves as a helpful starting point.
 
 ## Overview
 
-The example consists of:
-1. **Aeron Media Driver**: A container running the aeron archive media driver.
-2. **Ticker Writer**: A dummy application acting as a writer. It just publishes and archives binance ticker json messages.
-3. **Ticker Reader**: A dummy application acting as a reader. It just periodically publishes stats about the archive and live ticker channel.
+The setup includes:
 
-The setup uses:
-- **Docker** for building container images.
-- **Kubernetes** for deploying and running the containers with shared resources.
+1. **Aeron Media Driver**: A containerized Aeron Archive Media Driver.
+2. **Ticker Writer**: Publishes and archives Binance ticker JSON messages.
+3. **Ticker Reader**: Periodically publishes stats about the archive and live ticker channel.
 
-## Requirements
+## Quick Start for Local Testing
 
-To run this example, you need:
-- **Docker Desktop** with Kubernetes enabled.  
-  Make sure Kubernetes is enabled under Docker Desktop settings.  
-  Alternatively, any Kubernetes cluster can be used if appropriately configured.
-- `kubectl` command-line tool for interacting with Kubernetes.
+For local testing, Podman is recommended for its lightweight nature and ease of use. If you have a Kubernetes cluster, you can deploy using Kubernetes configurations.
 
-## Quick Start
+### Podman Local Testing
 
-### Build Docker Images
+1. **Build the Podman Images**  
+   Build all required images using Podman:
+   ```bash
+   just podman-build
+   ```
 
-Run the following command to build the necessary Docker images:
-```bash
-just build
-```
+2. **Deploy Using Podman**  
+   Deploy the example configuration with:
+   ```bash
+   just podman-deploy
+   ```
 
-This command will:
-1. Build the `aeron-media-driver` Docker image.
-2. Build the `rusteron-dummy-example` Docker image.
+3. **Stop and Clean Up Podman Resources**  
+   To stop the deployment:
+   ```bash
+   just podman-stop
+   ```
 
-### Deploy to Kubernetes
+### Kubernetes Deployment (Alternative)
 
-Deploy the pod configuration using:
-```bash
-just deploy
-```
+If you have a Kubernetes cluster, you can use it for deployment:
 
-This command applies the `pod.yml` to your Kubernetes cluster. Ensure Kubernetes is running and accessible before deploying.
+1. **Build Docker Images**  
+   Ensure the images are built:
+   ```bash
+   just docker-build
+   ```
 
-### Verify Deployment
+2. **Deploy to Kubernetes**  
+   Apply the pod configuration to your Kubernetes cluster:
+   ```bash
+   just k8s-deploy
+   ```
 
-Check the status of the pod:
-```bash
-kubectl get pods
-```
+3. **Clean Up Kubernetes Resources**  
+   Remove the deployed pod:
+   ```bash
+   just k8s-clean
+   ```
 
-### Clean Up
+## Prerequisites
 
-To remove the pod, use:
-```bash
-just clean
-```
+- **Podman** or **Docker** for container management.
+- **Kubernetes** (optional) for orchestration. Ensure it's enabled if using Docker Desktop.
+- **just** for task automation. Install `just` from its [GitHub repository](https://github.com/casey/just).
 
-## About This Example
+## Key Features Demonstrated
 
-This setup is a **simple dummy configuration**. It demonstrates:
-- Using shared memory (`/dev/shm`) and shared data (`/data`) volumes across containers.
-- Example `args` for defining specific entry points for the writer and reader.
-- Kubernetes `pod.yml` for deploying multiple containers in a single pod.
+- Shared memory (`/dev/shm`) and data (`/data`) volumes for container interaction.
+- Configurable arguments and shared environments using `pod.yml`.
+- Task automation for building, deploying, and cleaning with `just`.
 
-This is not a production-ready setup but may serve as inspiration for structuring your Docker and Kubernetes configurations.
-
-## Notes
-
-- If using Docker Desktop, ensure Kubernetes is enabled under **Settings > Kubernetes**.
-- The `just` tool is used for simplifying repetitive tasks. Install `just` from [its GitHub page](https://github.com/casey/just) if you don't already have it.
+> Note: This example is designed for experimentation and learning. For production, additional configuration, security, and testing are required.

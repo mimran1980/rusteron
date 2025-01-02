@@ -7,44 +7,35 @@ spec:
     - name: aeron-media-driver
       image: aeron-media-driver:latest
       volumeMounts:
-        - name: shared-memory
-          mountPath: /dev/shm
         - name: shared-data
           mountPath: /data
       env:
-        - name: "AERON_THREADING_MODE"
+        - name: "aeron.threading.mode"
           value: "DEDICATED"
-        - name: "AERON_SENDER_IDLE_STRATEGY"
+        - name: "aeron.sender.idle.strategy"
           value: "backoff"
-        - name: "AERON_RECEIVER_IDLE_STRATEGY"
+        - name: "aeron.receiver.idle.strategy"
           value: "backoff"
-        - name: "AERON_CONDUCTOR_IDLE_STRATEGY"
+        - name: "aeron.conductor.idle.strategy"
           value: "backoff"
-        - name: "AERON_ARCHIVE_DIR"
+        - name: "aeron.archive.dir"
           value: "/data"
-        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+        - name: "aeron.archive.control.channel"
           value: "aeron:udp?endpoint=localhost:8010"
-        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+        - name: "aeron.archive.control.response.channel"
           value: "aeron:udp?endpoint=localhost:8011"
-        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+        - name: "aeron.archive.replication.channel"
           value: "aeron:udp?endpoint=localhost:8012"
 
     - name: ticker-writer
       image: rusteron-dummy-example:latest
       args: [ "ticker_writer" ]
-      ports:
-        - containerPort: 9123
-          protocol: UDP
       volumeMounts:
-        - name: shared-memory
-          mountPath: /dev/shm
         - name: shared-data
           mountPath: /data
       env:
         - name: "AERON_THREADING_MODE"
           value: "DEDICATED"
-        - name: "AERON_ARCHIVE_DIR"
-          value: "/data"
         - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8010"
         - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
@@ -56,15 +47,11 @@ spec:
       image: rusteron-dummy-example:latest
       args: [ "ticker_reader" ]
       volumeMounts:
-        - name: shared-memory
-          mountPath: /dev/shm
         - name: shared-data
           mountPath: /data
       env:
         - name: "AERON_THREADING_MODE"
           value: "DEDICATED"
-        - name: "AERON_ARCHIVE_DIR"
-          value: "/data"
         - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8010"
         - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
@@ -73,9 +60,6 @@ spec:
           value: "aeron:udp?endpoint=localhost:8012"
 
   volumes:
-    - name: shared-memory
-      emptyDir:
-        medium: Memory
     - name: shared-data
-      hostPath:
-        path: ./target/data
+      emptyDir: {}
+    # don't need to do shm as pod shared /dev/shm anyway

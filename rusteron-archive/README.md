@@ -90,7 +90,7 @@ archive_context.set_recording_signal_consumer(Some(&Handler::leak(
     ),
 )))?;
 archive_context.set_idle_strategy(Some(&Handler::leak(
-    AeronIdleStrategyFuncClosure::from(|work_count| {}),
+    AeronIdleStrategyFuncClosure::from(|_work_count| {}),
 )))?;
 archive_context.set_error_handler(Some(&error_handler))?;
 

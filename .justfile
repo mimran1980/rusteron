@@ -13,12 +13,16 @@ check:
 fix:
   cargo fmt --all
   cargo clippy --allow-dirty --allow-staged --fix
+  cd rusteron-docker-samples/rusteron-dummy-example && just fix
 
 # Clean the project by removing the target directory
 clean:
   rm -rf rusteron-archive/target
   rm -rf rusteron-client/target
   rm -rf rusteron-media-driver/target
+  rm -rf rusteron-rb/target
+  rm -rf rusteron-docker-samples/target
+  rm -rf rusteron-docker-samples/rusteron-dummy-example/target
   cd rusteron-archive/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
   cd rusteron-client/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
   cd rusteron-media-driver/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
