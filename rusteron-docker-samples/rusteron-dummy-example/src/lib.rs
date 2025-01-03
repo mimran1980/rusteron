@@ -60,6 +60,13 @@ pub fn init_logger() {
 }
 
 pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
+    let request_control_channel = &std::env::var("AERON_ARCHIVE_CONTROL_CHANNEL")
+        .expect("missing environment variable AERON_ARCHIVE_CONTROL_CHANNEL");
+    let response_control_channel = &std::env::var("AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL")
+        .expect("missing environment variable AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL");
+    let recording_events_channel = &std::env::var("AERON_ARCHIVE_REPLICATION_CHANNEL")
+        .expect("missing environment variable AERON_ARCHIVE_REPLICATION_CHANNEL");
+
     let start = Instant::now();
     let signal_consumer =
         Handler::leak(crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
@@ -78,43 +85,47 @@ pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
                 Ok(aeron) => match aeron.start() {
                     Ok(_) => {
                         info!(
-                            "Successfully connected to aeron client [{}]",
+                            "Successfully connected to aeron client, now trying to connect to archive... [aeronVersion={}]",
                             aeron.version_full()
                         );
-                        let archive_context = AeronArchiveContext::new_with_no_credentials_supplier(
-                                    &aeron,
-                                    &std::env::var("AERON_ARCHIVE_CONTROL_CHANNEL").expect("missing environment variable AERON_ARCHIVE_CONTROL_CHANNEL"),
-                                    &std::env::var("AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL").expect("missing environment variable AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"),
-                                    &std::env::var("AERON_ARCHIVE_REPLICATION_CHANNEL").expect("missing environment variable AERON_ARCHIVE_REPLICATION_CHANNEL"),
-                                ).expect("error creating archive context");
-
-                        archive_context
-                            .set_recording_signal_consumer(Some(&signal_consumer))
-                            .expect("Failed to set recording signal consumer");
-                        archive_context
-                            .set_error_handler(Some(&error_handler))
-                            .expect("unable to set error handler");
-                        archive_context
-                            .set_idle_strategy(Some(&Handler::leak(
-                                AeronIdleStrategyFuncClosure::from(|_work_count| {}),
-                            )))
-                            .expect("unable to set idle strategy");
-                        if let Ok(connect) = AeronArchiveAsyncConnect::new(&archive_context) {
-                            match connect.poll_blocking(Duration::from_secs(10)) {
-                                Ok(archive) => {
-                                    let i = archive.get_archive_id();
-                                    assert!(i > 0);
-                                    info!("aeron archive media driver is up [connected with archive id {i}]");
-                                    return Ok((archive, aeron));
-                                }
-                                Err(e) => {
-                                    error!("Failed to poll and connect to Aeron archive: {:?}", e);
+                        match AeronArchiveContext::new_with_no_credentials_supplier(
+                            &aeron,
+                            request_control_channel,
+                            response_control_channel,
+                            recording_events_channel,
+                        ) {
+                            Ok(archive_context) => {
+                                archive_context
+                                    .set_recording_signal_consumer(Some(&signal_consumer))
+                                    .expect("Failed to set recording signal consumer");
+                                archive_context
+                                    .set_error_handler(Some(&error_handler))
+                                    .expect("unable to set error handler");
+                                archive_context
+                                    .set_idle_strategy(Some(&Handler::leak(
+                                        AeronIdleStrategyFuncClosure::from(|_work_count| {}),
+                                    )))
+                                    .expect("unable to set idle strategy");
+                                match AeronArchiveAsyncConnect::new(&archive_context) {
+                                    Ok(connect) => {
+                                        match connect.poll_blocking(Duration::from_secs(10)) {
+                                            Ok(archive) => {
+                                                let i = archive.get_archive_id();
+                                                assert!(i > 0);
+                                                info!("aeron archive media driver is up [connected with archive id {i}]");
+                                                return Ok((archive, aeron));
+                                            }
+                                            Err(e) => {
+                                                error!("Failed to poll and connect to Aeron archive: {:?}", e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("Failed to create AeronArchiveAsyncConnect with the given context - {:?}", e);
+                                    }
                                 }
                             }
-                        } else {
-                            error!(
-                                "Failed to create AeronArchiveAsyncConnect with the given context"
-                            );
+                            Err(c) => error!("failed to create aeron context: {:?}", c),
                         }
                     }
                     Err(e) => {

@@ -10,16 +10,17 @@ spec:
         - name: shared-data
           mountPath: /data
       env:
-        - name: "aeron.threading.mode"
-          value: "DEDICATED"
-        - name: "aeron.sender.idle.strategy"
-          value: "backoff"
-        - name: "aeron.receiver.idle.strategy"
-          value: "backoff"
-        - name: "aeron.conductor.idle.strategy"
-          value: "backoff"
-        - name: "aeron.archive.dir"
-          value: "/data"
+        - name: "aeron.spies.simulate.connection"
+          value: "true"
+        - name: "aeron.pretouch.log.files"
+          value: "true"
+        - name: "agrona.disable.bounds.checks"
+          value: "false"
+        - name: "aeron.event.log"
+#          value: "admin,replay"
+          value: "all"
+        - name: "aeron.event.archive"
+          value: "all"
         - name: "aeron.archive.control.channel"
           value: "aeron:udp?endpoint=localhost:8010"
         - name: "aeron.archive.control.response.channel"
@@ -34,14 +35,16 @@ spec:
         - name: shared-data
           mountPath: /data
       env:
-        - name: "AERON_THREADING_MODE"
-          value: "DEDICATED"
+        - name: "RUST_BACKTRACE"
+          value: "1"
         - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8010"
         - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8011"
         - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8012"
+        - name: "AERON_PRETOUCH_LOG_FILES"
+          value: "true"
 
     - name: ticker-reader
       image: rusteron-dummy-example:latest
@@ -50,14 +53,16 @@ spec:
         - name: shared-data
           mountPath: /data
       env:
-        - name: "AERON_THREADING_MODE"
-          value: "DEDICATED"
+        - name: "RUST_BACKTRACE"
+          value: "1"
         - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8010"
         - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8011"
         - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8012"
+        - name: "AERON_PRETOUCH_LOG_FILES"
+          value: "true"
 
   volumes:
     - name: shared-data

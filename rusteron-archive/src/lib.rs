@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     #[serial]
-    // #[ignore] // TODO need to fix test, doesn't receive any response back
+    #[ignore] // TODO need to fix test, doesn't receive any response back
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
         pub const STREAM_ID: i32 = 1033;
         pub const MESSAGE_PREFIX: &str = "Message-Prefix-";

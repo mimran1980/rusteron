@@ -63,11 +63,10 @@ impl AeronRecorder {
         let stream_id = TICKER_STREAM_ID;
         let subscription_id =
             archive.start_recording(channel, stream_id, SOURCE_LOCATION_REMOTE, true)?;
-        info!("started recording ticker stream [subscriptionId={subscription_id}");
+        info!("started recording ticker stream [subscriptionId={subscription_id}]");
 
-        let publication = aeron
-            .async_add_exclusive_publication(channel, stream_id)?
-            .poll_blocking(Duration::from_secs(60))?;
+        let publication =
+            aeron.add_exclusive_publication(channel, stream_id, Duration::from_secs(60))?;
 
         info!(
             "created exclusive ticker publication [sessionId={}]",
