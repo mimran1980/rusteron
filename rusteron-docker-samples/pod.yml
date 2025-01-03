@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dummy-example
+spec:
+  containers:
+    - name: aeron-media-driver
+      image: aeron-media-driver:latest
+      volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      env:
+        - name: "AERON_SPIES_SIMULATE_CONNECTION"
+          value: "true"
+        - name: "AERON_PRETOUCH_LOG_FILES"
+          value: "true"
+        - name: "AGRONA_DISABLE_BOUNDS_CHECKS"
+          value: "true"
+        - name: "AERON_PRINT_CONFIGURATION"
+          value: "true"
+        - name: "AERON_EVENT_LOG"
+#          value: "admin,replay"
+          value: "all"
+        - name: "AERON_EVENT_ARCHIVE_LOG"
+          value: "all"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8010"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8011"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8012"
+
+    - name: ticker-writer
+      image: rusteron-dummy-example:latest
+      args: [ "ticker_writer" ]
+      volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      env:
+        - name: "RUST_BACKTRACE"
+          value: "1"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8010"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8011"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8012"
+        - name: "AERON_PRETOUCH_LOG_FILES"
+          value: "true"
+
+    - name: ticker-reader
+      image: rusteron-dummy-example:latest
+      args: [ "ticker_reader" ]
+      volumeMounts:
+        - name: shared-data
+          mountPath: /data
+      env:
+        - name: "RUST_BACKTRACE"
+          value: "1"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8010"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8011"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
+          value: "aeron:udp?endpoint=localhost:8012"
+        - name: "AERON_PRETOUCH_LOG_FILES"
+          value: "true"
+
+  volumes:
+    - name: shared-data
+      emptyDir: {}
+    # don't need to do shm as pod shared /dev/shm anyway

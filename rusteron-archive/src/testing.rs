@@ -156,7 +156,7 @@ impl EmbeddedArchiveMediaDriverProcess {
                                 .expect("unable to set error handler");
                             archive_context
                                 .set_idle_strategy(Some(&Handler::leak(
-                                    AeronIdleStrategyFuncClosure::from(|work_count| {}),
+                                    AeronIdleStrategyFuncClosure::from(|_work_count| {}),
                                 )))
                                 .expect("unable to set idle strategy");
                             if let Ok(connect) = AeronArchiveAsyncConnect::new(&archive_context) {
@@ -174,7 +174,7 @@ impl EmbeddedArchiveMediaDriverProcess {
                     }
                 }
             }
-            info!("waiting for aeron to start up aeron");
+            info!("waiting for aeron to start up, retrying...");
         }
 
         assert!(
@@ -286,7 +286,7 @@ impl EmbeddedArchiveMediaDriverProcess {
             &format!("-Daeron.dir={}", aeron_dir),
             &format!("-Daeron.archive.dir={}", archive_dir),
             "-Daeron.spies.simulate.connection=true",
-            "-Daeron.event.log=admin", // this will only work if an agent is built
+            "-Daeron.event.log=admin,replay", // this will only work if an agent is built
             "-Daeron.event.archive.log=all",
             "-Daeron.event.cluster.log=all",
             // "-Daeron.term.buffer.sparse.file=false",

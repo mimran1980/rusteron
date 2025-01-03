@@ -832,7 +832,7 @@ impl CWrapper {
                 pub fn new_zeroed() -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
                         move |ctx_field| {
-                            log::info!("creating zeroed empty resource {}", stringify!(#type_name));
+                            log::debug!("creating zeroed empty resource {}", stringify!(#type_name));
                             let inst: #type_name = unsafe { std::mem::zeroed() };
                             let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
                             unsafe { *ctx_field = inner_ptr };

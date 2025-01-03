@@ -62,3 +62,12 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
           tags: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check docker example builds
+        run: |
+          cd rusteron-docker-samples
+          docker build -t aeron-media-driver aeron-media-driver
+          docker build -t rusteron-dummy-example rusteron-dummy-example

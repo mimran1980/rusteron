@@ -13,9 +13,20 @@ check:
 fix:
   cargo fmt --all
   cargo clippy --allow-dirty --allow-staged --fix
+  cd rusteron-docker-samples/rusteron-dummy-example && just fix
 
 # Clean the project by removing the target directory
 clean:
+  rm -rf rusteron-archive/target
+  rm -rf rusteron-client/target
+  rm -rf rusteron-media-driver/target
+  rm -rf rusteron-rb/target
+  rm -rf rusteron-docker-samples/target
+  rm -rf rusteron-docker-samples/rusteron-dummy-example/target
+  cd rusteron-archive/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
+  cd rusteron-client/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
+  cd rusteron-media-driver/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
+  cd rusteron-rb/aeron && git submodule update --init --recursive && git reset --hard && git clean -fdx && cd -
   cargo clean
 
 # Build the project in debug mode
@@ -194,9 +205,12 @@ create-sym-link:
 
 # e.g just aeron-archive-tool ./rusteron-archive/target/aeron/784454882946541/shm/archive describe/dump/errors
 aeron-archive-tool dir action:
-    java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar io.aeron.archive.ArchiveTool {{dir}} {{action}}
+    java --add-opens java.base/jdk.internal.misc=ALL-UNNAMED -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar io.aeron.archive.ArchiveTool {{dir}} {{action}}
 
 # e.g just aeron-archive-tool ./rusteron-archive/target/aeron/784454882946541/shm
 aeron-stat dir:
-    java -cp ./rusteron-client/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.dir={{dir}} io.aeron.samples.AeronStat
+    java --add-opens java.base/jdk.internal.misc=ALL-UNNAMED -cp ./rusteron-archive/aeron/aeron-all/build/libs/aeron-all-*.jar -Daeron.dir={{dir}} io.aeron.samples.AeronStat
 
+build-docker-samples:
+    cd rusteron-docker-samples/rusteron-dummy-example && cargo build --release && cd ..
+    cd rusteron-docker-samples && just build

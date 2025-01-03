@@ -6,8 +6,6 @@ pub const AERON_CLIENT_ERROR_CLIENT_TIMEOUT: i32 = -1001;
 pub const AERON_CLIENT_ERROR_CONDUCTOR_SERVICE_TIMEOUT: i32 = -1002;
 pub const AERON_CLIENT_ERROR_BUFFER_FULL: i32 = -1003;
 pub const AERON_CLIENT_MAX_LOCAL_ADDRESS_STR_LEN: u32 = 64;
-pub const AERON_RESPONSE_ADDRESS_TYPE_IPV4: u32 = 1;
-pub const AERON_RESPONSE_ADDRESS_TYPE_IPV6: u32 = 2;
 pub const AERON_DIR_ENV_VAR: &[u8; 10] = b"AERON_DIR\0";
 pub const AERON_DRIVER_TIMEOUT_ENV_VAR: &[u8; 21] = b"AERON_DRIVER_TIMEOUT\0";
 pub const AERON_CLIENT_RESOURCE_LINGER_DURATION_ENV_VAR: &[u8; 38] =
@@ -123,59 +121,6 @@ const _: () = {
         [::std::mem::offset_of!(aeron_header_values_stct, position_bits_to_shift) - 36usize];
 };
 pub type aeron_header_values_t = aeron_header_values_stct;
-#[repr(C, packed(4))]
-#[derive(Debug, Copy, Clone)]
-pub struct aeron_publication_error_values_stct {
-    pub registration_id: i64,
-    pub destination_registration_id: i64,
-    pub session_id: i32,
-    pub stream_id: i32,
-    pub receiver_id: i64,
-    pub group_tag: i64,
-    pub address_type: i16,
-    pub source_port: u16,
-    pub source_address: [u8; 16usize],
-    pub error_code: i32,
-    pub error_message_length: i32,
-    pub error_message: [u8; 1usize],
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of aeron_publication_error_values_stct"]
-        [::std::mem::size_of::<aeron_publication_error_values_stct>() - 72usize];
-    ["Alignment of aeron_publication_error_values_stct"]
-        [::std::mem::align_of::<aeron_publication_error_values_stct>() - 4usize];
-    ["Offset of field: aeron_publication_error_values_stct::registration_id"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, registration_id) - 0usize];
-    ["Offset of field: aeron_publication_error_values_stct::destination_registration_id"][::std::mem::offset_of!(
-        aeron_publication_error_values_stct,
-        destination_registration_id
-    )
-        - 8usize];
-    ["Offset of field: aeron_publication_error_values_stct::session_id"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, session_id) - 16usize];
-    ["Offset of field: aeron_publication_error_values_stct::stream_id"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, stream_id) - 20usize];
-    ["Offset of field: aeron_publication_error_values_stct::receiver_id"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, receiver_id) - 24usize];
-    ["Offset of field: aeron_publication_error_values_stct::group_tag"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, group_tag) - 32usize];
-    ["Offset of field: aeron_publication_error_values_stct::address_type"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, address_type) - 40usize];
-    ["Offset of field: aeron_publication_error_values_stct::source_port"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, source_port) - 42usize];
-    ["Offset of field: aeron_publication_error_values_stct::source_address"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, source_address) - 44usize];
-    ["Offset of field: aeron_publication_error_values_stct::error_code"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, error_code) - 60usize];
-    ["Offset of field: aeron_publication_error_values_stct::error_message_length"][::std::mem::offset_of!(
-        aeron_publication_error_values_stct,
-        error_message_length
-    ) - 64usize];
-    ["Offset of field: aeron_publication_error_values_stct::error_message"]
-        [::std::mem::offset_of!(aeron_publication_error_values_stct, error_message) - 68usize];
-};
-pub type aeron_publication_error_values_t = aeron_publication_error_values_stct;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct aeron_subscription_stct {
@@ -315,24 +260,6 @@ pub type aeron_error_handler_t = ::std::option::Option<
         message: *const ::std::os::raw::c_char,
     ),
 >;
-#[doc = " The error frame handler to be called when the driver notifies the client about an error frame being received.\n The data passed to this callback will only be valid for the lifetime of the callback. The user should use\n <code>aeron_publication_error_values_copy</code> if they require the data to live longer than that."]
-pub type aeron_publication_error_frame_handler_t = ::std::option::Option<
-    unsafe extern "C" fn(
-        clientd: *mut ::std::os::raw::c_void,
-        error_frame: *mut aeron_publication_error_values_t,
-    ),
->;
-unsafe extern "C" {
-    #[doc = " Copy an existing aeron_publication_error_values_t to the supplied pointer. The caller is responsible for freeing the\n allocated memory using aeron_publication_error_values_delete when the copy is not longer required.\n\n @param dst to copy the values to.\n @param src to copy the values from.\n @return 0 if this is successful, -1 otherwise. Will set aeron_errcode() and aeron_errmsg() on failure."]
-    pub fn aeron_publication_error_values_copy(
-        dst: *mut *mut aeron_publication_error_values_t,
-        src: *mut aeron_publication_error_values_t,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    #[doc = " Delete a instance of aeron_publication_error_values_t that was created when making a copy\n (aeron_publication_error_values_copy). This should not be use on the pointer received via the aeron_frame_handler_t.\n @param to_delete to be deleted."]
-    pub fn aeron_publication_error_values_delete(to_delete: *mut aeron_publication_error_values_t);
-}
 #[doc = " Generalised notification callback."]
 pub type aeron_notification_t =
     ::std::option::Option<unsafe extern "C" fn(clientd: *mut ::std::os::raw::c_void)>;
@@ -348,23 +275,6 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn aeron_context_get_error_handler_clientd(
-        context: *mut aeron_context_t,
-    ) -> *mut ::std::os::raw::c_void;
-}
-unsafe extern "C" {
-    pub fn aeron_context_set_publication_error_frame_handler(
-        context: *mut aeron_context_t,
-        handler: aeron_publication_error_frame_handler_t,
-        clientd: *mut ::std::os::raw::c_void,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn aeron_context_get_publication_error_frame_handler(
-        context: *mut aeron_context_t,
-    ) -> aeron_publication_error_frame_handler_t;
-}
-unsafe extern "C" {
-    pub fn aeron_context_get_publication_error_frame_handler_clientd(
         context: *mut aeron_context_t,
     ) -> *mut ::std::os::raw::c_void;
 }
@@ -970,14 +880,6 @@ unsafe extern "C" {
         counters_reader: *mut aeron_counters_reader_t,
         counter_id: i32,
         type_id: *mut i32,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    #[doc = " Get a pointer to the key of a counter's metadata\n\n @param counters_reader that contains the counter\n @param counter_id to find\n @param key_p out pointer set to location of metadata key\n @return -1 on failure, 0 on success."]
-    pub fn aeron_counters_reader_metadata_key(
-        counters_reader: *mut aeron_counters_reader_t,
-        counter_id: i32,
-        key_p: *mut *mut u8,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
