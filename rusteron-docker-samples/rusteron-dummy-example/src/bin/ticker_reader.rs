@@ -176,7 +176,7 @@ impl AeronArchiveRecordingDescriptorConsumerFuncCallback for RecorderDescriptorR
 
 fn register_exit_signals() -> Result<Arc<AtomicBool>> {
     let shutdown_flag = Arc::new(AtomicBool::new(false));
-    let signals = &[SIGINT, SIGTERM, SIGKILL, SIGQUIT];
+    let signals = &[SIGINT, SIGTERM, SIGQUIT];
     for &signal in signals {
         let flag_clone = Arc::clone(&shutdown_flag);
         signal_hook::flag::register(signal, flag_clone.clone())?;

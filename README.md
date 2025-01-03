@@ -41,7 +41,7 @@ The library is divided into several modules, each focusing on specific parts of 
 
 - **[rusteron-archive](https://github.com/mimran1980/rusteron/tree/main/rusteron-archive)**: Extends the Aeron client to
   include archiving features, such as recording streams and handling replay capabilities. It uses the Aeron C bindings
-  from aeron-archive module.
+  from aeron-archive module. _(Note requires aeron >=1.47/master)_
 
 - **[rusteron-media-driver](https://github.com/mimran1980/rusteron/tree/main/rusteron-media-driver)**: Implements the
   Aeron Media Driver, a core component for managing messaging between producers and consumers. It uses the Aeron C

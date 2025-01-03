@@ -10,22 +10,24 @@ spec:
         - name: shared-data
           mountPath: /data
       env:
-        - name: "aeron.spies.simulate.connection"
+        - name: "AERON_SPIES_SIMULATE_CONNECTION"
           value: "true"
-        - name: "aeron.pretouch.log.files"
+        - name: "AERON_PRETOUCH_LOG_FILES"
           value: "true"
-        - name: "agrona.disable.bounds.checks"
-          value: "false"
-        - name: "aeron.event.log"
+        - name: "AGRONA_DISABLE_BOUNDS_CHECKS"
+          value: "true"
+        - name: "AERON_PRINT_CONFIGURATION"
+          value: "true"
+        - name: "AERON_EVENT_LOG"
 #          value: "admin,replay"
           value: "all"
-        - name: "aeron.event.archive"
+        - name: "AERON_EVENT_ARCHIVE_LOG"
           value: "all"
-        - name: "aeron.archive.control.channel"
+        - name: "AERON_ARCHIVE_CONTROL_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8010"
-        - name: "aeron.archive.control.response.channel"
+        - name: "AERON_ARCHIVE_CONTROL_RESPONSE_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8011"
-        - name: "aeron.archive.replication.channel"
+        - name: "AERON_ARCHIVE_REPLICATION_CHANNEL"
           value: "aeron:udp?endpoint=localhost:8012"
 
     - name: ticker-writer
