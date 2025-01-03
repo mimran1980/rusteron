@@ -5,7 +5,6 @@ use futures_util::{SinkExt, StreamExt};
 use log::{error, info};
 use rusteron_archive::*;
 use std::io;
-use std::thread::sleep;
 use std::time::{Duration, Instant};
 use websocket_lite::{ClientBuilder, Message, Opcode};
 
