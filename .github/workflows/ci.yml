@@ -84,5 +84,5 @@ jobs:
 
       - name: Build and Test
         run: |
-          cargo build ${{ env.feature-flags }}
+          cargo build ${{ env.feature-flags }} --verbose
           cargo test --all --all-targets ${{ env.feature-flags }} -- --nocapture
