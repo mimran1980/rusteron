@@ -85,6 +85,7 @@ jobs:
           java-version: '17'
 
       - name: Build and Test
-        run: |          
-          cargo clean build ${{ env.feature-flags }}
+        run: |       
+          carog clean
+          cargo build ${{ env.feature-flags }} --verboe
           cargo test --all --all-targets ${{ env.feature-flags }} -- --nocapture
