@@ -86,6 +86,6 @@ jobs:
 
       - name: Build and Test
         run: |       
-          carog clean
+          cargo clean
           cargo build ${{ env.feature-flags }} --verboe
           cargo test --all --all-targets ${{ env.feature-flags }} -- --nocapture
