@@ -18,7 +18,7 @@ pkg-config = "0.3"
 syn = { version = "2.0", features = ["full"] }
 proc-macro2 = "1.0"
 quote = "1.0"
-itertools = "0.13"
+itertools = "0.14"
 num-format = "0.4"
 hdrhistogram = "7.5"
 zerocopy = { version = "0.8", features = ["derive", "simd", "alloc"] }

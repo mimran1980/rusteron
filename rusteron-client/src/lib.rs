@@ -39,7 +39,7 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .try_init();
         let major = unsafe { crate::aeron_version_major() };
-        let minor = unsafe { crate::aeron_version_minor() };
+        let minor = unsafe { πcrate::aeron_version_minor() };
         let patch = unsafe { crate::aeron_version_patch() };
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
@@ -101,20 +101,16 @@ mod tests {
 
         aeron.start()?;
         info!("client started");
-        let publisher = aeron
-            .async_add_publication(AERON_IPC_STREAM, 123)?
-            .poll_blocking(Duration::from_secs(5))?;
+        let publisher = aeron.add_publication(AERON_IPC_STREAM, 123, Duration::from_secs(5))?;
         info!("created publisher");
 
-        let subscription = aeron
-            .async_add_subscription(
-                AERON_IPC_STREAM,
-                123,
-                Handlers::no_available_image_handler(),
-                Handlers::no_unavailable_image_handler(),
-            )?
-            .poll_blocking(Duration::from_secs(5))
-            .unwrap();
+        let subscription = aeron.add_subscription(
+            AERON_IPC_STREAM,
+            123,
+            Handlers::no_available_image_handler(),
+            Handlers::no_unavailable_image_handler(),
+            Duration::from_secs(5),
+        )?;
         info!("created subscription");
 
         // pick a large enough size to confirm fragement assembler is working
@@ -236,20 +232,16 @@ mod tests {
 
         aeron.start()?;
         info!("client started");
-        let publisher = aeron
-            .async_add_publication(AERON_IPC_STREAM, 123)?
-            .poll_blocking(Duration::from_secs(5))?;
+        let publisher = aeron.add_publication(AERON_IPC_STREAM, 123, Duration::from_secs(5))?;
         info!("created publisher");
 
-        let subscription = aeron
-            .async_add_subscription(
-                AERON_IPC_STREAM,
-                123,
-                Handlers::no_available_image_handler(),
-                Handlers::no_unavailable_image_handler(),
-            )?
-            .poll_blocking(Duration::from_secs(5))
-            .unwrap();
+        let subscription = aeron.add_subscription(
+            AERON_IPC_STREAM,
+            123,
+            Handlers::no_available_image_handler(),
+            Handlers::no_unavailable_image_handler(),
+            Duration::from_secs(5),
+        )?;
         info!("created subscription");
 
         // pick a large enough size to confirm fragement assembler is working
@@ -381,9 +373,12 @@ mod tests {
         aeron.start()?;
         info!("client started [counters test]");
 
-        let counter = aeron
-            .async_add_counter(123, "test_counter".as_bytes(), "this is a test")?
-            .poll_blocking(Duration::from_secs(5))?;
+        let counter = aeron.add_counter(
+            123,
+            "test_counter".as_bytes(),
+            "this is a test",
+            Duration::from_secs(5),
+        )?;
 
         let publisher_handler = {
             let stop = stop.clone();
