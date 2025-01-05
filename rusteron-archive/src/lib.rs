@@ -559,8 +559,11 @@ mod tests {
             publication.get_constants()
         );
         let counters_reader = aeron.counters_reader();
+        info!("counters reader ready {:?}", counters_reader);
         let session_id = publication.get_constants()?.session_id;
+        info!("session id {}", session_id);
         let counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
+        info!("counter id {}", counter_id);
 
         info!("counter id {counter_id}, session id {session_id}");
         while counters_reader.get_counter_value(counter_id) < stop_position {
