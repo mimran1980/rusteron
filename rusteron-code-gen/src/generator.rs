@@ -1577,7 +1577,7 @@ pub fn generate_rust_code(
                     loop {
                         match #async_class_name::new(self, #(#async_new_args_name_only),*) {
                                 if let Ok(async) => {
-                                    if let Ok(result) = async.poll_blocking(timeout) => {
+                                    if let Some(result) = async.poll() => {
                                         return result;
                                     }
                                 }
@@ -1585,6 +1585,8 @@ pub fn generate_rust_code(
                                     log::error!("failed async poll for {:?}", self);
                                     return Err(AeronErrorType::TimedOut.into())
                                 }
+                                #[cfg(debug_assertions)]
+                                std::thread::sleep(std::time::Duration::from_millis(10));
                             }
                         }
                 }
