@@ -153,7 +153,6 @@ pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
         }
         info!("waiting for aeron to start up, retrying...");
         sleep(Duration::from_secs(5));
-        π
     }
 
     assert!(
