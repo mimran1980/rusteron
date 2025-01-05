@@ -39,7 +39,7 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .try_init();
         let major = unsafe { crate::aeron_version_major() };
-        let minor = unsafe { πcrate::aeron_version_minor() };
+        let minor = unsafe { crate::aeron_version_minor() };
         let patch = unsafe { crate::aeron_version_patch() };
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
