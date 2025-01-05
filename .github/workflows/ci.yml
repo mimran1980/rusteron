@@ -87,9 +87,9 @@ jobs:
 
       - name: Build and Test
         run: |
-          cd rusteron-archive/aeron/ && pwd && git status && cd -
-          cd rusteron-client/aeron/ && pwd && git status && cd -
-          cd rusteron-media-driver/aeron/ && pwd && git status && cd -
+          cd rusteron-archive/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
+          cd rusteron-client/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
+          cd rusteron-media-driver/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
           cd rusteron-rb/aeron/ && pwd && git status && cd -
           cargo clean
           cargo build ${{ env.feature-flags }}
