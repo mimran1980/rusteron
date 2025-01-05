@@ -28,9 +28,6 @@ impl LinkType {
     }
 
     fn target_name(&self) -> &'static str {
-        let aeron_version_txt_path = concat!(env!("CARGO_MANIFEST_DIR"), "/aeron/version.txt");
-        let version_txt_content = std::fs::read_to_string(aeron_version_txt_path)
-            .expect("Failed to read aeron/versions.txt");
         match self {
             LinkType::Dynamic => "aeron",
             LinkType::Static => "aeron_static",

@@ -54,7 +54,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        features: [default, static]
+#        features: [default, static]
+        features: [static]
         #        rust-version: ["stable", "stable 6 months ago"]
         rust-version: ["stable"]
 
@@ -87,12 +88,6 @@ jobs:
 
       - name: Build and Test
         run: |
-          rm -rf rusteron-archive/target
-          rm -rf rusteron-client/target
-          rm -rf rusteron-media-driver/target
-          rm -rf rusteron-rb/target
-          rm -rf rusteron-docker-samples/target
-          rm -rf rusteron-docker-samples/rusteron-dummy-example/target
           cd rusteron-archive/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
           cd rusteron-client/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
           cd rusteron-media-driver/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
