@@ -54,8 +54,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-#        features: [default, static]
-        features: [static]
+        features: [default, static]
+#        features: [static]
         #        rust-version: ["stable", "stable 6 months ago"]
         rust-version: ["stable"]
 
