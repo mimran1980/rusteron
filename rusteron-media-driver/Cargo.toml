@@ -51,7 +51,8 @@ log = { workspace = true}
 regex = { workspace = true}
 
 [features]
-static = []
+default=["static"]
+static=[]
 
 [[bin]]
 name = "media_driver"
