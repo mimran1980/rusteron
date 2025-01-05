@@ -1543,99 +1543,101 @@ pub fn generate_rust_code(
                 .collect();
 
             quote! {
-            impl #main_class_name {
-                #[inline]
-                pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
-                    let resource = ManagedCResource::new(
-                        move |ctx_field| unsafe {
-                            #poll_method_name(#(#init_args),*)
-                        },
-                        move |_ctx_field| {
-                            // TODO is there any cleanup to do
-                            0
-                        },
-                        false
-                    )?;
-                    Ok(Self {
-                        inner: std::rc::Rc::new(resource),
-                    })
-                }
-            }
+                    impl #main_class_name {
+                        #[inline]
+                        pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
+                            let resource = ManagedCResource::new(
+                                move |ctx_field| unsafe {
+                                    #poll_method_name(#(#init_args),*)
+                                },
+                                move |_ctx_field| {
+                                    // TODO is there any cleanup to do
+                                    0
+                                },
+                                false
+                            )?;
+                            Ok(Self {
+                                inner: std::rc::Rc::new(resource),
+                            })
+                        }
+                    }
 
-            impl #client_type {
-                #[inline]
-                pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
-                    #async_class_name::new(self, #(#async_new_args_name_only),*)
-                }
-            }
+                    impl #client_type {
+                        #[inline]
+                        pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
+                            #async_class_name::new(self, #(#async_new_args_name_only),*)
+                        }
+                    }
 
-            impl #client_type {
-                #[inline]
-                pub fn #client_type_method_name_without_async #where_clause_async(&self #(
-            , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
-                    let start = Instant::now();
-                    loop {
-                        match #async_class_name::new(self, #(#async_new_args_name_only),*) {
-                                if let Ok(async) => {
-                                    if let Some(result) = async.poll() => {
-                                        return result;
-                                    }
+                    impl #client_type {
+                        #[inline]
+                        pub fn #client_type_method_name_without_async #where_clause_async(&self #(
+                    , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+                            let start = std::time::Instant::now();
+                            loop {
+                                if let Ok(poller) = #async_class_name::new(self, #(#async_new_args_name_only),*) {
+                                    while start.elapsed() <= timeout  {
+                                      if let Some(result) = poller.poll() {
+                                          return Ok(result);
+                                      }
+                                    #[cfg(debug_assertions)]
+                                    std::thread::sleep(std::time::Duration::from_millis(10));
+                                  }
                                 }
-                                if( start.elapsed() > Duration ) {
-                                    log::error!("failed async poll for {:?}", self);
-                                    return Err(AeronErrorType::TimedOut.into())
+                            if start.elapsed() > timeout {
+                                log::error!("failed async poll for {:?}", self);
+                                return Err(AeronErrorType::TimedOut.into());
+                            }
+                            #[cfg(debug_assertions)]
+                            std::thread::sleep(std::time::Duration::from_millis(10));
+                          }
+            }
+                    }
+
+                    impl #async_class_name {
+                        #[inline]
+                        pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
+                            let resource_async = ManagedCResource::new(
+                                move |ctx_field| unsafe {
+                                    #new_method_name(#(#async_init_args),*)
+                                },
+                                move |_ctx_field| {
+                                    // TODO is there any cleanup to do
+                                    0
+                                },
+                                false
+                            )?;
+                            Ok(Self {
+                                inner: std::rc::Rc::new(resource_async),
+                            })
+                        }
+
+                        pub fn poll(&self) -> Option<#main_class_name> {
+                            if let Ok(publication) = #main_class_name::new(self) {
+                                Some(publication)
+                            } else {
+                                None
+                            }
+                        }
+
+                        pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+                            if let Some(publication) = self.poll() {
+                                return Ok(publication);
+                            }
+
+                            let time = std::time::Instant::now();
+                            while time.elapsed() < timeout {
+                                if let Some(publication) = self.poll() {
+                                    return Ok(publication);
                                 }
                                 #[cfg(debug_assertions)]
                                 std::thread::sleep(std::time::Duration::from_millis(10));
                             }
+                            log::error!("failed async poll for {:?}", self);
+                            Err(AeronErrorType::TimedOut.into())
                         }
-                }
-            }
-
-            impl #async_class_name {
-                #[inline]
-                pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
-                    let resource_async = ManagedCResource::new(
-                        move |ctx_field| unsafe {
-                            #new_method_name(#(#async_init_args),*)
-                        },
-                        move |_ctx_field| {
-                            // TODO is there any cleanup to do
-                            0
-                        },
-                        false
-                    )?;
-                    Ok(Self {
-                        inner: std::rc::Rc::new(resource_async),
-                    })
-                }
-
-                pub fn poll(&self) -> Option<#main_class_name> {
-                    if let Ok(publication) = #main_class_name::new(self) {
-                        Some(publication)
-                    } else {
-                        None
                     }
-                }
-
-                pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
-                    if let Some(publication) = self.poll() {
-                        return Ok(publication);
-                    }
-
-                    let time = std::time::Instant::now();
-                    while time.elapsed() < timeout {
-                        if let Some(publication) = self.poll() {
-                            return Ok(publication);
-                        }
-                        #[cfg(debug_assertions)]
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                    }
-                    log::error!("failed async poll for {:?}", self);
-                    Err(AeronErrorType::TimedOut.into())
-                }
-            }
-                        }
+                                }
         } else {
             quote! {}
         }
