@@ -55,6 +55,10 @@ jobs:
           git config --global user.email "mimran1980@gmail.com"
           git config --global user.name "Mo Imran"
           release_type="${{ github.event.inputs.release_type }}"
+          cd rusteron-archive/aeron/ && pwd && git status && cd -
+          cd rusteron-client/aeron/ && pwd && git status && cd -
+          cd rusteron-media-driver/aeron/ && pwd && git status && cd -
+          cd rusteron-rb/aeron/ && pwd && git status && cd -
           cargo release "$release_type" --workspace --execute --no-confirm --verbose --no-verify
 
       - name: Push new version and tag to GitHub

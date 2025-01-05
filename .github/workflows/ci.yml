@@ -86,7 +86,11 @@ jobs:
           java-version: '17'
 
       - name: Build and Test
-        run: |       
+        run: |
+          cd rusteron-archive/aeron/ && pwd && git status && cd -
+          cd rusteron-client/aeron/ && pwd && git status && cd -
+          cd rusteron-media-driver/aeron/ && pwd && git status && cd -
+          cd rusteron-rb/aeron/ && pwd && git status && cd -
           cargo clean
           cargo build --verbose ${{ env.feature-flags }}
           cargo test --verbose --all --all-targets ${{ env.feature-flags }} -- --nocapture
