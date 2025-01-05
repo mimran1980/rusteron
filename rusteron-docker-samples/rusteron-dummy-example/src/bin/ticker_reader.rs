@@ -1,10 +1,8 @@
 use log::{error, info};
 use rusteron_archive::*;
 use rusteron_dummy_example::{archive_connect, init_logger, TICKER_CHANNEL, TICKER_STREAM_ID};
-use signal_hook::consts::*;
 use std::fmt::Debug;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::time::Instant;
 use websocket_lite::Result;
