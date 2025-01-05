@@ -158,7 +158,7 @@ mod tests {
 
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Info)
+            .filter_level(log::LevelFilter::Debug)
             .try_init();
 
         assert!(is_udp_port_available(23265));
@@ -430,7 +430,7 @@ mod tests {
     // pub fn test_failed_connect() -> Result<(), Box<dyn error::Error>> {
     //         env_logger::Builder::new()
     //         .is_test(true)
-    //         .filter_level(log::LevelFilter::Info)
+    //         .filter_level(log::LevelFilter::Debug)
     //         .init();
     //     let ctx = AeronArchiveContext::new()?;
     //     std::env::set_var("AERON_DRIVER_TIMEOUT", "1");
@@ -505,7 +505,7 @@ mod tests {
     pub fn test_aeron_archive() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Info)
+            .filter_level(log::LevelFilter::Debug)
             .try_init();
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");

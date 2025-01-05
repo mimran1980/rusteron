@@ -105,7 +105,7 @@ mod tests {
     fn send_message() -> Result<(), AeronCError> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Info)
+            .filter_level(log::LevelFilter::Debug)
             .try_init();
         let topic = AERON_IPC_STREAM;
         let stream_id = 32;
