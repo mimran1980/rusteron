@@ -1573,7 +1573,20 @@ pub fn generate_rust_code(
                 #[inline]
                 pub fn #client_type_method_name_without_async #where_clause_async(&self #(
             , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
-                    #async_class_name::new(self, #(#async_new_args_name_only),*)?.poll_blocking(timeout)
+                    let start = Instant::now();
+                    loop {
+                        match #async_class_name::new(self, #(#async_new_args_name_only),*) {
+                                if let Ok(async) => {
+                                    if let Ok(result) = async.poll_blocking(timeout) => {
+                                        return result;
+                                    }
+                                }
+                                if( start.elapsed() > Duration ) {
+                                    log::error!("failed async poll for {:?}", self);
+                                    return Err(AeronErrorType::TimedOut.into())
+                                }
+                            }
+                        }
                 }
             }
 
