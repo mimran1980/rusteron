@@ -5,6 +5,7 @@ use futures_util::{SinkExt, StreamExt};
 use log::{error, info};
 use rusteron_archive::*;
 use std::io;
+use std::thread::sleep;
 use std::time::{Duration, Instant};
 use websocket_lite::{ClientBuilder, Message, Opcode};
 
@@ -151,6 +152,8 @@ pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
             }
         }
         info!("waiting for aeron to start up, retrying...");
+        sleep(Duration::from_secs(5));
+        π
     }
 
     assert!(
