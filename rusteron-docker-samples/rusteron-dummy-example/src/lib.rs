@@ -4,7 +4,10 @@ use crate::model::Subscribe;
 use futures_util::{SinkExt, StreamExt};
 use log::{error, info};
 use rusteron_archive::*;
+use signal_hook::consts::{SIGINT, SIGQUIT, SIGTERM};
 use std::io;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use websocket_lite::{ClientBuilder, Message, Opcode};
@@ -55,7 +58,7 @@ pub async fn download_ws(
 
 pub fn init_logger() {
     env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(log::LevelFilter::Debug)
         .init()
 }
 
@@ -163,4 +166,15 @@ pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
     Err(std::io::Error::other(
         "unable to start up aeron media driver client",
     ))
+}
+
+pub fn register_exit_signals() -> websocket_lite::Result<Arc<AtomicBool>> {
+    let shutdown_flag = Arc::new(AtomicBool::new(false));
+    let signals = &[SIGINT, SIGTERM, SIGQUIT];
+    for &signal in signals {
+        let flag_clone = Arc::clone(&shutdown_flag);
+        signal_hook::flag::register(signal, flag_clone.clone())?;
+    }
+
+    Ok(shutdown_flag)
 }

@@ -14,7 +14,7 @@ fn main() -> Result<()> {
 
     let (archive, aeron) = archive_connect()?;
 
-    let shutdown = register_exit_signals()?;
+    let shutdown = rusteron_dummy_example::register_exit_signals()?;
 
     let mut archive_log_time = Instant::now();
     let archive_log = Duration::from_secs(120);
@@ -172,17 +172,6 @@ impl AeronArchiveRecordingDescriptorConsumerFuncCallback for RecorderDescriptorR
             self.last_recording_with_stop_position = Some(recording_descriptor);
         }
     }
-}
-
-fn register_exit_signals() -> Result<Arc<AtomicBool>> {
-    let shutdown_flag = Arc::new(AtomicBool::new(false));
-    let signals = &[SIGINT, SIGTERM, SIGQUIT];
-    for &signal in signals {
-        let flag_clone = Arc::clone(&shutdown_flag);
-        signal_hook::flag::register(signal, flag_clone.clone())?;
-    }
-
-    Ok(shutdown_flag)
 }
 
 #[derive(Debug, Default)]

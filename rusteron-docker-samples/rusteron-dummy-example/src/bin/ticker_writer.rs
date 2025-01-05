@@ -1,16 +1,20 @@
-use log::{info, warn};
+use log::{error, info, warn};
 use rusteron_archive::*;
 use rusteron_dummy_example::model::Subscribe;
 use rusteron_dummy_example::{
-    archive_connect, download_ws, init_logger, JsonMesssageHandler, TICKER_CHANNEL,
-    TICKER_STREAM_ID,
+    archive_connect, download_ws, init_logger, register_exit_signals, JsonMesssageHandler,
+    TICKER_CHANNEL, TICKER_STREAM_ID,
 };
+use std::sync::atomic::Ordering;
+use std::thread::sleep;
 use std::time::Duration;
 use tokio::time::Instant;
 
 #[tokio::main]
 async fn main() -> websocket_lite::Result<()> {
     init_logger();
+
+    let stop = register_exit_signals()?;
 
     let pairs = vec![
         "btcusdt",
@@ -41,17 +45,34 @@ async fn main() -> websocket_lite::Result<()> {
     };
 
     let (archive, aeron) = archive_connect()?;
+    let archive_copy = archive.clone();
+    let aeron_copy = aeron.close();
 
-    let handle = tokio::spawn(download_ws(
-        url,
-        subscription.clone(),
-        AeronRecorder::new(archive, aeron)?,
-    ));
+    let recorder = AeronRecorder::new(archive, aeron);
+    while !stop.load(Ordering::Acquire) {
+        match &recorder {
+            Ok(recorder) => {
+                let handle = tokio::spawn(download_ws(url, subscription.clone(), recorder.clone()));
 
-    handle.await??;
+                handle
+                    .await
+                    .expect("Error occurred during download")
+                    .expect("Error occurred during retrieval");
+            }
+            Err(err) => {
+                error!("Error: {:?}", err);
+                sleep(Duration::from_secs(5));
+            }
+        }
+    }
+
+    drop(archive_copy);
+    drop(aeron_copy);
+
     Ok(())
 }
 
+#[derive(Debug, Clone)]
 struct AeronRecorder {
     publication: AeronExclusivePublication,
     published_count: usize,
@@ -61,6 +82,7 @@ impl AeronRecorder {
     pub fn new(archive: AeronArchive, aeron: Aeron) -> websocket_lite::Result<Self> {
         let channel = TICKER_CHANNEL;
         let stream_id = TICKER_STREAM_ID;
+        info!("started recording {} {}", channel, stream_id);
         let subscription_id =
             archive.start_recording(channel, stream_id, SOURCE_LOCATION_REMOTE, true)?;
         info!("started recording ticker stream [subscriptionId={subscription_id}]");
