@@ -92,5 +92,5 @@ jobs:
           cd rusteron-media-driver/aeron/ && pwd && git status && cd -
           cd rusteron-rb/aeron/ && pwd && git status && cd -
           cargo clean
-          cargo build --verbose ${{ env.feature-flags }}
-          cargo test --verbose --all --all-targets ${{ env.feature-flags }} -- --nocapture
+          cargo build ${{ env.feature-flags }}
+          cargo test --all --all-targets ${{ env.feature-flags }} -- --nocapture
