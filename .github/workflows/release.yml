@@ -55,6 +55,12 @@ jobs:
           git config --global user.email "mimran1980@gmail.com"
           git config --global user.name "Mo Imran"
           release_type="${{ github.event.inputs.release_type }}"
+          rm -rf rusteron-archive/target
+          rm -rf rusteron-client/target
+          rm -rf rusteron-media-driver/target
+          rm -rf rusteron-rb/target
+          rm -rf rusteron-docker-samples/target
+          rm -rf rusteron-docker-samples/rusteron-dummy-example/target
           cd rusteron-archive/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
           cd rusteron-client/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
           cd rusteron-media-driver/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
