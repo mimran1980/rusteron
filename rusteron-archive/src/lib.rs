@@ -567,7 +567,7 @@ mod tests {
 
         let start = Instant::now();
         while counter_id <= 0 && start.elapsed() < Duration::from_secs(5) {
-            let counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
+            counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
             info!("counter id {}", counter_id);
         }
 
