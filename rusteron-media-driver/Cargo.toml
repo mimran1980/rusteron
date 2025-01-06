@@ -51,7 +51,8 @@ log = { workspace = true}
 regex = { workspace = true}
 
 [features]
-default=[]
+# using static as different modules have different versions of aeron which don't seem to play nicely
+default=["static"]
 static=[]
 
 [[bin]]

@@ -50,4 +50,6 @@ serial_test = { workspace = true }
 env_logger = "0.11"
 
 [features]
+# using static as different modules have different versions of aeron which don't seem to play nicely
+default = ["static"]
 static = []

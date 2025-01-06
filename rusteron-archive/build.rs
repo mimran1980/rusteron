@@ -54,6 +54,7 @@ pub fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=bindings.h");
     println!("cargo:rerun-if-changed=aeron/version.txt");
+    println!("cargo:rerun-if-changed=.git");
 
     if pkg_config::probe_library("uuid").is_err() {
         eprintln!("uuid lib not found in path");
