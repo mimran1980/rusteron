@@ -565,10 +565,13 @@ mod tests {
 
         let mut counter_id = -1;
 
-        while counter_id <= 0 {
+        let start = Instant::now();
+        while counter_id <= 0 && start.elapsed() < Duration::from_secs(5) {
             let counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
             info!("counter id {}", counter_id);
         }
+
+        assert!(counter_id >= 0);
 
         info!("counter id {counter_id}, session id {session_id}");
         while counters_reader.get_counter_value(counter_id) < stop_position {
