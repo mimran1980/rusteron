@@ -19,7 +19,7 @@ spec:
         - name: "AERON_PRINT_CONFIGURATION"
           value: "true"
         - name: "AERON_EVENT_LOG"
-#          value: "admin,replay"
+#          value: "admin"
           value: "all"
         - name: "AERON_EVENT_ARCHIVE_LOG"
           value: "all"

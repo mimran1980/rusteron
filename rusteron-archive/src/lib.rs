@@ -548,9 +548,11 @@ mod tests {
                     panic!("{}", err);
                 }
             }
-            info!("sent message {i}");
+            info!("sent message {i} [test_aeron_archive]");
         }
 
+        let session_id = publication.get_constants()?.session_id;
+        info!("publication session id {}", session_id);
         // since this is single threaded need to make sure it did write to archiver, usually not required in multi-proccess app
         let stop_position = publication.position();
         info!(
@@ -560,10 +562,13 @@ mod tests {
         );
         let counters_reader = aeron.counters_reader();
         info!("counters reader ready {:?}", counters_reader);
-        let session_id = publication.get_constants()?.session_id;
-        info!("session id {}", session_id);
-        let counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
-        info!("counter id {}", counter_id);
+
+        let mut counter_id = -1;
+
+        while counter_id <= 0 {
+            let counter_id = RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
+            info!("counter id {}", counter_id);
+        }
 
         info!("counter id {counter_id}, session id {session_id}");
         while counters_reader.get_counter_value(counter_id) < stop_position {
