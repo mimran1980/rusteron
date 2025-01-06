@@ -45,8 +45,8 @@ jobs:
 
       - name: Build and Test
         run: |
-          cargo build --release
-          cargo test -- --nocapture
+          cargo build --workspace --release
+          cargo test --workspace -- --nocapture
 
       - name: Run cargo-release for specified version
         env:
