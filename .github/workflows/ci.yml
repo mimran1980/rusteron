@@ -43,7 +43,9 @@ jobs:
         run: cargo clippy --all -- --deny warnings
 
       - name: Check docs
-        run: cargo test --doc
+        run: |
+          cargo build
+          cargo test --doc
 
   build:
     name: Build
