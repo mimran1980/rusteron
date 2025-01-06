@@ -94,6 +94,6 @@ jobs:
           cd rusteron-media-driver/aeron/ && pwd && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && git status && cd -
           cd rusteron-rb/aeron/ && pwd && git status && cd -
           
-          cargo clean --workspace
+          cargo clean
           cargo build --workspace  --verbose ${{ env.feature-flags }}
           cargo test --workspace --verbose --all --all-targets ${{ env.feature-flags }} -- --nocapture

@@ -31,11 +31,11 @@ clean:
 
 # Build the project in debug mode
 build:
-  COPY_BINDINGS=true cargo build --all-targets
+  COPY_BINDINGS=true cargo build --workspace --all-targets
 
 # Build the project in release mode
 release:
-  cargo build --all-targets --release
+  cargo build --workspace --all-targets --release
 
 # Run the Aeron archive driver using Java
 run-aeron-archive-driver:
