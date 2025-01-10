@@ -82,18 +82,16 @@ jobs:
 
       - name: Install dependencies on Ubuntu
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y uuid-dev
+        run: sudo apt-get update && sudo apt-get install -y curl pkg-config libssl-dev uuid-dev ca-certificates make cmake gcc g++ clang zlib1g-dev libbsd-dev libidn11
 
       # aeron archive cmake for some reason starts java
       - name: Install Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '23'
 
       - name: Build and Test
         run: |
-          cargo clean
-          cargo build --workspace ${{ env.feature-flags }}
           cargo build --workspace --release --verbose ${{ env.feature-flags }}
           cargo test --workspace --all --all-targets ${{ env.feature-flags }} -- --nocapture
