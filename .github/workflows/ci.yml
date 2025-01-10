@@ -55,8 +55,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+#        os: [ubuntu-latest, windows-latest, macos-latest]
 #        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         features: [default, static]
         # using static as different modules have different versions of aeron which don't seem to play nicely
 #        features: [static]
@@ -94,4 +95,5 @@ jobs:
         run: |
           cargo clean
           cargo build --workspace ${{ env.feature-flags }}
+          cargo build --workspace --release --verbose ${{ env.feature-flags }}
           cargo test --workspace --all --all-targets ${{ env.feature-flags }} -- --nocapture

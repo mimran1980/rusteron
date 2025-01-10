@@ -47,7 +47,8 @@ jobs:
 
       - name: Build and Test
         run: |
-          cargo build --workspace --verbose
+          cargo build --workspace
+          cargo build --release --workspace --verbose
           cargo test --workspace -- --nocapture
 
       - name: Install cargo-release
