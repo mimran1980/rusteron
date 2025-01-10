@@ -73,6 +73,18 @@ impl AeronArchive {
     }
 }
 
+impl AeronArchiveAsyncConnect {
+    pub fn poll_for_error(&self) -> Result<Option<AeronArchive>, AeronCError> {
+        match AeronArchive::new(self) {
+          Ok(publication) => Ok(Some(publication)),
+          Err(AeronCError {code }) if code == 0 => {
+            Ok(None) // try again
+          }
+          Err(e) => Err(e)
+        }
+    }
+}
+
 impl AeronArchiveContext {
     // The method below sets no credentials supplier, which is essential for the operation
     // of the Aeron Archive Context. The `set_credentials_supplier` must be set to prevent
