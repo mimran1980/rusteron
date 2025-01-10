@@ -3,7 +3,7 @@ FROM ubuntu:latest AS builder
 
 WORKDIR /usr/src/app
 
-RUN apt-get update && apt-get install -y default-jdk curl pkg-config libssl-dev uuid-dev ca-certificates make cmake gcc g++ clang zlib1g-dev libbsd-dev libidn11 \
+RUN apt-get update && apt-get install -y default-jdk curl pkg-config libssl-dev uuid-dev ca-certificates make cmake gcc g++ clang zlib1g-dev libbsd-dev \
     && apt-get clean  \
     && rm -rf /var/lib/apt/lists/*
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
