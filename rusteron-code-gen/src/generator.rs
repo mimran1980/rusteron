@@ -351,16 +351,14 @@ impl ReturnType {
                 if include_field_name {
                     return quote! {
                         #array_name: {
-                            let c_string = std::ffi::CString::new(#array_name).expect("CString::new failed");
-                            c_string.as_ptr()
+                            std::ffi::CString::new(#array_name).expect("CString::new failed").into_raw()
                         },
                         #length_name: #array_name.len()
                     };
                 } else {
                     return quote! {
                         {
-                            let c_string = std::ffi::CString::new(#array_name).expect("CString::new failed");
-                            c_string.as_ptr()
+                            std::ffi::CString::new(#array_name).expect("CString::new failed").into_raw()
                         },
                         #array_name.len()
                     };

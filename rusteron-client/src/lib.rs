@@ -26,6 +26,7 @@ mod tests {
     use serial_test::serial;
     use std::error;
     use std::io::Write;
+
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread::sleep;
@@ -356,11 +357,14 @@ mod tests {
             |counters_reader: AeronCountersReader,
              registration_id: i64,
              counter_id: i32| {
-                info!("on counter {:?} {counters_reader:?}, registration_id={registration_id}, counter_id={counter_id}, value={}", counters_reader.get_counter_label(counter_id, 1000), counters_reader.addr(counter_id));
+                info!("on counter key={:?}, label={:?} registration_id={registration_id}, counter_id={counter_id}, value={}, {counters_reader:?}",
+                    String::from_utf8(counters_reader.get_counter_key(counter_id).unwrap()),
+                    counters_reader.get_counter_label(counter_id, 1000), counters_reader.addr(counter_id));
                 assert_eq!(counters_reader.counter_registration_id(counter_id).unwrap(), registration_id);
                 if let Ok(label) = counters_reader.get_counter_label(counter_id, 1000) {
-                    if label == "test_counter" {
+                    if label == "label_buffer" {
                         found_counter = true;
+                        assert_eq!(&counters_reader.get_counter_key(counter_id).unwrap(), "key".as_bytes());
                     }
                 }
             }
@@ -375,10 +379,12 @@ mod tests {
 
         let counter = aeron.add_counter(
             123,
-            "test_counter".as_bytes(),
-            "this is a test",
+            "key".as_bytes(),
+            "label_buffer",
             Duration::from_secs(5),
         )?;
+        let constants = counter.get_constants()?;
+        let counter_id = constants.counter_id;
 
         let publisher_handler = {
             let stop = stop.clone();
@@ -414,6 +420,12 @@ mod tests {
         assert!(found_counter);
 
         stop.store(true, Ordering::SeqCst);
+
+        let reader = aeron.counters_reader();
+        assert_eq!(reader.get_counter_label(counter_id, 256)?, "label_buffer");
+        assert_eq!(reader.get_counter_key(counter_id)?, "key".as_bytes());
+        let buffers = AeronCountersReaderBuffers::default();
+        reader.get_buffers(&buffers)?;
 
         let _ = publisher_handler.join().unwrap();
         let _ = driver_handle.join().unwrap();
