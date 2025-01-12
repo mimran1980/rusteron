@@ -58,7 +58,7 @@ pub async fn download_ws(
 
 pub fn init_logger() {
     env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Info)
         .init()
 }
 

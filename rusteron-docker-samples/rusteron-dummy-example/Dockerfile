@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y default-jdk curl pkg-config libssl-dev 
     && rm -rf /var/lib/apt/lists/*
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
-COPY Cargo.* ./
+COPY Cargo.toml ./
 COPY src ./src
 
 # build profile dev or release
@@ -28,5 +28,5 @@ ARG BUILD_DIR_NAME=debug
 
 COPY --from=builder /usr/src/app/target/${BUILD_DIR_NAME}/ticker_reader /usr/local/bin/ticker_reader
 COPY --from=builder /usr/src/app/target/${BUILD_DIR_NAME}/ticker_writer /usr/local/bin/ticker_writer
-COPY --from=builder /usr/src/app/target/${BUILD_DIR_NAME}/build/rusteron-archive-*/out/build/lib/*.a /usr/lib
+COPY --from=builder /usr/src/app/target/${BUILD_DIR_NAME}/build/rusteron-archive-*/out/build/lib/*.so /usr/lib
 

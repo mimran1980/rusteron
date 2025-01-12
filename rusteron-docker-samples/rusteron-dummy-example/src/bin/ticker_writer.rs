@@ -48,7 +48,7 @@ async fn main() -> websocket_lite::Result<()> {
     let archive_copy = archive.clone();
     let aeron_copy = aeron.close();
 
-    let recorder = AeronRecorder::new(archive, aeron);
+    let mut recorder = AeronRecorder::new(archive.clone(), aeron.clone());
     while !stop.load(Ordering::Acquire) {
         match &recorder {
             Ok(recorder) => {
@@ -62,6 +62,7 @@ async fn main() -> websocket_lite::Result<()> {
             Err(err) => {
                 error!("Error: {:?}", err);
                 sleep(Duration::from_secs(5));
+                recorder = AeronRecorder::new(archive.clone(), aeron.clone());
             }
         }
     }
@@ -82,7 +83,10 @@ impl AeronRecorder {
     pub fn new(archive: AeronArchive, aeron: Aeron) -> websocket_lite::Result<Self> {
         let channel = TICKER_CHANNEL;
         let stream_id = TICKER_STREAM_ID;
-        info!("started recording {} {}", channel, stream_id);
+        info!(
+            "attempting to starting recording {} streamId={}",
+            channel, stream_id
+        );
         let subscription_id =
             archive.start_recording(channel, stream_id, SOURCE_LOCATION_REMOTE, true)?;
         info!("started recording ticker stream [subscriptionId={subscription_id}]");
