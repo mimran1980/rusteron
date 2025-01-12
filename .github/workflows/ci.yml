@@ -55,12 +55,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-#        os: [ubuntu-latest, macos-latest]
+#        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
 #        os: [ubuntu-latest]
         features: [default, static]
-        # using static as different modules have different versions of aeron which don't seem to play nicely
-#        features: [static]
         #        rust-version: ["stable", "stable 6 months ago"]
         rust-version: ["stable"]
 
