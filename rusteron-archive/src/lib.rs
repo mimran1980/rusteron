@@ -149,6 +149,17 @@ mod tests {
         "aeron:udp?control-mode=dynamic|control=localhost:8012";
 
     #[test]
+    #[ignore] // TODO need to finish off
+    fn test_uri_string_builder() -> Result<(), AeronCError> {
+        let builder = AeronUriStringBuilder::default();
+        builder.init_new()?;
+        // builder.put("hello", "world")?;
+        builder.set_initial_position(0, 4, 1024)?;
+        panic!("{}", builder.build(1024)?);
+        Ok(())
+    }
+
+    #[test]
     #[serial]
     #[ignore] // TODO need to fix test, doesn't receive any response back
     fn test_simple_replay_merge() -> Result<(), AeronCError> {

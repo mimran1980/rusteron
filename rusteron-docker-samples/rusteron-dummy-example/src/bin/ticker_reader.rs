@@ -1,6 +1,8 @@
 use log::{error, info};
 use rusteron_archive::*;
-use rusteron_dummy_example::{archive_connect, init_logger, TICKER_CHANNEL, TICKER_STREAM_ID};
+use rusteron_dummy_example::{
+    archive_connect, init_logger, start_media_driver, TICKER_CHANNEL, TICKER_STREAM_ID,
+};
 use std::fmt::Debug;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -9,6 +11,11 @@ use websocket_lite::Result;
 
 fn main() -> Result<()> {
     init_logger();
+
+    // just make sure it includes media driver in binary
+    if 0 == Aeron::epoch_clock() {
+        start_media_driver().unwrap();
+    }
 
     let (archive, aeron) = archive_connect()?;
 

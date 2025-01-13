@@ -4,6 +4,7 @@ use crate::model::Subscribe;
 use futures_util::{SinkExt, StreamExt};
 use log::{error, info};
 use rusteron_archive::*;
+use rusteron_media_driver::{AeronDriver, AeronDriverContext};
 use signal_hook::consts::{SIGINT, SIGQUIT, SIGTERM};
 use std::io;
 use std::sync::atomic::AtomicBool;
@@ -17,6 +18,21 @@ pub const TICKER_STREAM_ID: i32 = 10;
 
 pub trait JsonMesssageHandler {
     fn on_msg(&mut self, msg: &str);
+}
+
+pub fn start_media_driver() -> Result<(), Box<dyn std::error::Error>> {
+    let aeron_context = AeronDriverContext::new()?;
+    let aeron_driver = AeronDriver::new(&aeron_context)?;
+    aeron_driver.start(true)?;
+    info!("Aeron media driver started successfully. Press Ctrl+C to stop.");
+
+    aeron_driver.conductor().context().print_configuration();
+    aeron_driver.main_do_work()?;
+    info!("aeron dir: {:?}", aeron_context.get_dir());
+
+    loop {
+        aeron_driver.main_idle_strategy(aeron_driver.main_do_work()?);
+    }
 }
 
 pub async fn download_ws(
