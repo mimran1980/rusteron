@@ -187,6 +187,271 @@ impl AeronPublication {
     }
 }
 
+impl AeronUriStringBuilder {
+    #[inline]
+    pub fn build(&self, max_str_length: usize) -> Result<String, AeronCError> {
+        let mut result = String::with_capacity(max_str_length);
+        self.build_into(&mut result)?;
+        Ok(result)
+    }
+
+    pub fn initial_term_id_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_INITIAL_TERM_ID_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn term_id_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_TERM_ID_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn term_offset_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_TERM_OFFSET_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn alias_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_ALIAS_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn term_length_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_TERM_LENGTH_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn linger_timeout_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_LINGER_TIMEOUT_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn mtu_length_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_MTU_LENGTH_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn sparse_term_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_SPARSE_TERM_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn eos_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_EOS_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn tether_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_TETHER_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn tags_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_TAGS_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn session_id_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_SESSION_ID_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn group_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_GROUP_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn rejoin_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_REJOIN_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn fc_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_FC_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn gtag_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_GTAG_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn cc_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_CC_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn spies_simulate_connection_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_SPIES_SIMULATE_CONNECTION_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn ats_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_ATS_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn socket_sndbuf_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_SOCKET_SNDBUF_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn socket_rcvbuf_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_SOCKET_RCVBUF_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn receiver_window_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_RECEIVER_WINDOW_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn media_rcv_timestamp_offset_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_MEDIA_RCV_TIMESTAMP_OFFSET_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn channel_rcv_timestamp_offset_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_CHANNEL_RCV_TIMESTAMP_OFFSET_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn channel_snd_timestamp_offset_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_CHANNEL_SND_TIMESTAMP_OFFSET_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn timestamp_offset_reserved(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_TIMESTAMP_OFFSET_RESERVED).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn response_correlation_id_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_RESPONSE_CORRELATION_ID_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn nak_delay_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_NAK_DELAY_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn untethered_window_limit_timeout_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_UNTETHERED_WINDOW_LIMIT_TIMEOUT_KEY)
+                .expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn untethered_resting_timeout_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_UNTETHERED_RESTING_TIMEOUT_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn max_resend_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_MAX_RESEND_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn stream_id_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_STREAM_ID_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+    pub fn publication_window_key(&self, value: &str) -> Result<&Self, AeronCError> {
+        self.put(
+            std::str::from_utf8(AERON_URI_PUBLICATION_WINDOW_KEY).expect("invalid utf8"),
+            value,
+        )?;
+        Ok(self)
+    }
+
+    #[inline]
+    pub fn build_into(&self, dst: &mut String) -> Result<(), AeronCError> {
+        unsafe {
+            let capacity = dst.capacity();
+            let vec = dst.as_mut_vec();
+            vec.set_len(capacity);
+            self.sprint(vec.as_mut_ptr() as *mut _, capacity)?;
+            let mut len = 0;
+            loop {
+                if len == capacity {
+                    break;
+                }
+                let val = vec[len];
+                if val == 0 {
+                    break;
+                }
+                len += 1;
+            }
+            vec.set_len(len);
+        }
+        Ok(())
+    }
+}
+
 impl AeronCountersReader {
     #[inline]
     #[doc = "Get the label for a counter."]
