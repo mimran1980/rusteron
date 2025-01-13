@@ -385,6 +385,8 @@ pub const AERON_AGENT_RUNNER_RECEIVER: u32 = 2;
 pub const AERON_AGENT_RUNNER_SHARED_NETWORK: u32 = 1;
 pub const AERON_AGENT_RUNNER_SHARED: u32 = 0;
 pub const AERON_AGENT_RUNNER_MAX: u32 = 3;
+pub const AERON_URI_STRING_BUILDER_PREFIX_KEY: &[u8; 9] = b"__prefix\0";
+pub const AERON_URI_STRING_BUILDER_MEDIA_KEY: &[u8; 8] = b"__media\0";
 unsafe extern "C" {
     pub fn aeron_alloc_no_err(
         ptr: *mut *mut ::std::os::raw::c_void,
@@ -16181,4 +16183,80 @@ unsafe extern "C" {
         now_ms: i64,
         log_func: aeron_log_func_t,
     ) -> bool;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct aeron_uri_string_builder_stct {
+    pub params: aeron_str_to_ptr_hash_map_t,
+    pub closed: bool,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of aeron_uri_string_builder_stct"]
+        [::std::mem::size_of::<aeron_uri_string_builder_stct>() - 56usize];
+    ["Alignment of aeron_uri_string_builder_stct"]
+        [::std::mem::align_of::<aeron_uri_string_builder_stct>() - 8usize];
+    ["Offset of field: aeron_uri_string_builder_stct::params"]
+        [::std::mem::offset_of!(aeron_uri_string_builder_stct, params) - 0usize];
+    ["Offset of field: aeron_uri_string_builder_stct::closed"]
+        [::std::mem::offset_of!(aeron_uri_string_builder_stct, closed) - 48usize];
+};
+pub type aeron_uri_string_builder_t = aeron_uri_string_builder_stct;
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_init_new(
+        builder: *mut aeron_uri_string_builder_t,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_init_on_string(
+        builder: *mut aeron_uri_string_builder_t,
+        uri: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_close(
+        builder: *mut aeron_uri_string_builder_t,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_put(
+        builder: *mut aeron_uri_string_builder_t,
+        key: *const ::std::os::raw::c_char,
+        value: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_put_int32(
+        builder: *mut aeron_uri_string_builder_t,
+        key: *const ::std::os::raw::c_char,
+        value: i32,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_put_int64(
+        builder: *mut aeron_uri_string_builder_t,
+        key: *const ::std::os::raw::c_char,
+        value: i64,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_get(
+        builder: *mut aeron_uri_string_builder_t,
+        key: *const ::std::os::raw::c_char,
+    ) -> *const ::std::os::raw::c_char;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_sprint(
+        builder: *mut aeron_uri_string_builder_t,
+        buffer: *mut ::std::os::raw::c_char,
+        buffer_len: usize,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_uri_string_builder_set_initial_position(
+        builder: *mut aeron_uri_string_builder_t,
+        position: i64,
+        initial_term_id: i32,
+        term_length: i32,
+    ) -> ::std::os::raw::c_int;
 }

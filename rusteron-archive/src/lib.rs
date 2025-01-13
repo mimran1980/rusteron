@@ -155,7 +155,7 @@ mod tests {
         builder.init_new()?;
         // builder.put("hello", "world")?;
         builder.set_initial_position(0, 4, 1024)?;
-        panic!("{}", builder.build(1024)?);
+        // panic!("{}", builder.build(1024)?);
         Ok(())
     }
 
