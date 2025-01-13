@@ -1029,6 +1029,15 @@ impl CWrapper {
 
     fn find_close_method(&self, method: &Method) -> Option<&Method> {
         let mut close_method = None;
+
+        // must have init, create or add method name
+        if ["_init", "_create", "_add"]
+            .iter()
+            .all(|find| !method.fn_name.contains(find))
+        {
+            return None;
+        }
+
         for name in ["_destroy", "_delete"] {
             let close_fn = format_ident!(
                 "{}",

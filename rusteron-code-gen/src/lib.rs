@@ -39,18 +39,15 @@ pub fn append_to_file(file_path: &str, code: &str) -> std::io::Result<()> {
 
 #[allow(dead_code)]
 pub fn format_with_rustfmt(code: &str) -> Result<String, std::io::Error> {
-    // Spawn a rustfmt process
     let mut rustfmt = Command::new("rustfmt")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()?;
 
-    // Write the code to rustfmt's stdin
     if let Some(mut stdin) = rustfmt.stdin.take() {
         stdin.write_all(code.as_bytes())?;
     }
 
-    // Get the formatted code from rustfmt's stdout
     let output = rustfmt.wait_with_output()?;
     let formatted_code = String::from_utf8_lossy(&output.stdout).to_string();
 
@@ -59,10 +56,8 @@ pub fn format_with_rustfmt(code: &str) -> Result<String, std::io::Error> {
 
 #[allow(dead_code)]
 pub fn format_token_stream(tokens: TokenStream) -> String {
-    // Convert TokenStream to a string
     let code = tokens.to_string();
 
-    // Use rustfmt to format the code string
     match format_with_rustfmt(&code) {
         Ok(formatted_code) if !formatted_code.trim().is_empty() => formatted_code,
         _ => code.replace("{", "{\n"), // Fallback to unformatted code in case of error
@@ -92,8 +87,6 @@ mod tests {
                 .unwrap()
                 .class_name
         );
-
-        // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
 
         let file = write_to_file(TokenStream::new(), true, "md.rs");
         for (p, w) in bindings
@@ -129,15 +122,12 @@ mod tests {
                 .unwrap()
                 .class_name
         );
-        // dbg!(bindings.wrappers.iter().filter(|(_,w)|w.methods.iter().any(|m|m.fn_name.ends_with("_poll")) ).next());
         assert_eq!(
             0,
             bindings.methods.len(),
             "expected all methods to have been matched {:#?}",
             bindings.methods
         );
-
-        // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
 
         let file = write_to_file(TokenStream::new(), true, "client.rs");
         for (p, w) in bindings.wrappers.values().enumerate() {
@@ -164,15 +154,6 @@ mod tests {
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn rb() {
         let bindings = parse_bindings(&"../rusteron-code-gen/bindings/rb.rs".into());
-        // dbg!(bindings.wrappers.iter().filter(|(_,w)|w.methods.iter().any(|m|m.fn_name.ends_with("_poll")) ).next());
-        // assert_eq!(
-        //     0,
-        //     bindings.methods.len(),
-        //     "expected all methods to have been matched {:#?}",
-        //     bindings.methods
-        // );
-
-        // panic!("{:#?}", bindings.wrappers.values().map(|v| v.class_name.to_string()).collect_vec());
 
         let file = write_to_file(TokenStream::new(), true, "rb.rs");
         for (p, w) in bindings.wrappers.values().enumerate() {
