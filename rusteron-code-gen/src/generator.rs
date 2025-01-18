@@ -1431,21 +1431,20 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
         }
 
-       // #[no_mangle]
+        // #[no_mangle]
         #[allow(dead_code)]
         #(#doc_comments)*
         unsafe extern "C" fn #fn_name<F: #closure_type_name>(
             #(#args),*
         ) -> #closure_return_type
         {
-            if !#closure_name.is_null() {
-                let closure: &mut F = &mut *(#closure_name as *mut F);
-                closure.#handle_method_name(#(#converted_args),*)
-            } else {
+            #[cfg(debug_assertions)]
+            if #closure_name.is_null() {
                 unimplemented!("closure should not be null")
             }
+            let closure: &mut F = &mut *(#closure_name as *mut F);
+            closure.#handle_method_name(#(#converted_args),*)
         }
-
 
         // #[no_mangle]
         #[allow(dead_code)]
@@ -1454,12 +1453,12 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             #(#args),*
         ) -> #closure_return_type
         {
-            if !#closure_name.is_null() {
-                let closure: &mut F = &mut *(#closure_name as *mut F);
-                closure(#(#converted_args),*)
-            } else {
+            #[cfg(debug_assertions)]
+            if #closure_name.is_null() {
                 unimplemented!("closure should not be null")
             }
+            let closure: &mut F = &mut *(#closure_name as *mut F);
+            closure(#(#converted_args),*)
         }
 
     }
