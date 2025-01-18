@@ -113,6 +113,12 @@ mod tests {
         )?;
         info!("created subscription");
 
+        let closure = AeronFragmentHandlerClosure::from(|msg: &[u8], header: AeronHeader| {
+            println!("foo");
+        });
+        let fragment_handler = Handler::wrap(Box::new(&closure));
+        subscription.poll(Some(&fragment_handler), 1024).unwrap();
+
         // pick a large enough size to confirm fragement assembler is working
         let string_len = media_driver_ctx.ipc_mtu_length * 100;
         info!("string length: {}", string_len);
