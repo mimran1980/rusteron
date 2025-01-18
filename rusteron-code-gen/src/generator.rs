@@ -1193,6 +1193,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
     }
 
     let fn_name = format_ident!("{}_callback", handler.type_name);
+    let closure_fn_name = format_ident!("{}_callback_for_once_closure", handler.type_name);
     let doc_comments: Vec<proc_macro2::TokenStream> = handler
         .docs
         .iter()
@@ -1430,7 +1431,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             }
         }
 
-        // #[no_mangle]
+       // #[no_mangle]
         #[allow(dead_code)]
         #(#doc_comments)*
         unsafe extern "C" fn #fn_name<F: #closure_type_name>(
@@ -1444,6 +1445,23 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
                 unimplemented!("closure should not be null")
             }
         }
+
+
+        // #[no_mangle]
+        #[allow(dead_code)]
+        #(#doc_comments)*
+        unsafe extern "C" fn #closure_fn_name<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type>(
+            #(#args),*
+        ) -> #closure_return_type
+        {
+            if !#closure_name.is_null() {
+                let closure: &mut F = &mut *(#closure_name as *mut F);
+                closure(#(#converted_args),*)
+            } else {
+                unimplemented!("closure should not be null")
+            }
+        }
+
     }
 }
 
