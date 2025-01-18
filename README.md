@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = publisher.offer(message, Handlers::no_reserved_value_supplier_handler());
 
     let closure =
-        AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
+        AeronFragmentHandlerClosure::from(move |msg: &[u8], header: AeronHeader| {
             println!(
                 "received a message from aeron {:?}, msg length:{}",
                 header.position(),

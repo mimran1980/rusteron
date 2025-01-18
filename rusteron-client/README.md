@@ -202,7 +202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Handlers::no_unavailable_image_handler())?
         .poll_blocking(Duration::from_secs(5))?;
 
-    let closure = AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
+    let closure = AeronFragmentHandlerClosure::from(move |msg: &[u8], header: AeronHeader| {
         println!(
             "Received a message from Aeron [position={:?}], msg length: {}",
             header.position(),
