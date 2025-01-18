@@ -42,7 +42,7 @@ mod tests {
         let minor = unsafe { crate::aeron_version_minor() };
         let patch = unsafe { crate::aeron_version_patch() };
 
-        let cargo_version = "1.47.0";
+        let cargo_version = "1.48.0";
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
         assert_eq!(aeron_version, cargo_version);
 
@@ -153,22 +153,21 @@ mod tests {
         let count_copy = Arc::clone(&count);
         let stop2 = stop.clone();
 
-        let closure =
-            AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
-                count_copy.fetch_add(1, Ordering::SeqCst);
-                if msg.len() != string_len {
-                    stop2.store(true, Ordering::SeqCst);
-                    error!(
-                        "ERROR: message was {} was expecting {} [header={:?}]",
-                        msg.len(),
-                        string_len,
-                        header
-                    );
-                    sleep(Duration::from_secs(1));
-                }
-                assert_eq!(msg.len(), string_len);
-                assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
-            });
+        let closure = AeronFragmentHandlerClosure::from(move |msg: &[u8], header: AeronHeader| {
+            count_copy.fetch_add(1, Ordering::SeqCst);
+            if msg.len() != string_len {
+                stop2.store(true, Ordering::SeqCst);
+                error!(
+                    "ERROR: message was {} was expecting {} [header={:?}]",
+                    msg.len(),
+                    string_len,
+                    header
+                );
+                sleep(Duration::from_secs(1));
+            }
+            assert_eq!(msg.len(), string_len);
+            assert_eq!(msg, "1".repeat(string_len).as_bytes())
+        });
         let (closure, _inner) = Handler::leak_with_fragment_assembler(closure)?;
 
         // Start the timer
@@ -279,22 +278,21 @@ mod tests {
         let count_copy = Arc::clone(&count);
         let stop2 = stop.clone();
 
-        let closure =
-            AeronFragmentHandlerClosure::from(move |msg: Vec<u8>, header: AeronHeader| {
-                count_copy.fetch_add(1, Ordering::SeqCst);
-                if msg.len() != string_len {
-                    stop2.store(true, Ordering::SeqCst);
-                    error!(
-                        "ERROR: message was {} was expecting {} [header={:?}]",
-                        msg.len(),
-                        string_len,
-                        header
-                    );
-                    sleep(Duration::from_secs(1));
-                }
-                assert_eq!(msg.len(), string_len);
-                assert_eq!(msg.as_slice(), "1".repeat(string_len).as_bytes())
-            });
+        let closure = AeronFragmentHandlerClosure::from(move |msg: &[u8], header: AeronHeader| {
+            count_copy.fetch_add(1, Ordering::SeqCst);
+            if msg.len() != string_len {
+                stop2.store(true, Ordering::SeqCst);
+                error!(
+                    "ERROR: message was {} was expecting {} [header={:?}]",
+                    msg.len(),
+                    string_len,
+                    header
+                );
+                sleep(Duration::from_secs(1));
+            }
+            assert_eq!(msg.len(), string_len);
+            assert_eq!(msg, "1".repeat(string_len).as_bytes())
+        });
         let (closure, _inner) = Handler::leak_with_fragment_assembler(closure)?;
 
         let start_time = Instant::now();

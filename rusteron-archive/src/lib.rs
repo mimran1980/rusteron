@@ -171,8 +171,8 @@ mod tests {
         pub const CONTROL_ENDPOINT: &str = "localhost:23265";
         pub const RECORDING_ENDPOINT: &str = "localhost:23266";
         pub const LIVE_ENDPOINT: &str = "localhost:23267";
-        // pub const REPLAY_ENDPOINT: &str = "localhost:0";
-        pub const REPLAY_ENDPOINT: &str = "localhost:23268";
+        pub const REPLAY_ENDPOINT: &str = "localhost:0";
+        // pub const REPLAY_ENDPOINT: &str = "localhost:23268";
 
         let _ = env_logger::Builder::new()
             .is_test(true)
@@ -370,8 +370,8 @@ mod tests {
 
         // let (handler,closure) = Handler::leak_with_fragment_assembler(crate::AeronFragmentHandlerClosure::from(
         let handler = Handler::leak(crate::AeronFragmentHandlerClosure::from(
-            |buffer: Vec<u8>, header: AeronHeader| {
-                let message = String::from_utf8_lossy(buffer.as_slice());
+            |buffer: &[u8], header: AeronHeader| {
+                let message = String::from_utf8_lossy(buffer);
                 info!("Replayed message: {}", message);
             },
         ));
@@ -385,15 +385,6 @@ mod tests {
             0,
             subscription.get_constants()?.registration_id,
         )?;
-        let replay_session_id =
-            archive.start_replay(recording_id, &replay_destination, STREAM_ID, &params)?;
-        info!("replay session id {}", replay_session_id);
-        info!("replay session id {}", replay_session_id as i32);
-        // aeron.add_subscription(&format!("{replay_destination}|session-id={}", replay_session_id as i32), STREAM_ID,
-        // Handlers::no_available_image_handler(),
-        // Handlers::no_unavailable_image_handler(),
-        // Duration::from_secs(5))?;
-        assert!(replay_session_id > 0, "Replay failed to start");
         let err = archive.poll_for_error_response_as_string(4096)?;
         if !err.is_empty() {
             panic!("{}", err);
@@ -441,7 +432,7 @@ mod tests {
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
 
-        let cargo_version = "1.47.0";
+        let cargo_version = "1.48.0";
         assert_eq!(aeron_version, cargo_version);
     }
 

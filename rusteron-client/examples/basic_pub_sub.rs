@@ -48,14 +48,14 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
     };
 
     let count = Cell::new(0usize);
-    let closure = AeronFragmentHandlerClosure::from(|msg: Vec<u8>, header: AeronHeader| {
+    let closure = AeronFragmentHandlerClosure::from(|msg: &[u8], header: AeronHeader| {
         println!(
             "received a message from aeron [position: {:?}, msg length:{}]",
             header.position(),
             msg.len()
         );
         count.set(count.get() + 1);
-        assert_eq!(msg.as_slice(), "1".repeat(large_string_len).as_bytes())
+        assert_eq!(msg, "1".repeat(large_string_len).as_bytes())
     });
     // if you don't need fragmentation support use Handler::leak instead
     let (closure, _inner) = Handler::leak_with_fragment_assembler(closure)?;

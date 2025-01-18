@@ -4681,11 +4681,14 @@ pub struct aeron_driver_uri_publication_params_stct {
     pub response_correlation_id: i64,
     pub has_max_resend: bool,
     pub max_resend: u32,
+    pub has_publication_window_length: bool,
+    pub publication_window_length: i32,
+    pub is_response: bool,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of aeron_driver_uri_publication_params_stct"]
-        [::std::mem::size_of::<aeron_driver_uri_publication_params_stct>() - 104usize];
+        [::std::mem::size_of::<aeron_driver_uri_publication_params_stct>() - 120usize];
     ["Alignment of aeron_driver_uri_publication_params_stct"]
         [::std::mem::align_of::<aeron_driver_uri_publication_params_stct>() - 8usize];
     ["Offset of field: aeron_driver_uri_publication_params_stct::has_position"]
@@ -4746,6 +4749,18 @@ const _: () = {
     ) - 96usize];
     ["Offset of field: aeron_driver_uri_publication_params_stct::max_resend"]
         [::std::mem::offset_of!(aeron_driver_uri_publication_params_stct, max_resend) - 100usize];
+    ["Offset of field: aeron_driver_uri_publication_params_stct::has_publication_window_length"][::std::mem::offset_of!(
+        aeron_driver_uri_publication_params_stct,
+        has_publication_window_length
+    )
+        - 104usize];
+    ["Offset of field: aeron_driver_uri_publication_params_stct::publication_window_length"][::std::mem::offset_of!(
+        aeron_driver_uri_publication_params_stct,
+        publication_window_length
+    )
+        - 108usize];
+    ["Offset of field: aeron_driver_uri_publication_params_stct::is_response"]
+        [::std::mem::offset_of!(aeron_driver_uri_publication_params_stct, is_response) - 112usize];
 };
 pub type aeron_driver_uri_publication_params_t = aeron_driver_uri_publication_params_stct;
 #[repr(C)]
@@ -11069,6 +11084,15 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn aeron_udp_channel_matches_tag(
+        channel: *mut aeron_udp_channel_t,
+        endpoint_channel: *mut aeron_udp_channel_t,
+        local_address: *mut sockaddr_storage,
+        remote_address: *mut sockaddr_storage,
+        has_match: *mut bool,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn aeron_udp_channel_delete(channel: *mut aeron_udp_channel_t);
 }
 #[repr(C)]
@@ -11793,6 +11817,13 @@ unsafe extern "C" {
         endpoint: *mut aeron_send_channel_endpoint_t,
         endpoint_name: *const ::std::os::raw::c_char,
         new_addr: *mut sockaddr_storage,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn aeron_send_channel_endpoint_matches_tag(
+        endpoint: *mut aeron_send_channel_endpoint_t,
+        channel: *mut aeron_udp_channel_t,
+        has_match: *mut bool,
     ) -> ::std::os::raw::c_int;
 }
 #[repr(C)]
@@ -12807,6 +12838,13 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn aeron_receive_channel_endpoint_matches_tag(
+        endpoint: *mut aeron_receive_channel_endpoint_t,
+        channel: *mut aeron_udp_channel_t,
+        has_match: *mut bool,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn aeron_receive_channel_endpoint_try_remove_endpoint(
         endpoint: *mut aeron_receive_channel_endpoint_t,
     );
@@ -13497,7 +13535,7 @@ unsafe extern "C" {
         image: *mut *mut aeron_publication_image_t,
         endpoint: *mut aeron_receive_channel_endpoint_t,
         destination: *mut aeron_receive_destination_t,
-        context: *mut aeron_driver_context_t,
+        conductor: *mut aeron_driver_conductor_t,
         correlation_id: i64,
         session_id: i32,
         stream_id: i32,

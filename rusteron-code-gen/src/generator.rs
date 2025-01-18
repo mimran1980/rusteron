@@ -1184,6 +1184,14 @@ fn get_docs(
 }
 
 pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream {
+    if handler
+        .args
+        .iter()
+        .any(|arg| arg.is_primitive() && arg.is_mut_pointer())
+    {
+        return quote! {};
+    }
+
     let fn_name = format_ident!("{}_callback", handler.type_name);
     let doc_comments: Vec<proc_macro2::TokenStream> = handler
         .docs
@@ -1247,6 +1255,24 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
         .filter(|t| !t.is_empty())
         .collect();
 
+    // let needs_lifetime = !handler.args.is_empty() && handler.args.iter().any(|arg| {
+    //     let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
+    //     let type_name = return_type.get_new_return_type(false, false);
+    //     let type_name = type_name.to_string();
+    //     type_name.contains("&") && !type_name.contains(" self")
+    // });
+    //
+    // let lifetime = if needs_lifetime {
+    //     quote! {'a}
+    // } else {
+    //     quote! {}
+    // };
+    // let lifetime_comma = if needs_lifetime {
+    //     quote! { 'a , }
+    // } else {
+    //     quote! {}
+    // };
+
     let closure_args: Vec<proc_macro2::TokenStream> = handler
         .args
         .iter()
@@ -1262,6 +1288,13 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             if type_name.is_empty() {
                 None
             } else {
+                let type_name = if !return_type.original.is_primitive()
+                    && type_name.to_string().contains("&")
+                {
+                    syn::parse_str(&type_name.to_string().replace("&", "& 'static")).unwrap()
+                } else {
+                    type_name
+                };
                 Some(quote! {
                     #field_name: #type_name
                 })
@@ -1304,19 +1337,18 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
 
             let return_type = ReturnType::new(arg.clone(), bindings.wrappers.clone());
             let type_name = return_type.get_new_return_type(false, false);
-            if arg.is_c_string() {
-                return Some(quote! { String });
-            } else if let ArgProcessing::ByteArrayWithLength(_) = arg.processing {
-                return if arg.is_byte_array() {
-                    Some(quote! { Vec<u8> })
-                } else {
-                    None
-                };
-            } else if arg.is_single_mut_pointer() && arg.is_primitive() {
+            if arg.is_single_mut_pointer() && arg.is_primitive() {
                 let owned_type: Type =
                     parse_str(arg.c_type.split_whitespace().last().unwrap()).unwrap();
                 return Some(quote! { #owned_type });
             } else {
+                let type_name = if !return_type.original.is_primitive()
+                    && type_name.to_string().contains("&")
+                {
+                    syn::parse_str(&type_name.to_string().replace("&", "& 'static ")).unwrap()
+                } else {
+                    type_name
+                };
                 return Some(quote! {
                     #type_name
                 });
@@ -1348,7 +1380,7 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             if return_type.is_empty() {
                 None
             } else {
-                Some(quote! { #field_name.to_owned() })
+                Some(quote! { #field_name })
             }
         })
         .filter(|t| !t.is_empty())
