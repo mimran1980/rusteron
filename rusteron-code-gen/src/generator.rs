@@ -2,7 +2,7 @@ use crate::get_possible_wrappers;
 #[allow(unused_imports)]
 use crate::snake_to_pascal_case;
 use itertools::Itertools;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -124,12 +124,14 @@ impl Arg {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct CHandler {
     pub type_name: String,
     pub args: Vec<Arg>,
     pub return_type: Arg,
     pub docs: HashSet<String>,
+    pub fn_mut_signature: TokenStream,
+    pub closure_type_name: TokenStream,
 }
 
 #[derive(Debug, Clone)]
@@ -445,6 +447,7 @@ impl CWrapper {
     fn generate_methods(
         &self,
         wrappers: &HashMap<String, CWrapper>,
+        closure_handlers: &Vec<CHandler>,
     ) -> Vec<proc_macro2::TokenStream> {
         self.methods
             .iter()
@@ -473,7 +476,7 @@ impl CWrapper {
                     quote! { <#(#generic_types),*> }
                 };
 
-                let mut fn_arguments: Vec<proc_macro2::TokenStream> = method
+                let fn_arguments: Vec<proc_macro2::TokenStream> = method
                     .arguments
                     .iter()
                     .filter_map(|arg| {
@@ -604,14 +607,21 @@ impl CWrapper {
                 }
 
 
-                if method.arguments.iter().any(|arg| matches!(arg.processing, ArgProcessing::Handler(_)) ) {
+                if method.arguments.iter().any(|arg| matches!(arg.processing, ArgProcessing::Handler(_)) && !method.fn_name.starts_with("set_")
+                    && !method.fn_name.starts_with("add_")) {
                     let fn_name = format_ident!("{}_once", fn_name);
-                    
+
                     // replace type to be FnMut
-                    let where_clause = where_clause.to_string().replace("Callback ", "ClosureTrait ");
+                    let mut where_clause = where_clause.to_string();
+
+                    for c in closure_handlers.iter() {
+                        if !c.closure_type_name.is_empty() {
+                            where_clause = where_clause.replace(&c.closure_type_name.to_string(), &c.fn_mut_signature.to_string());
+                        }
+                    }
                     let where_clause = parse_str::<TokenStream>(&where_clause).unwrap();
 
-                    // replace arygment from Handler to Clousre
+                    // replace arguments from Handler to Closure
                     let fn_arguments = fn_arguments.iter().map(|arg| {
                         let mut arg = arg.clone();
                         let str = arg.to_string();
@@ -674,7 +684,7 @@ impl CWrapper {
                         #[inline]
                         #(#method_docs)*
                         /// _NOTE: aeron must not store this closure and instead use it immediately. If not you will get undefined behaviour
-                        ///  use with care_ 
+                        ///  use with care_
                         pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
                             unsafe {
                                 let result = #ffi_call(#(#arg_names),*);
@@ -1263,7 +1273,7 @@ fn get_docs(
         .collect()
 }
 
-pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream {
+pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenStream {
     if handler
         .args
         .iter()
@@ -1294,8 +1304,6 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
 
     let wrapper_closure_type_name =
         format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
-    let wrapper_closure_type_name_fn =
-        format_ident!("{}ClosureTrait", snake_to_pascal_case(&handler.type_name));
     let logger_type_name = format_ident!("{}Logger", snake_to_pascal_case(&handler.type_name));
 
     let handle_method_name = format_ident!(
@@ -1422,6 +1430,13 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
         .filter(|t| !t.is_empty())
         .collect();
 
+    handler.fn_mut_signature = quote! {
+       FnMut(#(#fn_mut_args),*) -> #closure_return_type
+    };
+    handler.closure_type_name = quote! {
+       #closure_type_name
+    };
+
     let logger_return_type = if closure_return_type.to_token_stream().to_string().eq("()") {
         closure_return_type.clone().to_token_stream()
     } else {
@@ -1481,9 +1496,6 @@ pub fn generate_handlers(handler: &CHandler, bindings: &CBinding) -> TokenStream
             closure: F,
         }
 
-        pub trait #wrapper_closure_type_name_fn: FnMut(#(#fn_mut_args),*) -> #closure_return_type {
-        }
-
         impl<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> #closure_type_name for #wrapper_closure_type_name<F> {
             fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type {
                 (self.closure)(#(#wrapper_closure_args),*)
@@ -1537,11 +1549,12 @@ pub fn generate_rust_code(
     include_common_code: bool,
     include_clippy: bool,
     include_aeron_client_registering_resource_t: bool,
+    closure_handlers: &Vec<CHandler>,
 ) -> proc_macro2::TokenStream {
     let class_name = syn::Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
     let type_name = syn::Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
-    let methods = wrapper.generate_methods(wrappers);
+    let methods = wrapper.generate_methods(wrappers, closure_handlers);
     let constructor = wrapper.generate_constructor(wrappers);
 
     let async_impls = if wrapper.type_name.starts_with("aeron_async_")

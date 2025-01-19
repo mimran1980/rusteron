@@ -78,7 +78,7 @@ mod tests {
     #[test]
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn media_driver() {
-        let bindings = parse_bindings(&"../rusteron-code-gen/bindings/media-driver.rs".into());
+        let mut bindings = parse_bindings(&"../rusteron-code-gen/bindings/media-driver.rs".into());
         assert_eq!(
             "AeronImageFragmentAssembler",
             bindings
@@ -89,21 +89,33 @@ mod tests {
         );
 
         let file = write_to_file(TokenStream::new(), true, "md.rs");
+
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            // need to run this first so I know the FnMut(xxxx) which is required in generate_rust_code
+            let _ = crate::generate_handlers(handler, &bindings_copy);
+        }
         for (p, w) in bindings
             .wrappers
             .values()
             .filter(|w| !w.type_name.contains("_t_") && w.type_name != "in_addr")
             .enumerate()
         {
-            let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true, true);
+            let code = crate::generate_rust_code(
+                w,
+                &bindings.wrappers,
+                p == 0,
+                true,
+                true,
+                &bindings.handlers,
+            );
             write_to_file(code, false, "md.rs");
         }
-
-        for handler in &bindings.handlers {
-            let code = crate::generate_handlers(handler, &bindings);
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            let code = crate::generate_handlers(handler, &bindings_copy);
             append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
-
         let t = trybuild::TestCases::new();
         append_to_file(&file, MEDIA_DRIVER_BINDINGS).unwrap();
         append_to_file(&file, "\npub fn main() {}\n").unwrap();
@@ -113,7 +125,7 @@ mod tests {
     #[test]
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn client() {
-        let bindings = parse_bindings(&"../rusteron-code-gen/bindings/client.rs".into());
+        let mut bindings = parse_bindings(&"../rusteron-code-gen/bindings/client.rs".into());
         assert_eq!(
             "AeronImageFragmentAssembler",
             bindings
@@ -130,17 +142,25 @@ mod tests {
         );
 
         let file = write_to_file(TokenStream::new(), true, "client.rs");
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            // need to run this first so I know the FnMut(xxxx) which is required in generate_rust_code
+            let _ = crate::generate_handlers(handler, &bindings_copy);
+        }
         for (p, w) in bindings.wrappers.values().enumerate() {
-            let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true, true);
-            if code.to_string().contains("ndler : Option < AeronCloseClientHandlerImpl > , clientd :) -> Result < Self , AeronCError > { let resource = Manage") {
-                panic!("{}", format_token_stream(code));
-            }
-
+            let code = crate::generate_rust_code(
+                w,
+                &bindings.wrappers,
+                p == 0,
+                true,
+                true,
+                &bindings.handlers,
+            );
             write_to_file(code, false, "client.rs");
         }
-
-        for handler in &bindings.handlers {
-            let code = crate::generate_handlers(handler, &bindings);
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            let code = crate::generate_handlers(handler, &bindings_copy);
             append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
 
@@ -153,11 +173,25 @@ mod tests {
     #[test]
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn rb() {
-        let bindings = parse_bindings(&"../rusteron-code-gen/bindings/rb.rs".into());
+        let mut bindings = parse_bindings(&"../rusteron-code-gen/bindings/rb.rs".into());
 
         let file = write_to_file(TokenStream::new(), true, "rb.rs");
+
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            // need to run this first so I know the FnMut(xxxx) which is required in generate_rust_code
+            let _ = crate::generate_handlers(handler, &bindings_copy);
+        }
+
         for (p, w) in bindings.wrappers.values().enumerate() {
-            let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true, false);
+            let code = crate::generate_rust_code(
+                w,
+                &bindings.wrappers,
+                p == 0,
+                true,
+                false,
+                &bindings.handlers,
+            );
             if code.to_string().contains("ndler : Option < AeronCloseClientHandlerImpl > , rbd :) -> Result < Self , AeronCError > { let resource = Manage") {
                 panic!("{}", format_token_stream(code));
             }
@@ -165,8 +199,9 @@ mod tests {
             write_to_file(code, false, "rb.rs");
         }
 
-        for handler in &bindings.handlers {
-            let code = crate::generate_handlers(handler, &bindings);
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            let code = crate::generate_handlers(handler, &bindings_copy);
             append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
 
@@ -179,7 +214,7 @@ mod tests {
     #[test]
     #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
     fn archive() {
-        let bindings = parse_bindings(&"../rusteron-code-gen/bindings/archive.rs".into());
+        let mut bindings = parse_bindings(&"../rusteron-code-gen/bindings/archive.rs".into());
         assert_eq!(
             "AeronImageFragmentAssembler",
             bindings
@@ -190,16 +225,27 @@ mod tests {
         );
 
         let file = write_to_file(TokenStream::new(), true, "archive.rs");
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            // need to run this first so I know the FnMut(xxxx) which is required in generate_rust_code
+            let _ = crate::generate_handlers(handler, &bindings_copy);
+        }
         for (p, w) in bindings.wrappers.values().enumerate() {
-            let code = crate::generate_rust_code(w, &bindings.wrappers, p == 0, true, true);
+            let code = crate::generate_rust_code(
+                w,
+                &bindings.wrappers,
+                p == 0,
+                true,
+                true,
+                &bindings.handlers,
+            );
             write_to_file(code, false, "archive.rs");
         }
-
-        for handler in &bindings.handlers {
-            let code = crate::generate_handlers(handler, &bindings);
+        let bindings_copy = bindings.clone();
+        for handler in bindings.handlers.iter_mut() {
+            let code = crate::generate_handlers(handler, &bindings_copy);
             append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
         }
-
         let t = trybuild::TestCases::new();
         append_to_file(&file, ARCHIVE_BINDINGS).unwrap();
         append_to_file(&file, "\npub fn main() {}\n").unwrap();

@@ -174,7 +174,7 @@ pub fn main() {
         .write_to_file(out.clone())
         .expect("Couldn't write bindings!");
 
-    let bindings = rusteron_code_gen::parse_bindings(&out);
+    let mut bindings = rusteron_code_gen::parse_bindings(&out);
     let aeron = out_path.join("aeron.rs");
     let _ = fs::remove_file(aeron.clone());
 
@@ -195,13 +195,25 @@ pub fn main() {
     // .unwrap();
 
     let mut stream = TokenStream::new();
+    let bindings_copy = bindings.clone();
+    for handler in bindings.handlers.iter_mut() {
+        // need to run this first so I know the FnMut(xxxx) which is required in generate_rust_code
+        let _ = rusteron_code_gen::generate_handlers(handler, &bindings_copy);
+    }
     for (p, w) in bindings.wrappers.values().enumerate() {
-        let code =
-            rusteron_code_gen::generate_rust_code(w, &bindings.wrappers, p == 0, false, true);
+        let code = rusteron_code_gen::generate_rust_code(
+            w,
+            &bindings.wrappers,
+            p == 0,
+            false,
+            true,
+            &bindings.handlers,
+        );
         stream.extend(code);
     }
-    for handler in &bindings.handlers {
-        let code = rusteron_code_gen::generate_handlers(handler, &bindings);
+    let bindings_copy = bindings.clone();
+    for handler in bindings.handlers.iter_mut() {
+        let code = rusteron_code_gen::generate_handlers(handler, &bindings_copy);
         stream.extend(code);
     }
     append_to_file(

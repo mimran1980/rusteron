@@ -245,6 +245,8 @@ fn process_type(
                                         processing: ArgProcessing::Default,
                                     },
                                     docs: docs.clone(),
+                                    fn_mut_signature: Default::default(),
+                                    closure_type_name: Default::default(),
                                 };
                                 handlers.push(value);
                             }
