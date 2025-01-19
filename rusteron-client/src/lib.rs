@@ -118,6 +118,17 @@ mod tests {
         });
         let fragment_handler = Handler::wrap(Box::new(&closure));
         subscription.poll(Some(&fragment_handler), 1024).unwrap();
+        subscription
+            .poll_once(
+                |msg: &[u8], header: AeronHeader| {
+                    {
+                        println!("foo");
+                    }
+                    .into()
+                },
+                1024,
+            )
+            .unwrap();
 
         // pick a large enough size to confirm fragement assembler is working
         let string_len = media_driver_ctx.ipc_mtu_length * 100;
