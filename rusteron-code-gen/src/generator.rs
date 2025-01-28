@@ -615,6 +615,24 @@ impl CWrapper {
                     }
                 }
 
+                // getter methods
+                if ["constants"].iter().any(|name| method.struct_method_name == *name )
+                    && method.arguments.len() == 2 {
+                    let rt = ReturnType::new(method.arguments[1].clone(), wrappers.clone());
+                    let return_type = rt.get_new_return_type(false, false);
+                    let getter_method = format_ident!("get_{}", fn_name);
+                    let method_docs = method_docs.iter().cloned()
+                        .take_while(|t| !t.to_string().contains(" Parameter")).collect_vec();
+                    additional_methods.push(quote! {
+                        #[inline]
+                        #(#method_docs)*
+                        pub fn #getter_method #where_clause(#possible_self) -> Result<#return_type, AeronCError> {
+                            let result = #return_type::default();
+                            self.#fn_name(&result)?;
+                            Ok(result)
+                        }
+                    });
+                }
 
                 if method.arguments.iter().any(|arg| matches!(arg.processing, ArgProcessing::Handler(_)) && !method.fn_name.starts_with("set_")
                     && !method.fn_name.starts_with("add_")) {

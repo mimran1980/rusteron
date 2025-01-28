@@ -196,6 +196,7 @@ docs:
 # run unit tests
 test:
   cargo test --workspace -- --nocapture
+  cargo test  --workspace --doc
   cargo test  --workspace --all-targets --all-features -- --nocapture
 
 # creates symbolic link so that taret/aeron goes to /dev/shm/aeron (when benchmarking on linux)

@@ -16,12 +16,6 @@ impl AeronCounter {
     pub fn addr_atomic(&self) -> &std::sync::atomic::AtomicI64 {
         unsafe { std::sync::atomic::AtomicI64::from_ptr(self.addr()) }
     }
-
-    pub fn get_constants(&self) -> Result<AeronCounterConstants, AeronCError> {
-        let constants = AeronCounterConstants::default();
-        self.constants(&constants)?;
-        Ok(constants)
-    }
 }
 
 impl AeronSubscription {
@@ -31,12 +25,6 @@ impl AeronSubscription {
         destination: &str,
     ) -> Result<AeronAsyncDestination, AeronCError> {
         AeronAsyncDestination::aeron_subscription_async_add_destination(client, self, destination)
-    }
-
-    pub fn get_constants(&self) -> Result<AeronSubscriptionConstants, AeronCError> {
-        let constants = AeronSubscriptionConstants::default();
-        self.constants(&constants)?;
-        Ok(constants)
     }
 
     pub fn add_destination(
@@ -83,12 +71,6 @@ impl AeronExclusivePublication {
         )
     }
 
-    pub fn get_constants(&self) -> Result<AeronPublicationConstants, AeronCError> {
-        let constants = AeronPublicationConstants::default();
-        self.constants(&constants)?;
-        Ok(constants)
-    }
-
     pub fn add_destination(
         &mut self,
         client: &Aeron,
@@ -127,12 +109,6 @@ impl AeronPublication {
         destination: &str,
     ) -> Result<AeronAsyncDestination, AeronCError> {
         AeronAsyncDestination::aeron_publication_async_add_destination(client, self, destination)
-    }
-
-    pub fn get_constants(&self) -> Result<AeronPublicationConstants, AeronCError> {
-        let constants = AeronPublicationConstants::default();
-        self.constants(&constants)?;
-        Ok(constants)
     }
 
     pub fn add_destination(
