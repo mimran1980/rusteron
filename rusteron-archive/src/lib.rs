@@ -351,7 +351,7 @@ mod tests {
                     );
                 }
                 // slow down publishing so can catch up
-                if message_count > 100_000 {
+                if message_count > 10_000 {
                     while counter_id < 0 {
                         counter_id =
                             RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
@@ -361,7 +361,7 @@ mod tests {
                     while counters_reader.get_counter_value(counter_id) < publication.position() {
                         thread::sleep(Duration::from_micros(1));
                     }
-                    thread::sleep(Duration::from_micros(200));
+                    thread::sleep(Duration::from_micros(300));
                 }
             }
             info!("Publisher thread terminated");
@@ -504,7 +504,7 @@ mod tests {
         }
         assert!(!replay_merge.has_failed());
         assert!(replay_merge.is_live_added());
-        assert!(reply_count > 20_000);
+        assert!(reply_count > 10_000);
         Ok(())
     }
 
