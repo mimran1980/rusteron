@@ -616,7 +616,7 @@ impl CWrapper {
                 }
 
                 // getter methods
-                if ["constants"].iter().any(|name| method.struct_method_name == *name )
+                if ["constants", "buffers"].iter().any(|name| method.struct_method_name == *name )
                     && method.arguments.len() == 2 {
                     let rt = ReturnType::new(method.arguments[1].clone(), wrappers.clone());
                     let return_type = rt.get_new_return_type(false, false);
