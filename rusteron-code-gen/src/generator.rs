@@ -2,7 +2,7 @@ use crate::get_possible_wrappers;
 #[allow(unused_imports)]
 use crate::snake_to_pascal_case;
 use itertools::Itertools;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -119,12 +119,12 @@ impl Deref for Arg {
 }
 
 impl Arg {
-    pub fn as_ident(&self) -> syn::Ident {
-        syn::Ident::new(&self.name, proc_macro2::Span::call_site())
+    pub fn as_ident(&self) -> Ident {
+        Ident::new(&self.name, proc_macro2::Span::call_site())
     }
 
-    pub fn as_type(&self) -> syn::Type {
-        syn::parse_str(&self.c_type).expect("Invalid argument type")
+    pub fn as_type(&self) -> Type {
+        parse_str(&self.c_type).expect("Invalid argument type")
     }
 }
 
@@ -156,11 +156,11 @@ impl ReturnType {
         &self,
         convert_errors: bool,
         use_ref_for_cwrapper: bool,
-    ) -> proc_macro2::TokenStream {
+    ) -> TokenStream {
         if let ArgProcessing::Handler(_) = self.original.processing {
             if self.original.name.len() > 0 {
                 if !self.original.is_mut_pointer() {
-                    let new_type = syn::parse_str::<syn::Type>(&format!(
+                    let new_type = parse_str::<Type>(&format!(
                         "{}HandlerImpl",
                         snake_to_pascal_case(&self.original.c_type)
                     ))
@@ -197,8 +197,8 @@ impl ReturnType {
         if self.original.is_single_mut_pointer() {
             let type_name = self.original.split(" ").last().unwrap();
             if let Some(wrapper) = self.wrappers.get(type_name) {
-                let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
-                    .expect("Invalid class name in wrapper");
+                let new_type =
+                    parse_str::<Type>(&wrapper.class_name).expect("Invalid class name in wrapper");
                 if use_ref_for_cwrapper {
                     return quote! { &#new_type };
                 } else {
@@ -207,8 +207,8 @@ impl ReturnType {
             }
         }
         if let Some(wrapper) = self.wrappers.get(&self.original.c_type) {
-            let new_type = syn::parse_str::<syn::Type>(&wrapper.class_name)
-                .expect("Invalid class name in wrapper");
+            let new_type =
+                parse_str::<Type>(&wrapper.class_name).expect("Invalid class name in wrapper");
             return quote! { #new_type };
         }
         if convert_errors && self.original.is_c_raw_int() {
@@ -220,7 +220,7 @@ impl ReturnType {
         if self.original.is_mut_c_string() {
             // return quote! { &mut str };
         }
-        let return_type: syn::Type = syn::parse_str(&self.original).expect("Invalid return type");
+        let return_type: Type = parse_str(&self.original).expect("Invalid return type");
         if self.original.is_single_mut_pointer() && self.original.is_primitive() {
             let mut_type: Type = parse_str(
                 &return_type
@@ -236,10 +236,10 @@ impl ReturnType {
 
     pub fn handle_c_to_rs_return(
         &self,
-        result: proc_macro2::TokenStream,
+        result: TokenStream,
         convert_errors: bool,
         use_self: bool,
-    ) -> proc_macro2::TokenStream {
+    ) -> TokenStream {
         if let ArgProcessing::StringWithLength(_) = &self.original.processing {
             if !self.original.is_c_string_any() {
                 return quote! {};
@@ -296,12 +296,12 @@ impl ReturnType {
         if let ArgProcessing::Handler(handler_client) = &self.original.processing {
             if !self.original.is_mut_pointer() {
                 let handler = handler_client.get(0).unwrap();
-                let new_type = syn::parse_str::<syn::Type>(&format!(
+                let new_type = parse_str::<Type>(&format!(
                     "{}HandlerImpl",
                     snake_to_pascal_case(&handler.c_type)
                 ))
                 .expect("Invalid class name in wrapper");
-                let new_handler = syn::parse_str::<syn::Type>(&format!(
+                let new_handler = parse_str::<Type>(&format!(
                     "{}Callback",
                     snake_to_pascal_case(&handler.c_type)
                 ))
@@ -318,7 +318,7 @@ impl ReturnType {
         if let ArgProcessing::Handler(handler_client) = &self.original.processing {
             if !self.original.is_mut_pointer() {
                 let handler = handler_client.get(0).unwrap();
-                let new_type = syn::parse_str::<syn::Type>(&format!(
+                let new_type = parse_str::<Type>(&format!(
                     "{}HandlerImpl",
                     snake_to_pascal_case(&handler.c_type)
                 ))
@@ -333,9 +333,9 @@ impl ReturnType {
 
     pub fn handle_rs_to_c_return(
         &self,
-        result: proc_macro2::TokenStream,
+        result: TokenStream,
         include_field_name: bool,
-    ) -> proc_macro2::TokenStream {
+    ) -> TokenStream {
         if let ArgProcessing::Handler(handler_client) = &self.original.processing {
             if !self.original.is_mut_pointer() {
                 let handler = handler_client.get(0).unwrap();
@@ -343,7 +343,7 @@ impl ReturnType {
                 let handler_type = handler.as_type();
                 let clientd_name = handler_client.get(1).unwrap().as_ident();
                 let method_name = format_ident!("{}_callback", handler.c_type);
-                let new_type = syn::parse_str::<syn::Type>(&format!(
+                let new_type = parse_str::<Type>(&format!(
                     "{}HandlerImpl",
                     snake_to_pascal_case(&self.original.c_type)
                 ))
@@ -457,20 +457,20 @@ impl CWrapper {
         &self,
         wrappers: &HashMap<String, CWrapper>,
         closure_handlers: &Vec<CHandler>,
-    ) -> Vec<proc_macro2::TokenStream> {
+    ) -> Vec<TokenStream> {
         self.methods
             .iter()
             .filter(|m| !m.arguments.iter().any(|arg| arg.is_double_mut_pointer()))
             .map(|method| {
                 let fn_name =
-                    syn::Ident::new(&method.struct_method_name, proc_macro2::Span::call_site());
+                    Ident::new(&method.struct_method_name, proc_macro2::Span::call_site());
                 let return_type_helper =
                     ReturnType::new(method.return_type.clone(), wrappers.clone());
                 let return_type = return_type_helper.get_new_return_type(true, false);
-                let ffi_call = syn::Ident::new(&method.fn_name, proc_macro2::Span::call_site());
+                let ffi_call = Ident::new(&method.fn_name, proc_macro2::Span::call_site());
 
                 // Filter out arguments that are `*mut` of the struct's type
-                let generic_types: Vec<proc_macro2::TokenStream> = method
+                let generic_types: Vec<TokenStream> = method
                     .arguments
                     .iter()
                     .flat_map(|arg| {
@@ -485,7 +485,7 @@ impl CWrapper {
                     quote! { <#(#generic_types),*> }
                 };
 
-                let fn_arguments: Vec<proc_macro2::TokenStream> = method
+                let fn_arguments: Vec<TokenStream> = method
                     .arguments
                     .iter()
                     .filter_map(|arg| {
@@ -525,7 +525,7 @@ impl CWrapper {
                 let mut uses_self = false;
 
                 // Filter out argument names for the FFI call
-                let mut arg_names: Vec<proc_macro2::TokenStream> = method
+                let mut arg_names: Vec<TokenStream> = method
                     .arguments
                     .iter()
                     .filter_map(|arg| {
@@ -563,165 +563,16 @@ impl CWrapper {
                 };
 
 
-                let method_docs: Vec<proc_macro2::TokenStream> = get_docs(&method.docs, wrappers, Some(&fn_arguments) );
+                let method_docs: Vec<TokenStream> = get_docs(&method.docs, wrappers, Some(&fn_arguments) );
 
                 let mut additional_methods = vec![];
 
-                if method.arguments.len() == 3 && uses_self {
-                    let method_docs = method_docs.clone();
-                    let into_method = format_ident!("{}_into", fn_name);
-                    if method.arguments[1].is_mut_c_string() && method.arguments[2].is_usize() {
-                        let string_method = format_ident!("{}_as_string", fn_name);
-                        additional_methods.push(quote! {
-    #[inline]
-    #(#method_docs)*
-    pub fn #string_method(
-        &self,
-        max_length: usize,
-    ) -> Result<String, AeronCError> {
-        let mut result = String::with_capacity(max_length);
-        self.#into_method(&mut result)?;
-        Ok(result)
-    }
-
-    #[inline]
-    #(#method_docs)*
-    #[doc = "NOTE: allocation friendly method, the string capacity must be set as it will truncate string to capacity it will never grow the string. So if you pass String::new() it will write 0 chars"]
-    pub fn #into_method(
-        &self,
-        dst_truncate_to_capacity: &mut String,
-    ) -> Result<i32, AeronCError> {
-        unsafe {
-            let capacity = dst_truncate_to_capacity.capacity();
-            let vec = dst_truncate_to_capacity.as_mut_vec();
-            vec.set_len(capacity);
-            let result = self.#fn_name(vec.as_mut_ptr() as *mut _, capacity)?;
-            let mut len = 0;
-            loop {
-                if len == capacity {
-                    break;
-                }
-                let val = vec[len];
-                if val == 0 {
-                    break;
-                }
-                len += 1;
-            }
-            vec.set_len(len);
-            Ok(result)
-        }
-    }
-                        });
-                    }
-                }
+                Self::add_mut_string_methods_if_applicable(method, &fn_name, uses_self, &method_docs, &mut additional_methods);
 
                 // getter methods
-                if ["constants", "buffers"].iter().any(|name| method.struct_method_name == *name )
-                    && method.arguments.len() == 2 {
-                    let rt = ReturnType::new(method.arguments[1].clone(), wrappers.clone());
-                    let return_type = rt.get_new_return_type(false, false);
-                    let getter_method = format_ident!("get_{}", fn_name);
-                    let method_docs = method_docs.iter().cloned()
-                        .take_while(|t| !t.to_string().contains(" Parameter")).collect_vec();
-                    additional_methods.push(quote! {
-                        #[inline]
-                        #(#method_docs)*
-                        pub fn #getter_method #where_clause(#possible_self) -> Result<#return_type, AeronCError> {
-                            let result = #return_type::default();
-                            self.#fn_name(&result)?;
-                            Ok(result)
-                        }
-                    });
-                }
+                Self::add_getter_instead_of_mut_arg_if_applicable(wrappers, method, &fn_name, &where_clause, &possible_self, &method_docs, &mut additional_methods);
 
-                if method.arguments.iter().any(|arg| matches!(arg.processing, ArgProcessing::Handler(_)) && !method.fn_name.starts_with("set_")
-                    && !method.fn_name.starts_with("add_")) {
-                    let fn_name = format_ident!("{}_once", fn_name);
-
-                    // replace type to be FnMut
-                    let mut where_clause = where_clause.to_string();
-
-                    for c in closure_handlers.iter() {
-                        if !c.closure_type_name.is_empty() {
-                            where_clause = where_clause.replace(&c.closure_type_name.to_string(), &c.fn_mut_signature.to_string().replace("' static", "").replace("'static", ""));
-                        }
-                    }
-                    let where_clause = parse_str::<TokenStream>(&where_clause).unwrap();
-
-                    // replace arguments from Handler to Closure
-                    let fn_arguments = fn_arguments.iter().map(|arg| {
-                        let mut arg = arg.clone();
-                        let str = arg.to_string();
-                        if str.contains("& Handler ") {
-                            // e.g. callback : Option < & Handler < AeronErrorLogReaderFuncHandlerImpl >>
-                            let parts = str.split(" ").collect_vec();
-                            let variable_name = parse_str::<TokenStream>(parts[0]).unwrap();
-                            let closure_type = parse_str::<TokenStream>(parts[parts.len() - 2]).unwrap();
-                            arg = quote! { mut #variable_name : #closure_type };
-                        }
-
-                        arg
-                    });
-
-
-                    // update code to directly call closure without need of box or handler
-                    let arg_names = arg_names.iter().map(|x| {
-                        let mut str = x.to_string()
-                            .replace("_callback :: <", "_callback_for_once_closure :: <")
-                            ;
-
-                        if str.contains("_callback_for_once_closure") {
-                            /*
-                                let callback: aeron_counters_reader_foreach_counter_func_t = if func.is_none() {
-                                        None
-                                    } else {
-                                        Some(
-                                            aeron_counters_reader_foreach_counter_func_t_callback_for_once_closure::<
-                                                AeronCountersReaderForeachCounterFuncHandlerImpl,
-                                            >,
-                                        )
-                                    };
-                                    callback
-                                },
-                                func.map(|m| m.as_raw())
-                                    .unwrap_or_else(|| std::ptr::null_mut()),
-
-                             */
-                            let caps = regex::Regex::new(
-                                r#"let callback\s*:\s*(?P<type>[\w_]+)\s*=\s*if\s*(?P<handler_var_name>[\w_]+)\s*\.\s*is_none\s*\(\).*Some\s*\(\s*(?P<callback>[\w_]+)\s*::\s*<\s*(?P<handler>[\w_]+)\s*>\s*\).*"#
-                            )
-                                .unwrap()
-                                .captures(&str)
-                                .expect(&format!("regex failed for {str}"));
-                            let func_type = parse_str::<TokenStream>(&caps["type"]).unwrap();
-                            let handler_var_name = parse_str::<TokenStream>(&caps["handler_var_name"]).unwrap();
-                            let callback = parse_str::<TokenStream>(&caps["callback"]).unwrap();
-                            let handler_type = parse_str::<TokenStream>(&caps["handler"]).unwrap();
-
-                            let new_code = quote! {
-                                Some(#callback::<#handler_type>),
-                                &mut #handler_var_name as *mut _ as *mut std::os::raw::c_void
-                            };
-                            str = new_code.to_string();
-                        }
-
-                        parse_str::<TokenStream>(&str).unwrap()
-                    }).collect_vec();
-                    additional_methods.push(quote! {
-                        #[inline]
-                        #(#method_docs)*
-                        ///
-                        /// 
-                        /// _NOTE: aeron must not store this closure and instead use it immediately. If not you will get undefined behaviour,
-                        ///  use with care_
-                        pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
-                            unsafe {
-                                let result = #ffi_call(#(#arg_names),*);
-                                #converter
-                            }
-                        }
-                    })
-                }
+                Self::add_once_methods_for_handlers(closure_handlers, method, &fn_name, &return_type, &ffi_call, &where_clause, &fn_arguments, &mut arg_names, &converter, &possible_self, &method_docs, &mut additional_methods);
 
                 let mut_primitivies = method.arguments.iter()
                     .filter(|a| a.is_mut_pointer() && a.is_primitive())
@@ -807,12 +658,214 @@ impl CWrapper {
             .collect()
     }
 
+    fn add_once_methods_for_handlers(
+        closure_handlers: &Vec<CHandler>,
+        method: &Method,
+        fn_name: &Ident,
+        return_type: &TokenStream,
+        ffi_call: &Ident,
+        where_clause: &TokenStream,
+        fn_arguments: &Vec<TokenStream>,
+        arg_names: &mut Vec<TokenStream>,
+        converter: &TokenStream,
+        possible_self: &TokenStream,
+        method_docs: &Vec<TokenStream>,
+        additional_methods: &mut Vec<TokenStream>,
+    ) {
+        if method.arguments.iter().any(|arg| {
+            matches!(arg.processing, ArgProcessing::Handler(_))
+                && !method.fn_name.starts_with("set_")
+                && !method.fn_name.starts_with("add_")
+        }) {
+            let fn_name = format_ident!("{}_once", fn_name);
+
+            // replace type to be FnMut
+            let mut where_clause = where_clause.to_string();
+
+            for c in closure_handlers.iter() {
+                if !c.closure_type_name.is_empty() {
+                    where_clause = where_clause.replace(
+                        &c.closure_type_name.to_string(),
+                        &c.fn_mut_signature
+                            .to_string()
+                            .replace("' static", "")
+                            .replace("'static", ""),
+                    );
+                }
+            }
+            let where_clause = parse_str::<TokenStream>(&where_clause).unwrap();
+
+            // replace arguments from Handler to Closure
+            let fn_arguments = fn_arguments.iter().map(|arg| {
+                let mut arg = arg.clone();
+                let str = arg.to_string();
+                if str.contains("& Handler ") {
+                    // e.g. callback : Option < & Handler < AeronErrorLogReaderFuncHandlerImpl >>
+                    let parts = str.split(" ").collect_vec();
+                    let variable_name = parse_str::<TokenStream>(parts[0]).unwrap();
+                    let closure_type = parse_str::<TokenStream>(parts[parts.len() - 2]).unwrap();
+                    arg = quote! { mut #variable_name : #closure_type };
+                }
+
+                arg
+            });
+
+            // update code to directly call closure without need of box or handler
+            let arg_names = arg_names.iter().map(|x| {
+                let mut str = x.to_string()
+                    .replace("_callback :: <", "_callback_for_once_closure :: <")
+                    ;
+
+                if str.contains("_callback_for_once_closure") {
+                    /*
+                        let callback: aeron_counters_reader_foreach_counter_func_t = if func.is_none() {
+                                None
+                            } else {
+                                Some(
+                                    aeron_counters_reader_foreach_counter_func_t_callback_for_once_closure::<
+                                        AeronCountersReaderForeachCounterFuncHandlerImpl,
+                                    >,
+                                )
+                            };
+                            callback
+                        },
+                        func.map(|m| m.as_raw())
+                            .unwrap_or_else(|| std::ptr::null_mut()),
+
+                     */
+                    let caps = regex::Regex::new(
+                        r#"let callback\s*:\s*(?P<type>[\w_]+)\s*=\s*if\s*(?P<handler_var_name>[\w_]+)\s*\.\s*is_none\s*\(\).*Some\s*\(\s*(?P<callback>[\w_]+)\s*::\s*<\s*(?P<handler>[\w_]+)\s*>\s*\).*"#
+                    )
+                        .unwrap()
+                        .captures(&str)
+                        .expect(&format!("regex failed for {str}"));
+                    let func_type = parse_str::<TokenStream>(&caps["type"]).unwrap();
+                    let handler_var_name = parse_str::<TokenStream>(&caps["handler_var_name"]).unwrap();
+                    let callback = parse_str::<TokenStream>(&caps["callback"]).unwrap();
+                    let handler_type = parse_str::<TokenStream>(&caps["handler"]).unwrap();
+
+                    let new_code = quote! {
+                                Some(#callback::<#handler_type>),
+                                &mut #handler_var_name as *mut _ as *mut std::os::raw::c_void
+                            };
+                    str = new_code.to_string();
+                }
+
+                parse_str::<TokenStream>(&str).unwrap()
+            }).collect_vec();
+            additional_methods.push(quote! {
+                #[inline]
+                #(#method_docs)*
+                ///
+                ///
+                /// _NOTE: aeron must not store this closure and instead use it immediately. If not you will get undefined behaviour,
+                ///  use with care_
+                pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
+                    unsafe {
+                        let result = #ffi_call(#(#arg_names),*);
+                        #converter
+                    }
+                }
+            })
+        }
+    }
+
+    fn add_getter_instead_of_mut_arg_if_applicable(
+        wrappers: &HashMap<String, CWrapper>,
+        method: &Method,
+        fn_name: &Ident,
+        where_clause: &TokenStream,
+        possible_self: &TokenStream,
+        method_docs: &Vec<TokenStream>,
+        additional_methods: &mut Vec<TokenStream>,
+    ) {
+        if ["constants", "buffers"]
+            .iter()
+            .any(|name| method.struct_method_name == *name)
+            && method.arguments.len() == 2
+        {
+            let rt = ReturnType::new(method.arguments[1].clone(), wrappers.clone());
+            let return_type = rt.get_new_return_type(false, false);
+            let getter_method = format_ident!("get_{}", fn_name);
+            let method_docs = method_docs
+                .iter()
+                .cloned()
+                .take_while(|t| !t.to_string().contains(" Parameter"))
+                .collect_vec();
+            additional_methods.push(quote! {
+                        #[inline]
+                        #(#method_docs)*
+                        pub fn #getter_method #where_clause(#possible_self) -> Result<#return_type, AeronCError> {
+                            let result = #return_type::default();
+                            self.#fn_name(&result)?;
+                            Ok(result)
+                        }
+                    });
+        }
+    }
+
+    fn add_mut_string_methods_if_applicable(
+        method: &Method,
+        fn_name: &Ident,
+        uses_self: bool,
+        method_docs: &Vec<TokenStream>,
+        additional_methods: &mut Vec<TokenStream>,
+    ) {
+        if method.arguments.len() == 3 && uses_self {
+            let method_docs = method_docs.clone();
+            let into_method = format_ident!("{}_into", fn_name);
+            if method.arguments[1].is_mut_c_string() && method.arguments[2].is_usize() {
+                let string_method = format_ident!("{}_as_string", fn_name);
+                additional_methods.push(quote! {
+    #[inline]
+    #(#method_docs)*
+    pub fn #string_method(
+        &self,
+        max_length: usize,
+    ) -> Result<String, AeronCError> {
+        let mut result = String::with_capacity(max_length);
+        self.#into_method(&mut result)?;
+        Ok(result)
+    }
+
+    #[inline]
+    #(#method_docs)*
+    #[doc = "NOTE: allocation friendly method, the string capacity must be set as it will truncate string to capacity it will never grow the string. So if you pass String::new() it will write 0 chars"]
+    pub fn #into_method(
+        &self,
+        dst_truncate_to_capacity: &mut String,
+    ) -> Result<i32, AeronCError> {
+        unsafe {
+            let capacity = dst_truncate_to_capacity.capacity();
+            let vec = dst_truncate_to_capacity.as_mut_vec();
+            vec.set_len(capacity);
+            let result = self.#fn_name(vec.as_mut_ptr() as *mut _, capacity)?;
+            let mut len = 0;
+            loop {
+                if len == capacity {
+                    break;
+                }
+                let val = vec[len];
+                if val == 0 {
+                    break;
+                }
+                len += 1;
+            }
+            vec.set_len(len);
+            Ok(result)
+        }
+    }
+                        });
+            }
+        }
+    }
+
     /// Generate the fields / getters
     fn generate_fields(
         &self,
         cwrappers: &HashMap<String, CWrapper>,
         debug_fields: &mut Vec<TokenStream>,
-    ) -> Vec<proc_macro2::TokenStream> {
+    ) -> Vec<TokenStream> {
         self.fields
             .iter()
             .filter(|arg| {
@@ -824,7 +877,7 @@ impl CWrapper {
             })
             .map(|arg| {
                 let field_name = &arg.name;
-                let fn_name = syn::Ident::new(field_name, proc_macro2::Span::call_site());
+                let fn_name = Ident::new(field_name, proc_macro2::Span::call_site());
 
                 let mut arg = arg.clone();
                 // for mut strings return just &str not &mut str
@@ -870,10 +923,7 @@ impl CWrapper {
     }
 
     /// Generate the constructor for the struct
-    fn generate_constructor(
-        &self,
-        wrappers: &HashMap<String, CWrapper>,
-    ) -> Vec<proc_macro2::TokenStream> {
+    fn generate_constructor(&self, wrappers: &HashMap<String, CWrapper>) -> Vec<TokenStream> {
         let constructors = self
             .methods
             .iter()
@@ -888,7 +938,7 @@ impl CWrapper {
                     && close_method.unwrap().arguments.iter().skip(1).all(|a| method.arguments.iter().any(|a2| a.name == a2.name));
                 if found_close {
                     let close_fn = format_ident!("{}", close_method.unwrap().fn_name);
-                    let init_args: Vec<proc_macro2::TokenStream> = method
+                    let init_args: Vec<TokenStream> = method
                         .arguments
                         .iter()
                         .enumerate()
@@ -902,7 +952,7 @@ impl CWrapper {
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
-                    let close_args: Vec<proc_macro2::TokenStream> = close_method
+                    let close_args: Vec<TokenStream> = close_method
                         .unwrap_or(method)
                         .arguments
                         .iter()
@@ -921,10 +971,10 @@ impl CWrapper {
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
-                    let lets: Vec<proc_macro2::TokenStream> = Self::lets_for_copying_arguments(wrappers, &method.arguments, true);
-                    let drop_copies: Vec<proc_macro2::TokenStream> = Self::drop_copies(wrappers, &method.arguments);
+                    let lets: Vec<TokenStream> = Self::lets_for_copying_arguments(wrappers, &method.arguments, true);
+                    let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &method.arguments);
 
-                    let new_args: Vec<proc_macro2::TokenStream> = method
+                    let new_args: Vec<TokenStream> = method
                         .arguments
                         .iter()
                         .enumerate()
@@ -955,7 +1005,7 @@ impl CWrapper {
 
                     // panic!("{}", lets.clone().iter().map(|s|s.to_string()).join("\n"));
 
-                    let generic_types: Vec<proc_macro2::TokenStream> = method
+                    let generic_types: Vec<TokenStream> = method
                         .arguments
                         .iter()
                         .flat_map(|arg| {
@@ -971,7 +1021,7 @@ impl CWrapper {
                     };
 
 
-                    let method_docs: Vec<proc_macro2::TokenStream> =
+                    let method_docs: Vec<TokenStream> =
                         get_docs(&method.docs, wrappers, Some(&new_args));
 
                     quote! {
@@ -1031,7 +1081,7 @@ impl CWrapper {
             };
             if self.has_default_method() {
                 let type_name = format_ident!("{}", self.type_name);
-                let new_args: Vec<proc_macro2::TokenStream> = self
+                let new_args: Vec<TokenStream> = self
                     .fields
                     .iter()
                     .filter_map(|arg| {
@@ -1046,7 +1096,7 @@ impl CWrapper {
                     })
                     .filter(|t| !t.is_empty())
                     .collect();
-                let init_args: Vec<proc_macro2::TokenStream> = self
+                let init_args: Vec<TokenStream> = self
                     .fields
                     .iter()
                     .map(|arg| {
@@ -1058,7 +1108,7 @@ impl CWrapper {
                     .filter(|t| !t.is_empty())
                     .collect();
 
-                let generic_types: Vec<proc_macro2::TokenStream> = self
+                let generic_types: Vec<TokenStream> = self
                     .fields
                     .iter()
                     .flat_map(|arg| {
@@ -1079,10 +1129,9 @@ impl CWrapper {
                     .filter(|a| a.processing == ArgProcessing::Default)
                     .cloned()
                     .collect_vec();
-                let lets: Vec<proc_macro2::TokenStream> =
+                let lets: Vec<TokenStream> =
                     Self::lets_for_copying_arguments(wrappers, &cloned_fields, false);
-                let drop_copies: Vec<proc_macro2::TokenStream> =
-                    Self::drop_copies(wrappers, &self.fields);
+                let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &self.fields);
 
                 vec![quote! {
                     #[inline]
@@ -1317,7 +1366,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
 
     let fn_name = format_ident!("{}_callback", handler.type_name);
     let closure_fn_name = format_ident!("{}_callback_for_once_closure", handler.type_name);
-    let doc_comments: Vec<proc_macro2::TokenStream> = handler
+    let doc_comments: Vec<TokenStream> = handler
         .docs
         .iter()
         .flat_map(|doc| doc.lines())
@@ -1351,19 +1400,19 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
             .replace("aeron_", "")
     );
 
-    let args: Vec<proc_macro2::TokenStream> = handler
+    let args: Vec<TokenStream> = handler
         .args
         .iter()
         .map(|arg| {
             let arg_name = arg.as_ident();
             // do not need to convert as its calling hour handler
-            let arg_type: syn::Type = arg.as_type();
+            let arg_type: Type = arg.as_type();
             quote! { #arg_name: #arg_type }
         })
         .filter(|t| !t.is_empty())
         .collect();
 
-    let converted_args: Vec<proc_macro2::TokenStream> = handler
+    let converted_args: Vec<TokenStream> = handler
         .args
         .iter()
         .filter_map(|arg| {
@@ -1379,7 +1428,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
         .filter(|t| !t.is_empty())
         .collect();
 
-    let closure_args: Vec<proc_macro2::TokenStream> = handler
+    let closure_args: Vec<TokenStream> = handler
         .args
         .iter()
         .filter_map(|arg| {
@@ -1397,7 +1446,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
                 let type_name = if !return_type.original.is_primitive()
                     && type_name.to_string().contains("&")
                 {
-                    syn::parse_str(&type_name.to_string().replace("&", "& 'static")).unwrap()
+                    parse_str(&type_name.to_string().replace("&", "& 'static")).unwrap()
                 } else {
                     type_name
                 };
@@ -1410,7 +1459,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
         .collect();
 
     let mut log_field_names = vec![];
-    let closure_args_in_logger: Vec<proc_macro2::TokenStream> = handler
+    let closure_args_in_logger: Vec<TokenStream> = handler
         .args
         .iter()
         .filter_map(|arg| {
@@ -1441,7 +1490,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
         log_field_names.push(Some(quote! { "" }));
     }
 
-    let fn_mut_args: Vec<proc_macro2::TokenStream> = handler
+    let fn_mut_args: Vec<TokenStream> = handler
         .args
         .iter()
         .filter_map(|arg| {
@@ -1460,7 +1509,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
                 let type_name = if !return_type.original.is_primitive()
                     && type_name.to_string().contains("&")
                 {
-                    syn::parse_str(&type_name.to_string().replace("&", "& 'static ")).unwrap()
+                    parse_str(&type_name.to_string().replace("&", "& 'static ")).unwrap()
                 } else {
                     type_name
                 };
@@ -1487,7 +1536,7 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
         }
     };
 
-    let wrapper_closure_args: Vec<proc_macro2::TokenStream> = handler
+    let wrapper_closure_args: Vec<TokenStream> = handler
         .args
         .iter()
         .filter_map(|arg| {
@@ -1598,9 +1647,9 @@ pub fn generate_rust_code(
     include_clippy: bool,
     include_aeron_client_registering_resource_t: bool,
     closure_handlers: &Vec<CHandler>,
-) -> proc_macro2::TokenStream {
-    let class_name = syn::Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
-    let type_name = syn::Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
+) -> TokenStream {
+    let class_name = Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
+    let type_name = Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
     let methods = wrapper.generate_methods(wrappers, closure_handlers);
     let constructor = wrapper.generate_constructor(wrappers);
@@ -1664,7 +1713,7 @@ pub fn generate_rust_code(
                     .replace("async_", "")
             );
 
-            let init_args: Vec<proc_macro2::TokenStream> = poll_method
+            let init_args: Vec<TokenStream> = poll_method
                 .arguments
                 .iter()
                 .enumerate()
@@ -1681,7 +1730,7 @@ pub fn generate_rust_code(
                 .filter(|t| !t.is_empty())
                 .collect();
 
-            let new_args: Vec<proc_macro2::TokenStream> = poll_method
+            let new_args: Vec<TokenStream> = poll_method
                 .arguments
                 .iter()
                 .enumerate()
@@ -1702,7 +1751,7 @@ pub fn generate_rust_code(
                 .filter(|t| !t.is_empty())
                 .collect();
 
-            let async_init_args: Vec<proc_macro2::TokenStream> = new_method
+            let async_init_args: Vec<TokenStream> = new_method
                 .arguments
                 .iter()
                 .enumerate()
@@ -1719,7 +1768,7 @@ pub fn generate_rust_code(
                 .filter(|t| !t.is_empty())
                 .collect();
 
-            let generic_types: Vec<proc_macro2::TokenStream> = new_method
+            let generic_types: Vec<TokenStream> = new_method
                 .arguments
                 .iter()
                 .flat_map(|arg| {
@@ -1733,7 +1782,7 @@ pub fn generate_rust_code(
             } else {
                 quote! { <#(#generic_types),*> }
             };
-            let generic_types: Vec<proc_macro2::TokenStream> = poll_method
+            let generic_types: Vec<TokenStream> = poll_method
                 .arguments
                 .iter()
                 .flat_map(|arg| {
@@ -1747,7 +1796,7 @@ pub fn generate_rust_code(
             } else {
                 quote! { <#(#generic_types),*> }
             };
-            let async_new_args: Vec<proc_macro2::TokenStream> = new_method
+            let async_new_args: Vec<TokenStream> = new_method
                 .arguments
                 .iter()
                 .enumerate()
@@ -1770,7 +1819,7 @@ pub fn generate_rust_code(
 
             let async_new_args_for_client = async_new_args.iter().skip(1).cloned().collect_vec();
 
-            let async_new_args_name_only: Vec<proc_macro2::TokenStream> = new_method
+            let async_new_args_name_only: Vec<TokenStream> = new_method
                 .arguments
                 .iter()
                 .enumerate()
@@ -1928,7 +1977,7 @@ pub fn generate_rust_code(
 
         TokenStream::from_str(code.as_str()).unwrap()
     };
-    let class_docs: Vec<proc_macro2::TokenStream> = wrapper
+    let class_docs: Vec<TokenStream> = wrapper
         .docs
         .iter()
         .map(|doc| {
