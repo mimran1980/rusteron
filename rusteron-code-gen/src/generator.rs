@@ -1095,7 +1095,7 @@ impl CWrapper {
                             0
                         },
                         None,
-                        true
+                        false,
                     )?;
 
                     Ok(Self { inner: std::rc::Rc::new(resource) })
@@ -2024,7 +2024,7 @@ pub fn generate_rust_code(
 
             impl #class_name {
                 /// Regular clone just increases the reference count of underlying count.
-                /// `clone_struct` shallow copies the content of the underlying struct.
+                /// `clone_struct` shallow copies the content of the underlying struct on heap.
                 ///
                 /// NOTE: if the struct has references to other structs these will not be copied
                 ///
@@ -2039,7 +2039,7 @@ pub fn generate_rust_code(
 
                 /// The underlying c struct is stored on stack instead of heap. _(use with extra care)_
                 pub fn default_on_stack() -> Self {
-                    #class_name::new_zeroed().expect("failed to create struct")
+                    #class_name::new_zeroed_on_stack().expect("failed to create struct")
                 }
             }
         }
