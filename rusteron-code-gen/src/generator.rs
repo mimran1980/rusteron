@@ -1080,26 +1080,6 @@ impl CWrapper {
 
                     Ok(Self { inner: std::rc::Rc::new(resource) })
                 }
-
-               #[inline]
-                /// creates zeroed struct where the underlying c struct is on the stack
-                /// _(Use with care)_
-                pub fn new_zeroed_on_stack() -> Result<Self, AeronCError> {
-                    let resource = ManagedCResource::new(
-                        move |ctx_field| {
-                            #[cfg(debug_assertions)]
-                            log::debug!("creating zeroed empty resource on stack {}", stringify!(#type_name));
-                            let mut inst: std::mem::MaybeUninit<#type_name> = std::mem::MaybeUninit::new(unsafe { std::mem::zeroed() });
-                            let inner_ptr: *mut #type_name = inst.as_mut_ptr();
-                            unsafe { *ctx_field = inner_ptr };
-                            0
-                        },
-                        None,
-                        false,
-                    )?;
-
-                    Ok(Self { inner: std::rc::Rc::new(resource) })
-                }
             };
             if self.has_default_method() {
                 let type_name = format_ident!("{}", self.type_name);
@@ -2035,11 +2015,6 @@ pub fn generate_rust_code(
                     let copy = Self::default();
                     copy.inner.get_mut().clone_from(self.deref());
                     copy
-                }
-
-                /// The underlying c struct is stored on stack instead of heap. _(use with extra care)_
-                pub fn default_on_stack() -> Self {
-                    #class_name::new_zeroed_on_stack().expect("failed to create struct")
                 }
             }
         }
