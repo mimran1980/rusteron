@@ -49,6 +49,7 @@ impl<T> ManagedCResource<T> {
             cleanup_struct,
             borrowed: false,
         };
+        #[cfg(debug_assertions)]
         log::debug!("created c resource: {:?}", result);
         Ok(result)
     }
@@ -96,10 +97,12 @@ impl<T> Drop for ManagedCResource<T> {
         if !self.resource.is_null() && !self.borrowed {
             let resource = self.resource.clone();
             // Ensure the clean-up function is called when the resource is dropped.
+            #[cfg(debug_assertions)]
             log::debug!("closing c resource: {:?}", self);
             let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
 
             if self.cleanup_struct {
+                #[cfg(debug_assertions)]
                 log::debug!("closing rust struct resource: {:?}", resource);
                 unsafe {
                     let _ = Box::from_raw(resource);
