@@ -11,6 +11,7 @@ use std::{any, fmt, ptr};
 /// are properly released when they go out of scope.
 pub struct ManagedCResource<T> {
     resource: *mut T,
+    resource_on_stack: Option<std::mem::MaybeUninit<T>>,
     cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
     cleanup_struct: bool,
     borrowed: bool,
@@ -45,6 +46,7 @@ impl<T> ManagedCResource<T> {
 
         let result = Self {
             resource,
+            resource_on_stack: None,
             cleanup,
             cleanup_struct,
             borrowed: false,
@@ -57,6 +59,7 @@ impl<T> ManagedCResource<T> {
     pub fn new_borrowed(value: *const T) -> Self {
         Self {
             resource: value as *mut _,
+            resource_on_stack: None,
             cleanup: None,
             cleanup_struct: false,
             borrowed: true,
@@ -85,6 +88,7 @@ impl<T> ManagedCResource<T> {
                     return Err(AeronCError::from_code(result));
                 }
                 self.resource = std::ptr::null_mut();
+                self.resource_on_stack.take();
             }
         }
 
