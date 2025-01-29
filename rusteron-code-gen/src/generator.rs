@@ -1034,13 +1034,13 @@ impl CWrapper {
                             })));
                             let resource_constructor = ManagedCResource::new(
                                 move |ctx_field| unsafe { #init_fn(#(#init_args),*) },
-                                move |ctx_field| {
+                                Some(Box::new(move |ctx_field| {
                                     let result = unsafe { #close_fn(#(#close_args),*) };
                                     if let Some(drop_closure) = drop_copies_closure.borrow_mut().take() {
                                        drop_closure();
                                     }
                                     result
-                                },
+                                })),
                                 false
                             )?;
 
@@ -1072,7 +1072,7 @@ impl CWrapper {
                             unsafe { *ctx_field = inner_ptr };
                             0
                         },
-                        move |_ctx_field| { 0 },
+                        None,
                         true
                     )?;
 
@@ -1148,12 +1148,12 @@ impl CWrapper {
                                 unsafe { *ctx_field = inner_ptr };
                                 0
                             },
-                            move |_ctx_field| {
+                            Some(Box::new(move |_ctx_field| {
                                 if let Some(drop_closure) = drop_copies_closure.borrow_mut().take() {
                                        drop_closure();
                                 }
                                 0
-                            },
+                            })),
                             true
                         )?;
 
@@ -1848,10 +1848,7 @@ pub fn generate_rust_code(
                                 move |ctx_field| unsafe {
                                     #poll_method_name(#(#init_args),*)
                                 },
-                                move |_ctx_field| {
-                                    // TODO is there any cleanup to do
-                                    0
-                                },
+                                None,
                                 false
                             )?;
                             Ok(Self {
@@ -1899,10 +1896,7 @@ pub fn generate_rust_code(
                                 move |ctx_field| unsafe {
                                     #new_method_name(#(#async_init_args),*)
                                 },
-                                move |_ctx_field| {
-                                    // TODO is there any cleanup to do
-                                    0
-                                },
+                                None,
                                 false
                             )?;
                             Ok(Self {
