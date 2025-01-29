@@ -261,7 +261,7 @@ mod tests {
             std::thread::spawn(move || {
                 let binding = "1".repeat(string_len);
                 let msg = binding.as_bytes();
-                let buffer = AeronBufferClaim::default();
+                let buffer = AeronBufferClaim::default_on_stack();
                 loop {
                     if stop.load(Ordering::Acquire) || publisher.is_closed() {
                         break;
@@ -430,7 +430,7 @@ mod tests {
         let reader = aeron.counters_reader();
         assert_eq!(reader.get_counter_label(counter_id, 256)?, "label_buffer");
         assert_eq!(reader.get_counter_key(counter_id)?, "key".as_bytes());
-        let buffers = AeronCountersReaderBuffers::default();
+        let buffers = AeronCountersReaderBuffers::default_on_stack();
         reader.get_buffers(&buffers)?;
 
         let _ = publisher_handler.join().unwrap();

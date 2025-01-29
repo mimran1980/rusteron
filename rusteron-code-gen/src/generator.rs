@@ -1063,13 +1063,34 @@ impl CWrapper {
             let type_name = format_ident!("{}", self.type_name);
             let zeroed_impl = quote! {
                 #[inline]
+                /// creates zeroed struct where the underlying c struct is on the heap
                 pub fn new_zeroed() -> Result<Self, AeronCError> {
                     let resource = ManagedCResource::new(
                         move |ctx_field| {
                             #[cfg(debug_assertions)]
-                            log::debug!("creating zeroed empty resource {}", stringify!(#type_name));
+                            log::debug!("creating zeroed empty resource on heap {}", stringify!(#type_name));
                             let inst: #type_name = unsafe { std::mem::zeroed() };
                             let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
+                            unsafe { *ctx_field = inner_ptr };
+                            0
+                        },
+                        None,
+                        true
+                    )?;
+
+                    Ok(Self { inner: std::rc::Rc::new(resource) })
+                }
+
+               #[inline]
+                /// creates zeroed struct where the underlying c struct is on the stack
+                /// _(Use with care)_
+                pub fn new_zeroed_on_stack() -> Result<Self, AeronCError> {
+                    let resource = ManagedCResource::new(
+                        move |ctx_field| {
+                            #[cfg(debug_assertions)]
+                            log::debug!("creating zeroed empty resource on stack {}", stringify!(#type_name));
+                            let mut inst: std::mem::MaybeUninit<#type_name> = std::mem::MaybeUninit::new(unsafe { std::mem::zeroed() });
+                            let inner_ptr: *mut #type_name = inst.as_mut_ptr();
                             unsafe { *ctx_field = inner_ptr };
                             0
                         },
@@ -1997,7 +2018,7 @@ pub fn generate_rust_code(
             /// This will create an instance where the struct is zeroed, use with care
             impl Default for #class_name {
                 fn default() -> Self {
-                    #class_name::new_zeroed().unwrap()
+                    #class_name::new_zeroed().expect("failed to create struct")
                 }
             }
 
@@ -2014,6 +2035,11 @@ pub fn generate_rust_code(
                     let copy = Self::default();
                     copy.inner.get_mut().clone_from(self.deref());
                     copy
+                }
+
+                /// The underlying c struct is stored on stack instead of heap. _(use with extra care)_
+                pub fn default_on_stack() -> Self {
+                    #class_name::new_zeroed().expect("failed to create struct")
                 }
             }
         }
