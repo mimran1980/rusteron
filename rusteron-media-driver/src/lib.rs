@@ -223,10 +223,6 @@ mod tests {
         info!("publication stream_id: {:?}", publication.stream_id());
         info!("publication status: {:?}", publication.channel_status());
 
-        // client.main_do_work();
-        // let claim = AeronBufferClaim::default();
-        // assert!(publication.try_claim(100, &claim) > 0, "publication claim is empty");
-
         stop.store(true, Ordering::SeqCst);
 
         Ok(())
