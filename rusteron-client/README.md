@@ -206,7 +206,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Handlers::no_unavailable_image_handler())?
         .poll_blocking(Duration::from_secs(5))?;
 
-    loop {
+    let mut count = 0;
+    while count < 10000 {
         subscription.poll_once(|msg: &[u8], header: AeronHeader| {
           println!(
             "Received a message from Aeron [position={:?}], msg length: {}",
@@ -214,6 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             msg.len()
           );
         }, 128)?;
+        count += 1;
     }
 
     stop.store(true, Ordering::SeqCst);

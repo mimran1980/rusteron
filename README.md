@@ -131,8 +131,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     let (closure, _inner) = Handler::leak_with_fragment_assembler(FragmentHandler)?;
 
-    loop {
+    let mut count = 0;
+    while count < 10000 {
         subscription.poll(Some(&closure), 128)?;
+      count += 1;
     }
     Ok(())
 }
