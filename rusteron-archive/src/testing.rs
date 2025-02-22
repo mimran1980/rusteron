@@ -1,6 +1,5 @@
 use crate::{
-    Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext,
-    AeronArchiveRecordingSignal, AeronContext, AeronIdleStrategyFuncClosure, Handler,
+    Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext, AeronContext, Handler, NoOpAeronIdleStrategyFunc,
 };
 use log::info;
 use log::{error, warn};
@@ -136,28 +135,8 @@ impl EmbeddedArchiveMediaDriverProcess {
                                 &self.recording_events_channel,
                             )
                         {
-                            let signal_consumer = Handler::leak(
-                                crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
-                                    |signal: AeronArchiveRecordingSignal| {
-                                        info!("Recording signal received: {:?}", signal);
-                                    },
-                                ),
-                            );
                             archive_context
-                                .set_recording_signal_consumer(Some(&signal_consumer))
-                                .expect("Failed to set recording signal consumer");
-                            let error_handler = Handler::leak(
-                                crate::AeronErrorHandlerClosure::from(|code, msg| {
-                                    error!("err code: {}, msg: {}", code, msg);
-                                }),
-                            );
-                            archive_context
-                                .set_error_handler(Some(&error_handler))
-                                .expect("unable to set error handler");
-                            archive_context
-                                .set_idle_strategy(Some(&Handler::leak(
-                                    AeronIdleStrategyFuncClosure::from(|_work_count| {}),
-                                )))
+                                .set_idle_strategy(Some(&Handler::leak(NoOpAeronIdleStrategyFunc)))
                                 .expect("unable to set idle strategy");
                             if let Ok(connect) = AeronArchiveAsyncConnect::new(&archive_context) {
                                 if let Ok(archive) = connect.poll_blocking(Duration::from_secs(10))

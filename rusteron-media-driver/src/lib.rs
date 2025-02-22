@@ -123,6 +123,7 @@ impl AeronDriver {
 mod tests {
     use super::*;
     use log::error;
+    use std::os::raw::c_int;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
@@ -164,14 +165,20 @@ mod tests {
         ctx.set_dir(&dir)?;
 
         let client = Aeron::new(&ctx)?;
-        let mut error_count = 0;
 
-        let error_handler = Some(Handler::leak(AeronErrorHandlerClosure::from(
-            |error_code, msg| {
+        #[derive(Default, Debug)]
+        struct ErrorCount {
+            error_count: usize,
+        }
+
+        impl AeronErrorHandlerCallback for ErrorCount {
+            fn handle_aeron_error_handler(&mut self, error_code: c_int, msg: &str) {
                 error!("Aeron error {}: {}", error_code, msg);
-                error_count += 1;
-            },
-        )));
+                self.error_count += 1;
+            }
+        }
+
+        let error_handler = Some(Handler::leak(ErrorCount::default()));
         ctx.set_error_handler(error_handler.as_ref())?;
 
         struct Test {}
@@ -240,13 +247,24 @@ mod tests {
 
         println!("{:#?}", ctx);
 
-        let closure = AeronAgentStartFuncClosure::from(|role| unsafe {
-            aeron_set_thread_affinity_on_start(
-                ctx.get_inner() as *mut _,
-                std::ffi::CString::new(role).unwrap().into_raw(),
-            );
-        });
-        ctx.set_agent_on_start_function(Some(&Handler::leak(closure)))?;
+        struct AgentStartHandler {
+            ctx: AeronDriverContext,
+        }
+
+        impl AeronAgentStartFuncCallback for AgentStartHandler {
+            fn handle_aeron_agent_on_start_func(&mut self, role: &str) -> () {
+                unsafe {
+                    aeron_set_thread_affinity_on_start(
+                        self.ctx.get_inner() as *mut _,
+                        std::ffi::CString::new(role).unwrap().into_raw(),
+                    );
+                }
+            }
+        }
+
+        ctx.set_agent_on_start_function(Some(&Handler::leak(AgentStartHandler {
+            ctx: ctx.clone(),
+        })))?;
 
         println!("{:#?}", ctx);
 

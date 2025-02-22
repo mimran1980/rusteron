@@ -125,17 +125,6 @@ pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
                                 recording_events_channel,
                             ) {
                                 Ok(archive_context) => {
-                                    archive_context
-                                        .set_recording_signal_consumer(Some(&signal_consumer))
-                                        .expect("Failed to set recording signal consumer");
-                                    archive_context
-                                        .set_error_handler(Some(&error_handler))
-                                        .expect("unable to set error handler");
-                                    archive_context
-                                        .set_idle_strategy(Some(&Handler::leak(
-                                            AeronIdleStrategyFuncClosure::from(|_work_count| {}),
-                                        )))
-                                        .expect("unable to set idle strategy");
                                     match AeronArchiveAsyncConnect::new(&archive_context) {
                                         Ok(connect) => {
                                             match connect.poll_blocking(Duration::from_secs(10)) {

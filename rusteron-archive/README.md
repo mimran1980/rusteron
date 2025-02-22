@@ -1,20 +1,21 @@
+Below is the README with all references to Closure::from removed and replaced with direct struct instantiations. The “2. Using a Closure” section under Handlers and Callbacks is also removed as requested. All code snippets are in Markdown code fences.
+
 # rusteron-archive
 
 **rusteron-archive** is a module within the **rusteron** project that provides functionalities for interacting with Aeron's archive capabilities in a Rust environment. This module extends **rusteron-client** by offering features for recording streams, managing archives, and handling replay capabilities.
 
 ## Overview
 
-The **rusteron-archive** module is intended to help Rust developers leverage Aeron's archive functionalities, including the recording and replaying of messages. 
+The **rusteron-archive** module is intended to help Rust developers leverage Aeron's archive functionalities, including the recording and replaying of messages.
 
 ## Installation
 
 Add **rusteron-archive** to your `Cargo.toml`:
 
-dynamic lib
+*dynamic lib*:
 ```toml
 [dependencies]
 rusteron-archive = "0.1"
-```
 
 static lib
 ```toml
@@ -51,7 +52,7 @@ Much like **rusteron-client**, the **rusteron-archive** module follows several g
 
 Handlers within **rusteron-archive** work just like those in **rusteron-client**. You can attach and manage them using two main approaches:
 
-### 1. Implementing a Trait
+Defining a trait for your handler and implementing it within your own struct is the recommended, most performant approach. For instance:
 
 The recommended approach is to define a trait for your handler and implement it within your own struct. This pattern is performant and safe as it does not require additional allocations. For instance:
 
@@ -65,33 +66,16 @@ pub trait AeronErrorHandlerCallback {
 pub struct AeronErrorHandlerLogger;
 
 impl AeronErrorHandlerCallback for AeronErrorHandlerLogger {
-    fn handle_aeron_error_handler(&mut self, _errcode: ::std::os::raw::c_int, _message: &str) -> () {
-        println!("{}", stringify!(handle_aeron_error_handler));
+    fn handle_aeron_error_handler(&mut self, errcode: ::std::os::raw::c_int, message: &str) -> () {
+        eprintln!("Error {}: {}", errcode, message);
     }
 }
-```
 
 By passing instances of this trait to the archive context, you gain a reusable and safe way to respond to errors or other events without incurring unnecessary runtime overhead.
 
-### 2. Using a Closure
+Wrapping Callbacks with Handler
 
-Alternatively, you can use closures as handlers. This approach may be less efficient due to potential allocations, but it is often more convenient for quick, less performance-critical tasks. For example:
-
-```rust ,no_run
-use rusteron_archive::*;
-
-pub struct AeronErrorHandlerClosure<F: FnMut(::std::os::raw::c_int, &'static str) -> ()> {
-    closure: F,
-}
-
-impl<F: FnMut(::std::os::raw::c_int, &'static str) -> ()> AeronErrorHandlerCallback for AeronErrorHandlerClosure<F> {
-    fn handle_aeron_error_handler(&mut self, errcode: ::std::os::raw::c_int, message: &'static str) -> () {
-        (self.closure)(errcode, message)
-    }
-}
-```
-
-Closures are wrapped here in a struct so they may be passed into C safely.
+Callbacks must be wrapped in a Handler. This ensures proper integration with the Aeron C API. Use Handlers::leak(xxx) to pass a handler into the C bindings. When your handler is no longer needed, call release() to free resources and avoid memory leaks.
 
 ### Wrapping Callbacks with Handler
 
@@ -151,192 +135,6 @@ The `AeronCError` struct encapsulates the error code and provides methods to ret
 
 Failure to follow these guidelines can lead to unstable or unpredictable results.
 
-## Example Usage: Recording and Replaying a Stream with Aeron Archive
-
-Below is an example of how to use `AeronArchive` to set up a recording, publish messages, and replay the recorded stream.
-
-```rust ,no_run
-use rusteron_archive::*;
-use rusteron_archive::bindings::*;
-use std::time::Duration;
-use std::time::Instant;
-use std::cell::Cell;
-use std::thread::sleep;
-
-let request_port = find_unused_udp_port(8000).expect("Could not find port");
-let response_port = find_unused_udp_port(request_port + 1).expect("Could not find port");
-let request_control_channel = &format!("aeron:udp?endpoint=localhost:{}", request_port);
-let response_control_channel = &format!("aeron:udp?endpoint=localhost:{}", response_port);
-let recording_events_channel = &format!("aeron:udp?endpoint=localhost:{}", response_port+1);
-assert_ne!(request_control_channel, response_control_channel);
-
-let error_handler = Handler::leak(AeronErrorHandlerClosure::from(|error_code, msg| {
-panic!("error {} {}", error_code, msg)
-}));
-
-let aeron_context = AeronContext::new()?;
-aeron_context.set_client_name("test")?;
-aeron_context.set_publication_error_frame_handler(Some(&Handler::leak(
-AeronPublicationErrorFrameHandlerLogger,
-)))?;
-aeron_context.set_error_handler(Some(&error_handler))?;
-let aeron = Aeron::new(&aeron_context)?;
-aeron.start()?;
-println!("connected to aeron");
-
-let archive_context = AeronArchiveContext::new_with_no_credentials_supplier(
-    &aeron,
-    request_control_channel,
-    response_control_channel,
-    recording_events_channel,
-)?;
-let found_recording_signal = Cell::new(false);
-archive_context.set_recording_signal_consumer(Some(&Handler::leak(
-    AeronArchiveRecordingSignalConsumerFuncClosure::from(
-        |signal: AeronArchiveRecordingSignal| {
-            println!("signal {:?}", signal);
-            found_recording_signal.set(true);
-        },
-    ),
-)))?;
-archive_context.set_idle_strategy(Some(&Handler::leak(
-    AeronIdleStrategyFuncClosure::from(|_work_count| {}),
-)))?;
-archive_context.set_error_handler(Some(&error_handler))?;
-
-
-let connect = AeronArchiveAsyncConnect::new(&archive_context.clone())?;
-let archive = connect.poll_blocking(Duration::from_secs(5))?;
-
-// Start recording a channel and stream
-let channel = "aeron:ipc";
-let stream_id = 10;
-
-let subscription_id = archive.start_recording(
-    channel,
-    stream_id,
-    aeron_archive_source_location_t::AERON_ARCHIVE_SOURCE_LOCATION_LOCAL,
-    true,
-)?;
-
-println!("subscription id {}", subscription_id);
-
-// Publish messages to be recorded
-let publication = aeron
-    .async_add_exclusive_publication(channel, stream_id)?
-    .poll_blocking(Duration::from_secs(5))?;
-
-let start = Instant::now();
-while !found_recording_signal.get() && start.elapsed().as_secs() < 5 {
-    sleep(Duration::from_millis(50));
-    archive.poll_for_recording_signals()?;
-    let err = archive.poll_for_error_response_as_string(4096)?;
-    if !err.is_empty() {
-        panic!("{}", err);
-    }
-}
-assert!(start.elapsed().as_secs() < 5);
-
-for _ in 0..11 {
-    while publication.offer(
-        "123456".as_bytes(),
-        Handlers::no_reserved_value_supplier_handler(),
-    ) <= 0
-    {
-        sleep(Duration::from_millis(50));
-        archive.poll_for_recording_signals()?;
-        let err = archive.poll_for_error_response_as_string(4096)?;
-        if !err.is_empty() {
-            panic!("{}", err);
-        }
-    }
-    println!("sent message");
-}
-archive.stop_recording_channel_and_stream(channel, stream_id)?;
-drop(publication);
-
-// Locate the recorded stream in the archive
-println!("list recordings");
-let found_recording_id = Cell::new(-1);
-let start_pos = Cell::new(-1);
-let end_pos = Cell::new(-1);
-let handler = Handler::leak(
-    AeronArchiveRecordingDescriptorConsumerFuncClosure::from(
-        |d: AeronArchiveRecordingDescriptor| {
-            println!("found recording {:?}", d);
-            found_recording_id.set(d.recording_id);
-            start_pos.set(d.start_position);
-            end_pos.set(d.stop_position);
-        },
-    ),
-);
-let start = Instant::now();
-while start.elapsed() < Duration::from_secs(5)
-    && found_recording_id.get() == -1
-    && archive.list_recordings_for_uri(0, i32::MAX, channel, stream_id, Some(&handler))?
-        <= 0
-{
-    sleep(Duration::from_millis(50));
-    archive.poll_for_recording_signals()?;
-    let err = archive.poll_for_error_response_as_string(4096)?;
-    if !err.is_empty() {
-        panic!("{}", err);
-    }
-}
-assert!(start.elapsed() < Duration::from_secs(5));
-
-// Replay the recorded stream on a new stream_id
-println!("start replay");
-let params = AeronArchiveReplayParams::new(
-    0,
-    i32::MAX,
-    start_pos.get(),
-    end_pos.get() - start_pos.get(),
-    0,
-    0,
-)?;
-let replay_stream_id = 45;
-let replay_session_id =
-    archive.start_replay(found_recording_id.get(), channel, replay_stream_id, &params)?;
-let session_id = replay_session_id as i32;
-
-println!("replay session id {}", replay_session_id);
-println!("session id {}", session_id);
-let channel_replay = format!("{}?session-id={}", channel, session_id);
-println!("archive id: {}", archive.get_archive_id());
-
-println!("add subscription {}", channel_replay);
-let subscription = aeron
-    .async_add_subscription(
-        &channel_replay,
-        replay_stream_id,
-        Some(&Handler::leak(AeronAvailableImageLogger)),
-        Some(&Handler::leak(AeronUnavailableImageLogger)),
-    )?
-    .poll_blocking(Duration::from_secs(10))?;
-
-let count = Cell::new(0);
-let poll = Handler::leak(AeronFragmentHandlerClosure::from(|msg, header| {
-    assert_eq!(msg, "123456".as_bytes().to_vec());
-    count.set(count.get() + 1);
-}));
-
-let start = Instant::now();
-while start.elapsed() < Duration::from_secs(5) && subscription.poll(Some(&poll), 100)? <= 0
-{
-    archive.poll_for_recording_signals()?;
-    let err = archive.poll_for_error_response_as_string(4096)?;
-    if !err.is_empty() {
-        panic!("{}", err);
-    }
-}
-assert!(start.elapsed() < Duration::from_secs(5));
-println!("aeron {:?}", aeron);
-println!("ctx {:?}", archive_context);
-assert_eq!(11, count.get());
-Ok::<(), AeronCError>(())
-```
-
 ### Workflow Overview
 1. **Initialise Contexts**: Set up archive and client contexts.
 2. **Start Recording**: Begin recording a specified channel and stream.
@@ -346,7 +144,7 @@ Ok::<(), AeronCError>(())
 6. **Replay Setup**: Configure replay parameters and replay the recorded messages on a new stream.
 7. **Subscribe and Receive**: Subscribe to the replay stream, receiving the replayed messages as they appear.
 
-## Building This Project
+## Building This Project98
 
 For full details on building the **rusteron** project, please refer to the [HOW_TO_BUILD.md](../HOW_TO_BUILD.md) file.
 

@@ -1393,8 +1393,6 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
     let closure_type_name = format_ident!("{}Callback", snake_to_pascal_case(&handler.type_name));
     let closure_return_type = handler.return_type.as_type();
 
-    let wrapper_closure_type_name =
-        format_ident!("{}Closure", snake_to_pascal_case(&handler.type_name));
     let logger_type_name = format_ident!("{}Logger", snake_to_pascal_case(&handler.type_name));
 
     let handle_method_name = format_ident!(
@@ -1593,29 +1591,6 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
             /// No handler is set i.e. None with correct type
             pub fn #no_method_name() -> Option<&'static Handler<#logger_type_name>> {
                 None::<&Handler<#logger_type_name>>
-            }
-        }
-
-        /// Utility class designed to simplify the creation of handlers by allowing the use of closures.
-        /// Note due to lifetime issues with FnMut, all arguments will be owned i.e. performs allocation for strings
-        /// This is not the case if you use the trait instead of closure
-        ///
-        /// _(note you must copy any arguments that you use afterwards even those with static lifetimes)_
-        pub struct #wrapper_closure_type_name<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> {
-            closure: F,
-        }
-
-        impl<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> #closure_type_name for #wrapper_closure_type_name<F> {
-            fn #handle_method_name(&mut self, #(#closure_args),*) -> #closure_return_type {
-                (self.closure)(#(#wrapper_closure_args),*)
-            }
-        }
-
-        impl<F: FnMut(#(#fn_mut_args),*) -> #closure_return_type> From<F> for #wrapper_closure_type_name<F> {
-            fn from(value: F) -> Self {
-                Self {
-                    closure: value,
-                }
             }
         }
 
