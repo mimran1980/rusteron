@@ -1605,6 +1605,10 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
             if #closure_name.is_null() {
                 unimplemented!("closure should not be null")
             }
+            #[cfg(feature = "extra-logging")]
+            {
+                log::debug!("calling {}", stringify!(#handle_method_name));
+            }
             let closure: &mut F = &mut *(#closure_name as *mut F);
             closure.#handle_method_name(#(#converted_args),*)
         }
