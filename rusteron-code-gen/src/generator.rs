@@ -690,10 +690,7 @@ impl CWrapper {
                 if !c.closure_type_name.is_empty() {
                     where_clause = where_clause.replace(
                         &c.closure_type_name.to_string(),
-                        &c.fn_mut_signature
-                            .to_string()
-                            .replace("' static", "")
-                            .replace("'static", ""),
+                        &c.fn_mut_signature.to_string(),
                     );
                 }
             }
@@ -1450,13 +1447,6 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
             if type_name.is_empty() {
                 None
             } else {
-                let type_name = if !return_type.original.is_primitive()
-                    && type_name.to_string().contains("&")
-                {
-                    parse_str(&type_name.to_string().replace("&", "& 'static")).unwrap()
-                } else {
-                    type_name
-                };
                 Some(quote! {
                     #field_name: #type_name
                 })
@@ -1513,13 +1503,6 @@ pub fn generate_handlers(handler: &mut CHandler, bindings: &CBinding) -> TokenSt
                     parse_str(arg.c_type.split_whitespace().last().unwrap()).unwrap();
                 return Some(quote! { #owned_type });
             } else {
-                let type_name = if !return_type.original.is_primitive()
-                    && type_name.to_string().contains("&")
-                {
-                    parse_str(&type_name.to_string().replace("&", "& 'static ")).unwrap()
-                } else {
-                    type_name
-                };
                 return Some(quote! {
                     #type_name
                 });

@@ -15,8 +15,7 @@ check:
 # Automatically format code and fix simple Clippy warnings
 fix:
   cargo fmt --all
-  cargo clippy --allow-dirty --allow-staged --fix
-  cargo clippy --allow-dirty --allow-staged --fix -- -W unused_imports
+  cargo clippy --allow-dirty --allow-staged --fix -- -W unused_imports -W clippy::all
   cd rusteron-docker-samples/rusteron-dummy-example && just fix
 
 check-udeps:

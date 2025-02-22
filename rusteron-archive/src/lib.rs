@@ -542,7 +542,7 @@ mod tests {
     // pub fn test_failed_connect() -> Result<(), Box<dyn error::Error>> {
     //         env_logger::Builder::new()
     //         .is_test(true)
-    //         .filter_level(log::LevelFilter::Debug)
+    //         .filter_level(log::LevelFilter::Info)
     //         .init();
     //     let ctx = AeronArchiveContext::new()?;
     //     std::env::set_var("AERON_DRIVER_TIMEOUT", "1");
@@ -615,7 +615,7 @@ mod tests {
     pub fn test_aeron_archive() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
+            .filter_level(log::LevelFilter::Info)
             .try_init();
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()
             .expect("failed to kill all java processes");
@@ -773,11 +773,7 @@ mod tests {
         }
 
         impl AeronFragmentHandlerCallback for FragmentHandler {
-            fn handle_aeron_fragment_handler(
-                &mut self,
-                buffer: &'static [u8],
-                _header: AeronHeader,
-            ) {
+            fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], _header: AeronHeader) {
                 assert_eq!(buffer, "123456".as_bytes());
 
                 // Update count (using Cell for interior mutability)

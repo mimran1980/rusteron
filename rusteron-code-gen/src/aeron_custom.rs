@@ -629,7 +629,7 @@ impl AeronBufferClaim {
 
 pub struct AeronErrorLogger;
 impl AeronErrorHandlerCallback for AeronErrorLogger {
-    fn handle_aeron_error_handler(&mut self, error_code: std::ffi::c_int, msg: &'static str) -> () {
+    fn handle_aeron_error_handler(&mut self, error_code: std::ffi::c_int, msg: &str) -> () {
         log::error!("aeron error {}: {}", error_code, msg);
     }
 }

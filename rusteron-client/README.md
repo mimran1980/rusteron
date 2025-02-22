@@ -63,12 +63,12 @@ Alternatively, you can use closures as handlers. However, all arguments must be 
 ```rust,no_ignore
 use rusteron_client::*;
 
-pub struct AeronErrorHandlerClosure<F: FnMut(::std::os::raw::c_int, &'static str) -> ()> {
+pub struct AeronErrorHandlerClosure<F: FnMut(::std::os::raw::c_int, &str) -> ()> {
     closure: F,
 }
 
-impl<F: FnMut(::std::os::raw::c_int, &'static str) -> ()> AeronErrorHandlerCallback for AeronErrorHandlerClosure<F> {
-    fn handle_aeron_error_handler(&mut self, errcode: ::std::os::raw::c_int, message: &'static str) -> () {
+impl<F: FnMut(::std::os::raw::c_int, &str) -> ()> AeronErrorHandlerCallback for AeronErrorHandlerClosure<F> {
+    fn handle_aeron_error_handler(&mut self, errcode: ::std::os::raw::c_int, message: &str) -> () {
         (self.closure)(errcode, message)
     }
 }
@@ -155,6 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start embedded media driver for testing purposes
     let media_driver_ctx = AeronDriverContext::new()?;
     let (stop, driver_handle) = AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+    let stop2 = stop.clone();
     let stop3 = stop.clone();
 
     let ctx = AeronContext::new()?;
@@ -171,7 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start publishing messages
     let message = "Hello, Aeron!".as_bytes();
     std::thread::spawn(move || {
-        while !stop.load(Ordering::Acquire) {
+        while !stop2.load(Ordering::Acquire) {
             if publisher.offer(message, Handlers::no_reserved_value_supplier_handler()) > 0 {
                 println!("Sent message: Hello, Aeron!");
             }

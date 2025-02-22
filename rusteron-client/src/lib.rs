@@ -51,7 +51,7 @@ mod tests {
     fn version_check() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
+            .filter_level(log::LevelFilter::Info)
             .try_init();
         let major = unsafe { crate::aeron_version_major() };
         let minor = unsafe { crate::aeron_version_minor() };
@@ -75,7 +75,7 @@ mod tests {
     pub fn simple_large_send() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
+            .filter_level(log::LevelFilter::Info)
             .try_init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
@@ -174,11 +174,7 @@ mod tests {
         }
 
         impl AeronFragmentHandlerCallback for FragmentHandler {
-            fn handle_aeron_fragment_handler(
-                &mut self,
-                buffer: &'static [u8],
-                header: AeronHeader,
-            ) {
+            fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) {
                 self.count_copy.fetch_add(1, Ordering::SeqCst);
 
                 if buffer.len() != self.string_len {
@@ -259,7 +255,7 @@ mod tests {
     pub fn try_claim() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
+            .filter_level(log::LevelFilter::Info)
             .try_init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;
@@ -337,11 +333,7 @@ mod tests {
         }
 
         impl AeronFragmentHandlerCallback for FragmentHandler {
-            fn handle_aeron_fragment_handler(
-                &mut self,
-                buffer: &'static [u8],
-                header: AeronHeader,
-            ) {
+            fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) {
                 self.count_copy.fetch_add(1, Ordering::SeqCst);
 
                 if buffer.len() != self.string_len {
@@ -396,7 +388,7 @@ mod tests {
     pub fn counters() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
+            .filter_level(log::LevelFilter::Info)
             .try_init();
         let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
         media_driver_ctx.set_dir_delete_on_shutdown(true)?;

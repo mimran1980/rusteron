@@ -53,7 +53,7 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
     }
 
     impl AeronFragmentHandlerCallback for FragmentHandler {
-        fn handle_aeron_fragment_handler(&mut self, buffer: &'static [u8], header: AeronHeader) {
+        fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) {
             println!(
                 "received a message from aeron [position: {:?}, msg length:{}]",
                 header.position(),

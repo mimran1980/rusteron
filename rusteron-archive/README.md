@@ -89,7 +89,7 @@ If you do not need to set a particular handler, you can pass `None`. However, do
 use rusteron_archive::*;
 impl Handlers {
     #[doc = r" No handler is set i.e. None with correct type"]
-    pub fn no_error_handler_handler() -> Option<rust,no_ignoreHandler<AeronErrorHandlerLogger>> {
+    pub fn no_error_handler_handler() -> Option<& 'static Handler<AeronErrorHandlerLogger>> {
         None::<&Handler<AeronErrorHandlerLogger>>
     }
 }
