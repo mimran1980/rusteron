@@ -13,17 +13,10 @@ unsafe impl Send for AeronCounter {}
 unsafe impl Sync for AeronCounter {}
 
 impl AeronCnc {
-    pub fn new(aeron_dir: &str) -> Result<AeronCnc,AeronCError> {
+    pub fn new(aeron_dir: &str) -> Result<AeronCnc, AeronCError> {
+        let c_string = std::ffi::CString::new(aeron_dir).expect("CString conversion failed");
         let resource = ManagedCResource::new(
-            move |cnc| {
-                unsafe {
-                    aeron_cnc_init(
-                        cnc,
-                        std::ffi::CString::new(aeron_dir).expect("").as_ptr(),
-                        0,
-                    )
-                }
-            },
+            move |cnc| unsafe { aeron_cnc_init(cnc, c_string.as_ptr(), 0) },
             Some(Box::new(move |cnc| unsafe {
                 aeron_cnc_close(*cnc);
                 0

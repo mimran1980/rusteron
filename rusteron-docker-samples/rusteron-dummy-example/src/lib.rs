@@ -86,26 +86,12 @@ pub fn archive_connect() -> Result<(AeronArchive, Aeron), io::Error> {
         .expect("missing environment variable AERON_ARCHIVE_REPLICATION_CHANNEL");
 
     let start = Instant::now();
-    let signal_consumer =
-        Handler::leak(crate::AeronArchiveRecordingSignalConsumerFuncClosure::from(
-            |signal: AeronArchiveRecordingSignal| {
-                info!("Recording signal received: {:?}", signal);
-            },
-        ));
-
-    let error_handler = Handler::leak(crate::AeronErrorHandlerClosure::from(|code, msg| {
-        error!("err code: {}, msg: {}", code, msg);
-    }));
 
     while start.elapsed() < Duration::from_secs(30) {
         match AeronContext::new() {
             Ok(aeron_context) => {
                 aeron_context
-                    .set_error_handler(Some(&Handler::leak(AeronErrorHandlerClosure::from(
-                        |error_code, msg| {
-                            error!("aeron error {}: {}", error_code, msg);
-                        },
-                    ))))
+                    .set_error_handler(Some(&Handler::leak(AeronErrorHandlerLogger)))
                     .unwrap();
 
                 match Aeron::new(&aeron_context) {

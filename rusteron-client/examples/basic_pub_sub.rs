@@ -47,7 +47,6 @@ pub fn main() -> Result<(), Box<dyn error::Error>> {
         })
     };
 
-
     struct FragmentHandler {
         count: Cell<usize>,
         large_string_len: usize,

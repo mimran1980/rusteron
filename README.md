@@ -114,15 +114,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // if <0 its an error
     let result = publisher.offer(message, Handlers::no_reserved_value_supplier_handler());
 
-    let closure =
-        AeronFragmentHandlerClosure::from(move |msg: &[u8], header: AeronHeader| {
-            println!(
-                "received a message from aeron {:?}, msg length:{}",
-                header.position(),
-                msg.len()
-            );
-        });
-    let closure = Handler::leak_with_fragment_assembler(closure)?;
+        struct FragmentHandler;
+
+        impl AeronFragmentHandlerCallback for FragmentHandler {
+            fn handle_aeron_fragment_handler(
+                &mut self,
+                msg: &[u8],
+                header: AeronHeader,
+            ) {
+              println!(
+                  "received a message from aeron {:?}, msg length:{}",
+                  header.position(),
+                  msg.len()
+              );
+            }
+        }
+    let (closure, _inner) = Handler::leak_with_fragment_assembler(FragmentHandler)?;
 
     loop {
         subscription.poll(Some(&closure), 128)?;

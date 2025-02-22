@@ -1,5 +1,3 @@
-Below is the README with all references to Closure::from removed and replaced with direct struct instantiations. The “2. Using a Closure” section under Handlers and Callbacks is also removed as requested. All code snippets are in Markdown code fences.
-
 # rusteron-archive
 
 **rusteron-archive** is a module within the **rusteron** project that provides functionalities for interacting with Aeron's archive capabilities in a Rust environment. This module extends **rusteron-client** by offering features for recording streams, managing archives, and handling replay capabilities.
@@ -16,6 +14,7 @@ Add **rusteron-archive** to your `Cargo.toml`:
 ```toml
 [dependencies]
 rusteron-archive = "0.1"
+```
 
 static lib
 ```toml

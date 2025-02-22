@@ -1,5 +1,6 @@
 use crate::{
-    Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext, AeronContext, Handler, NoOpAeronIdleStrategyFunc,
+    Aeron, AeronArchive, AeronArchiveAsyncConnect, AeronArchiveContext, AeronContext, Handler,
+    NoOpAeronIdleStrategyFunc,
 };
 use log::info;
 use log::{error, warn};

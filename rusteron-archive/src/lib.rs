@@ -13,7 +13,6 @@
 //! - **`backtrace`** - When enabled will log a backtrace for each AeronCError
 //! - **`extra-logging`** - When enabled will log when resource is created and destroyed. useful if your seeing a segfault due to a resource being closed
 
-
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -798,7 +797,8 @@ mod tests {
         }
         assert!(
             start.elapsed() < Duration::from_secs(10),
-            "messages not received {:?}", poll.count
+            "messages not received {:?}",
+            poll.count
         );
         info!("aeron {:?}", aeron);
         info!("ctx {:?}", archive_context);

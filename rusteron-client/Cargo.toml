@@ -44,7 +44,6 @@ cmake = {  workspace = true }
 dunce = {  workspace = true }
 pkg-config = {  workspace = true }
 proc-macro2 = {  workspace = true }
-itertools = {  workspace = true }
 rusteron-code-gen = { workspace = true }
 log = { workspace = true}
 regex = { workspace = true}

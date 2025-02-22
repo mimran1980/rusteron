@@ -1,5 +1,7 @@
 # List all available tasks
 list:
+    cargo install cargo-udeps
+    cargo install cargo-edit
     cargo update
     just --list
 
@@ -14,7 +16,13 @@ check:
 fix:
   cargo fmt --all
   cargo clippy --allow-dirty --allow-staged --fix
+  cargo clippy --allow-dirty --allow-staged --fix -- -W unused_imports
   cd rusteron-docker-samples/rusteron-dummy-example && just fix
+
+check-udeps:
+  cargo +nightly tree --duplicate
+  cargo +nightly udeps
+
 
 # Clean the project by removing the target directory
 clean:
