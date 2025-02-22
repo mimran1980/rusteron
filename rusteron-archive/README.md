@@ -44,7 +44,7 @@ Much like **rusteron-client**, the **rusteron-archive** module follows several g
 - **Automatic Resource Management (`new` method only)**: The wrappers attempt to automatically manage resources, clearing objects and calling the appropriate close, destroy, or remove methods when needed.
 - **Manual Handler Management**: Callbacks and handlers require manual management. Handlers are passed into the C bindings using `Handlers::leak(xxx)`, and need to be explicitly released by calling `release()`. This manual process is required due to the complexity of determining when these handlers should be cleaned up once handed off to C.
   For methods where the callback is not stored and only used there and then e.g. poll, you can pass in a closure directory e.g.
-```rust ,ignore
+```rust,ignore
   subscription.poll_once(|msg, header| { println!("msg={:?}, header={:?}", msg, header) })
 ```
 
@@ -56,7 +56,7 @@ Defining a trait for your handler and implementing it within your own struct is 
 
 The recommended approach is to define a trait for your handler and implement it within your own struct. This pattern is performant and safe as it does not require additional allocations. For instance:
 
-```rust ,no_run
+```rust,no_ignore
 use rusteron_archive::*;
 
 pub trait AeronErrorHandlerCallback {
@@ -70,6 +70,7 @@ impl AeronErrorHandlerCallback for AeronErrorHandlerLogger {
         eprintln!("Error {}: {}", errcode, message);
     }
 }
+```
 
 By passing instances of this trait to the archive context, you gain a reusable and safe way to respond to errors or other events without incurring unnecessary runtime overhead.
 
@@ -85,11 +86,11 @@ Regardless of the approach, callbacks must be wrapped in a `Handler`. This ensur
 
 If you do not need to set a particular handler, you can pass `None`. However, doing so manually can be awkward due to static type requirements. To simplify this, **rusteron-archive** (like **rusteron-client**) provides convenience methods prefixed with `Handlers::no_...`, returning `None` with the correct type signature. For example:
 
-```rust ,ignore
+```rust,ignore
 use rusteron_archive::*;
 impl Handlers {
     #[doc = r" No handler is set i.e. None with correct type"]
-    pub fn no_error_handler_handler() -> Option<&'static Handler<AeronErrorHandlerLogger>> {
+    pub fn no_error_handler_handler() -> Option<rust,no_ignoreHandler<AeronErrorHandlerLogger>> {
         None::<&Handler<AeronErrorHandlerLogger>>
     }
 }

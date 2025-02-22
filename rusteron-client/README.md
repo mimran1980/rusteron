@@ -26,7 +26,7 @@ The **rusteron-client** module follows several general patterns to simplify the 
 - **Automatic Resource Management (`new` method only)**: The wrappers attempt to automatically manage resources, clearing objects and calling the appropriate close, destroy, or remove methods when needed.
 - **Manual Handler Management**: Callbacks and handlers require manual management. Handlers are passed into the C bindings using `Handlers::leak(xxx)`, and need to be explicitly released by calling `release()`. This manual process is required due to the complexity of determining when these handlers should be cleaned up once handed off to C. 
   For methods where the callback is not stored and only used there and then e.g. poll, you can pass in a closure directory e.g. 
-```rust ,ignore
+```rust,ignore
   subscription.poll_once(|msg, header| { println!("msg={:?}, header={:?}", msg, header) })
 ```
 
@@ -38,7 +38,7 @@ Handlers in **rusteron-client** play an important role in managing events such a
 
 The preferred approach is to implement the appropriate trait for your handler. This approach does not require allocations and allows you to maintain a performant, safe, and reusable implementation. For example:
 
-```rust ,no_run
+```rust,no_ignore
 use rusteron_client::*;
 
 pub trait AeronErrorHandlerCallback {
@@ -60,7 +60,7 @@ In this example, the `AeronErrorHandlerCallback` trait is implemented by `AeronE
 
 Alternatively, you can use closures as handlers. However, all arguments must be copied if your planning to use them later, even ones with static lifetimes. This method is not suitable for performance-sensitive roles but is more convenient for simpler, non-critical scenarios. Example:
 
-```rust ,no_run
+```rust,no_ignore
 use rusteron_client::*;
 
 pub struct AeronErrorHandlerClosure<F: FnMut(::std::os::raw::c_int, &'static str) -> ()> {
@@ -84,7 +84,7 @@ All callbacks need to be wrapped in a `Handler`. This helps ensure proper integr
 
 If you do not wish to set a handler or callback, you can pass `None`. Since this is a static mapping without dynamic dispatch (`dyn`), specifying the `None` type can be cumbersome. To simplify this, methods starting with `Handlers::no_xxx` are provided, allowing you to easily indicate that no handler is required without manually specifying the type. For example:
 
-```rust ,ignore
+```rust,ignore
 use rusteron_client::*;
 impl Handlers {
     #[doc = r" No handler is set i.e. None with correct type"]
@@ -143,7 +143,7 @@ Ensure you have also set up the necessary Aeron C libraries required by **ruster
 
 ## Usage Example
 
-```rust ,no_run
+```rust,no_ignore
 use rusteron_client::*;
 use rusteron_media_driver::{AeronDriverContext, AeronDriver};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -206,18 +206,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Handlers::no_unavailable_image_handler())?
         .poll_blocking(Duration::from_secs(5))?;
 
-    let closure = AeronFragmentHandlerClosure::from(move |msg: &[u8], header: AeronHeader| {
-        println!(
+    loop {
+        subscription.poll_once(|msg: &[u8], header: AeronHeader| {
+          println!(
             "Received a message from Aeron [position={:?}], msg length: {}",
             header.position(),
             msg.len()
-        );
-    });
-    let closure = Handler::leak(closure);
-
-    // Start receiving messages
-    loop {
-        subscription.poll(Some(&closure), 128)?;
+          );
+        }, 128)?;
     }
 
     stop.store(true, Ordering::SeqCst);
