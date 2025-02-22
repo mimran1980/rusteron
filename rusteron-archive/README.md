@@ -144,7 +144,7 @@ Failure to follow these guidelines can lead to unstable or unpredictable results
 6. **Replay Setup**: Configure replay parameters and replay the recorded messages on a new stream.
 7. **Subscribe and Receive**: Subscribe to the replay stream, receiving the replayed messages as they appear.
 
-## Building This Project98
+## Building This Project
 
 For full details on building the **rusteron** project, please refer to the [HOW_TO_BUILD.md](../HOW_TO_BUILD.md) file.
 
