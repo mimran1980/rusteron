@@ -301,10 +301,13 @@ impl<T> Handler<T> {
         self.raw_ptr as *mut std::os::raw::c_void
     }
 
-    pub fn release(self) {
+    pub fn release(&mut self) {
         if self.should_drop && !self.raw_ptr.is_null() {
             unsafe {
+                #[cfg(feature = "extra-logging")]
+                log::debug!("dropping handler {:?}", self.raw_ptr);
                 let _ = Box::from_raw(self.raw_ptr as *mut Box<T>);
+                self.should_drop = false;
             }
         }
     }
