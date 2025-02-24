@@ -1917,6 +1917,30 @@ pub fn generate_rust_code(
         quote! {}
     };
 
+    let mut additional_impls = vec![];
+
+    if wrapper
+        .methods
+        .iter()
+        .any(|m| m.struct_method_name == "closed")
+        || wrapper
+            .methods
+            .iter()
+            .any(|m| m.struct_method_name == "is_closed")
+    {
+        if !wrapper.methods.iter().any(|m| m.fn_name.contains("_init")) {
+            additional_impls.push(quote! {
+                impl Drop for #class_name {
+                    fn drop(&mut self) {
+                        if self.is_closed() {
+                            log::warn!("struct may have not been correctly closed {self:?}");
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     let common_code = if !include_common_code {
         quote! {}
     } else {
@@ -2095,6 +2119,8 @@ pub fn generate_rust_code(
                 }
             }
         }
+
+        #(#additional_impls)*
 
         // impl *mut #type_name {
         //     #[inline]
