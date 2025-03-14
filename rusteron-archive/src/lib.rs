@@ -121,7 +121,7 @@ unsafe extern "C" fn default_encoded_credentials(
 ) -> *mut aeron_archive_encoded_credentials_t {
     // Allocate a zeroed instance of `aeron_archive_encoded_credentials_t`
     let empty_credentials = Box::new(aeron_archive_encoded_credentials_t {
-        data: ptr::null(),
+        data: std::ptr::null(),
         length: 0,
     });
     Box::into_raw(empty_credentials)

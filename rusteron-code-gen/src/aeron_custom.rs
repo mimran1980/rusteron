@@ -81,11 +81,8 @@ impl AeronCncMetadata {
 impl AeronArchiveAsyncConnect {
     #[inline]
     pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
-        let resource_async = ManagedCResource::new(
-            move |ctx_field| unsafe { aeron_archive_async_connect(ctx_field, ctx.into()) },
-            None,
-            false,
-        )?;
+        let resource_async = Self::new(ctx)?;
+        resource_async.add_drop_dependa
         Ok(Self {
             inner: std::rc::Rc::new(resource_async),
             _aeron: Some(aeron.clone()),
@@ -93,28 +90,28 @@ impl AeronArchiveAsyncConnect {
     }
 }
 
-impl AutoCloseAeronSubscription {
+impl AeronSubscription {
     pub fn close_with_no_args(&mut self) -> Result<i32, AeronCError> {
         self.closed.set(true);
         self.inner.close(Handlers::no_notification_handler())
     }
 }
 
-impl AutoCloseAeronPublication {
+impl AeronPublication {
     pub fn close_with_no_args(&self) -> Result<i32, AeronCError> {
         self.closed.set(true);
         self.inner.close(Handlers::no_notification_handler())
     }
 }
 
-impl AutoCloseAeronExclusivePublication {
+impl AeronExclusivePublication {
     pub fn close_with_no_args(&self) -> Result<i32, AeronCError> {
         self.closed.set(true);
         self.inner.close(Handlers::no_notification_handler())
     }
 }
 
-impl AutoCloseAeronCounter {
+impl AeronCounter {
     pub fn close_with_no_args(&self) -> Result<i32, AeronCError> {
         self.closed.set(true);
         self.inner.close(Handlers::no_notification_handler())

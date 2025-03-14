@@ -1630,7 +1630,10 @@ pub fn generate_rust_code(
     let class_name = Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
     let type_name = Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
-    let methods = wrapper.generate_methods(wrappers, closure_handlers);
+
+    let mut additional_outer_impls = vec![];
+
+    let methods = wrapper.generate_methods(wrappers, closure_handlers, &mut additional_outer_impls);
     let constructor = wrapper.generate_constructor(wrappers);
 
     let async_impls = if wrapper.type_name.starts_with("aeron_async_")
