@@ -10,14 +10,6 @@ unsafe impl Send for AeronExclusivePublication {}
 unsafe impl Sync for AeronExclusivePublication {}
 unsafe impl Send for AeronCounter {}
 unsafe impl Sync for AeronCounter {}
-unsafe impl Send for AutoCloseAeronSubscription {}
-unsafe impl Sync for AutoCloseAeronSubscription {}
-unsafe impl Send for AutoCloseAeronPublication {}
-unsafe impl Sync for AutoCloseAeronPublication {}
-unsafe impl Send for AutoCloseAeronExclusivePublication {}
-unsafe impl Sync for AutoCloseAeronExclusivePublication {}
-unsafe impl Send for AutoCloseAeronCounter {}
-unsafe impl Sync for AutoCloseAeronCounter {}
 
 impl AeronCnc {
     pub fn new(aeron_dir: &str) -> Result<AeronCnc, AeronCError> {
@@ -83,6 +75,21 @@ impl AeronCncMetadata {
             inner: std::rc::Rc::new(resource),
         };
         Ok(result)
+    }
+}
+
+impl AeronArchiveAsyncConnect {
+    #[inline]
+    pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
+        let resource_async = ManagedCResource::new(
+            move |ctx_field| unsafe { aeron_archive_async_connect(ctx_field, ctx.into()) },
+            None,
+            false,
+        )?;
+        Ok(Self {
+            inner: std::rc::Rc::new(resource_async),
+            _aeron: Some(aeron.clone()),
+        })
     }
 }
 

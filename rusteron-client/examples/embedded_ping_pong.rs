@@ -76,7 +76,7 @@ fn run_pong(running_pong: Arc<AtomicBool>) -> Result<(), Box<dyn std::error::Err
 
     println!("Starting pong thread");
     pub struct PongRoundTripHandler {
-        publisher: AutoCloseAeronPublication,
+        publisher: AeronPublication,
         buffer_claim: AeronBufferClaim,
         header_values: AeronHeaderValues,
     }

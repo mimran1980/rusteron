@@ -71,11 +71,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 struct Publisher {
     running: Arc<AtomicBool>,
-    publication: AutoCloseAeronExclusivePublication,
+    publication: AeronExclusivePublication,
 }
 
 impl Publisher {
-    fn new(running: Arc<AtomicBool>, publication: AutoCloseAeronExclusivePublication) -> Self {
+    fn new(running: Arc<AtomicBool>, publication: AeronExclusivePublication) -> Self {
         Publisher {
             running,
             publication,
@@ -111,7 +111,7 @@ impl Publisher {
 
 struct ImageRateSubscriber {
     running: Arc<AtomicBool>,
-    subscription: AutoCloseAeronSubscription,
+    subscription: AeronSubscription,
     poll_handler: Handler<MsgCount>,
     message_length: usize,
     start_time: Instant,
@@ -130,7 +130,7 @@ impl AeronFragmentHandlerCallback for MsgCount {
 impl ImageRateSubscriber {
     fn new(
         running: Arc<AtomicBool>,
-        subscription: AutoCloseAeronSubscription,
+        subscription: AeronSubscription,
         message_length: usize,
     ) -> Self {
         let poll_handler = Handler::leak(MsgCount { message_count: 0 });

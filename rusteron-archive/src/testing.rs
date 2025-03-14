@@ -118,7 +118,7 @@ impl EmbeddedArchiveMediaDriverProcess {
             .spawn()
     }
 
-    pub fn archive_connect(&self) -> Result<(AutoCloseAeronArchive, Aeron), io::Error> {
+    pub fn archive_connect(&self) -> Result<(AeronArchive, Aeron), io::Error> {
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(30) {
             if let Ok(aeron_context) = AeronContext::new() {

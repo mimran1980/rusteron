@@ -14,6 +14,15 @@ pub struct ManagedCResource<T> {
     cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
     cleanup_struct: bool,
     borrowed: bool,
+    /// if someone externally rusteron calls close
+    close_already_called: bool,
+    /// if there is a c method to verify it someone has closed it, only few structs have this functionality
+    check_for_close: Option<Box<dyn Fn() -> bool>>,
+    /// this will be called if closed hasn't already happened even if its borrowed
+    auto_close: Option<Box<dyn Fn()>>,
+    /// this will usually always be empty it aimed for situations like AeronArchive or AeronSubscription 
+    /// ideally you want to add the Aeron instance here so Aeron doesn't get dropped before han  
+    dependancies: Vec<Box<dyn Fn()>>
 }
 
 impl<T> Debug for ManagedCResource<T> {
@@ -48,6 +57,10 @@ impl<T> ManagedCResource<T> {
             cleanup,
             cleanup_struct,
             borrowed: false,
+            close_already_called: false,
+            check_for_close: None,
+            auto_close: None,
+            dependancies: vec![],
         };
         #[cfg(feature = "extra-logging")]
         log::debug!("created c resource: {:?}", result);
@@ -60,6 +73,10 @@ impl<T> ManagedCResource<T> {
             cleanup: None,
             cleanup_struct: false,
             borrowed: true,
+            close_already_called: false,
+            check_for_close: None,
+            auto_close: None,
+            dependancies: vec![],
         }
     }
 
@@ -78,15 +95,28 @@ impl<T> ManagedCResource<T> {
     ///
     /// If cleanup fails, it returns an `AeronError`.
     pub fn close(&mut self) -> Result<(), AeronCError> {
+        if self.close_already_called {
+            return Ok(())
+        }
+        self.close_already_called = true;
+        self.dependancies.clear();
+
+        let alreay_closed = self.check_for_close.as_ref().map_or(false, |f| f());
+
         if let Some(mut cleanup) = self.cleanup.take() {
             if !self.resource.is_null() {
-                let result = cleanup(&mut self.resource);
-                if result < 0 {
-                    return Err(AeronCError::from_code(result));
+                if !alreay_closed {
+                    let result = cleanup(&mut self.resource);
+                    if result < 0 {
+                        return Err(AeronCError::from_code(result));
+                    }
                 }
                 self.resource = std::ptr::null_mut();
             }
         }
+
+
+
 
         Ok(())
     }

@@ -300,7 +300,7 @@ mod tests {
                 aeron_archive_context.get_recording_events_channel(),
             )?;
             aeron_archive_context.set_error_handler(Some(&error_handler))?;
-            let archive = AeronArchiveAsyncConnect::new(&aeron_archive_context)?
+            let archive = AeronArchiveAsyncConnect::new_with_aeron(&aeron_archive_context, &aeron)?
                 .poll_blocking(Duration::from_secs(30))
                 .expect("failed to connect to archive");
             replay_merge_subscription(&archive, aeron.clone(), session_id)?;
@@ -308,8 +308,6 @@ mod tests {
 
         running.store(false, Ordering::Release);
         publisher_thread.join().unwrap();
-
-        drop(archive);
 
         Ok(())
     }
@@ -628,7 +626,7 @@ mod tests {
 
         info!("connected to aeron");
 
-        let archive_connector = AeronArchiveAsyncConnect::new(&archive_context.clone())?;
+        let archive_connector = AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to aeron archive media driver");
@@ -801,7 +799,6 @@ mod tests {
         info!("aeron {:?}", aeron);
         info!("ctx {:?}", archive_context);
         assert_eq!(11, poll.count.get());
-        drop(archive);
         Ok(())
     }
 }

@@ -579,29 +579,6 @@ impl CWrapper {
 
                 Self::add_once_methods_for_handlers(closure_handlers, method, &fn_name, &return_type, &ffi_call, &where_clause, &fn_arguments, &mut arg_names, &converter, &possible_self, &method_docs, &mut additional_methods);
 
-                if method.struct_method_name == "close" {
-                    let autoclose = format_ident!("AutoClose{}",self.class_name);
-
-                    let args = fn_arguments.iter().map(|f| {
-                        let f = f.to_string();
-                        let f = &f[..f.find(':').unwrap_or_default()];
-                        parse_str::<TokenStream>(f).unwrap()
-                    }).collect_vec();
-
-                    additional_outer_impls.push(quote! {
-                        impl #autoclose {
-                            #[inline]
-                            #(#method_docs)*
-                            pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
-                                unsafe {
-                                    self.closed.set(true);
-                                    self.inner.#fn_name(#(#args),*)
-                                }
-                            }
-                        }
-                    })
-                }
-
                 let mut_primitivies = method.arguments.iter()
                     .filter(|a| a.is_mut_pointer() && a.is_primitive())
                     .collect_vec();
@@ -951,18 +928,13 @@ impl CWrapper {
     }
 
     /// Generate the constructor for the struct
-    fn generate_constructor(
-        &self,
-        wrappers: &HashMap<String, CWrapper>,
-        add_aeron_ref: bool,
-    ) -> Vec<TokenStream> {
+    fn generate_constructor(&self, wrappers: &HashMap<String, CWrapper>) -> Vec<TokenStream> {
         let constructors = self
             .methods
             .iter()
             .filter(|m| m.arguments.iter().any(|arg| arg.is_double_mut_pointer()))
             .map(|method| {
                 let init_fn = format_ident!("{}", method.fn_name);
-                let mut aeron_field_use = if add_aeron_ref { quote! { _aeron: None, } } else { quote!()};
 
                 let close_method = self.find_close_method(method);
                 let found_close = close_method.is_some()
@@ -1004,7 +976,7 @@ impl CWrapper {
                         })
                         .filter(|t| !t.is_empty())
                         .collect();
-                    let lets: Vec<TokenStream> = Self::lets_for_copying_arguments(wrappers, &method.arguments, true, add_aeron_ref);
+                    let lets: Vec<TokenStream> = Self::lets_for_copying_arguments(wrappers, &method.arguments, true);
                     let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &method.arguments);
 
                     let new_args: Vec<TokenStream> = method
@@ -1012,12 +984,6 @@ impl CWrapper {
                         .iter()
                         .enumerate()
                         .filter_map(|(_idx, arg)| {
-
-                            if add_aeron_ref && arg.c_type.ends_with(" aeron_t") {
-                                let a = format_ident!("{}_aeron_field", arg.as_ident());
-                                aeron_field_use = quote! { _aeron: Some(#a) }
-                            }
-
                             if arg.is_double_mut_pointer() {
                                 None
                             } else {
@@ -1083,7 +1049,7 @@ impl CWrapper {
                                 false
                             )?;
 
-                            Ok(Self { inner: std::rc::Rc::new(resource_constructor), #aeron_field_use })
+                            Ok(Self { inner: std::rc::Rc::new(resource_constructor) })
                         }
                     }
                 } else {
@@ -1092,11 +1058,6 @@ impl CWrapper {
             })
             .collect_vec();
 
-        let aeron_field_use = if add_aeron_ref {
-            quote! { _aeron: None, }
-        } else {
-            quote!()
-        };
         let no_constructor = constructors
             .iter()
             .map(|x| x.to_string())
@@ -1122,18 +1083,11 @@ impl CWrapper {
                         true
                     )?;
 
-                    Ok(Self { inner: std::rc::Rc::new(resource), #aeron_field_use })
+                    Ok(Self { inner: std::rc::Rc::new(resource) })
                 }
             };
             if self.has_default_method() {
                 let type_name = format_ident!("{}", self.type_name);
-
-                let aeron_field_use = if add_aeron_ref {
-                    quote! { _aeron: None, }
-                } else {
-                    quote!()
-                };
-
                 let new_args: Vec<TokenStream> = self
                     .fields
                     .iter()
@@ -1182,12 +1136,8 @@ impl CWrapper {
                     .filter(|a| a.processing == ArgProcessing::Default)
                     .cloned()
                     .collect_vec();
-                let lets: Vec<TokenStream> = Self::lets_for_copying_arguments(
-                    wrappers,
-                    &cloned_fields,
-                    false,
-                    add_aeron_ref,
-                );
+                let lets: Vec<TokenStream> =
+                    Self::lets_for_copying_arguments(wrappers, &cloned_fields, false);
                 let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &self.fields);
 
                 vec![quote! {
@@ -1214,7 +1164,7 @@ impl CWrapper {
                             true
                         )?;
 
-                        Ok(Self { inner: std::rc::Rc::new(r_constructor), #aeron_field_use })
+                        Ok(Self { inner: std::rc::Rc::new(r_constructor) })
                     }
 
                     #zeroed_impl
@@ -1256,7 +1206,6 @@ impl CWrapper {
         wrappers: &HashMap<String, CWrapper>,
         arguments: &Vec<Arg>,
         include_let_statements: bool,
-        add_aeron_ref: bool,
     ) -> Vec<TokenStream> {
         arguments
             .iter()
@@ -1272,19 +1221,9 @@ impl CWrapper {
                     let fields = if arg.is_single_mut_pointer()
                         && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap())
                     {
-                        let another_copy = if add_aeron_ref && arg.c_type.ends_with(" aeron_t") {
-                            let arg_copy = format_ident!("{}_aeron_field", arg.name);
-                            quote! {
-                                let #arg_copy = #arg_name.clone();
-                            }
-                        } else {
-                            quote! {}
-                        };
-
                         let arg_copy = format_ident!("{}_copy", arg.name);
                         quote! {
                             let #arg_copy = #arg_name.clone();
-                            #another_copy
                         }
                     } else {
                         quote! {}
@@ -1691,12 +1630,8 @@ pub fn generate_rust_code(
     let class_name = Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
     let type_name = Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
-    let mut additional_impls = vec![];
-
-    let add_aeron_ref = wrapper.type_name.contains("async_");
-
-    let methods = wrapper.generate_methods(wrappers, closure_handlers, &mut additional_impls);
-    let constructor = wrapper.generate_constructor(wrappers, add_aeron_ref);
+    let methods = wrapper.generate_methods(wrappers, closure_handlers);
+    let constructor = wrapper.generate_constructor(wrappers);
 
     let async_impls = if wrapper.type_name.starts_with("aeron_async_")
         || wrapper.type_name.starts_with("aeron_archive_async_")
@@ -1723,7 +1658,6 @@ pub fn generate_rust_code(
                 .find(|m| m.fn_name == format!("{}_poll", wrapper.without_name))
                 .unwrap();
 
-            let autoclose_class_name = format_ident!("AutoClose{}", main.class_name);
             let main_class_name = format_ident!("{}", main.class_name);
             let async_class_name = format_ident!("{}", wrapper.class_name);
             let poll_method_name = format_ident!("{}_poll", wrapper.without_name);
@@ -1862,17 +1796,6 @@ pub fn generate_rust_code(
                 .filter(|t| !t.is_empty())
                 .collect();
 
-            let aeron_field = new_method
-                .arguments
-                .iter()
-                .filter(|arg| arg.c_type.ends_with(" aeron_t"))
-                .map(|a| {
-                    let a = a.as_ident();
-                    quote! { Some(#a.clone())}
-                })
-                .next()
-                .unwrap_or(quote! {None});
-
             let async_new_args_for_client = async_new_args.iter().skip(1).cloned().collect_vec();
 
             let async_new_args_name_only: Vec<TokenStream> = new_method
@@ -1897,97 +1820,97 @@ pub fn generate_rust_code(
                 .collect();
 
             quote! {
-            impl #main_class_name {
-                #[inline]
-                pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
-                    let resource = ManagedCResource::new(
-                        move |ctx_field| unsafe {
-                            #poll_method_name(#(#init_args),*)
-                        },
-                        None,
-                        false
-                    )?;
-                    Ok(Self {
-                        inner: std::rc::Rc::new(resource),
-                    })
-                }
-            }
+                    impl #main_class_name {
+                        #[inline]
+                        pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
+                            let resource = ManagedCResource::new(
+                                move |ctx_field| unsafe {
+                                    #poll_method_name(#(#init_args),*)
+                                },
+                                None,
+                                false
+                            )?;
+                            Ok(Self {
+                                inner: std::rc::Rc::new(resource),
+                            })
+                        }
+                    }
 
-            impl #client_type {
-                #[inline]
-                pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
-                    #async_class_name::new(self, #(#async_new_args_name_only),*)
-                }
-            }
+                    impl #client_type {
+                        #[inline]
+                        pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
+                            #async_class_name::new(self, #(#async_new_args_name_only),*)
+                        }
+                    }
 
-            impl #client_type {
-                #[inline]
-                pub fn #client_type_method_name_without_async #where_clause_async(&self #(
-            , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#autoclose_class_name, AeronCError> {
-                    let start = std::time::Instant::now();
-                    loop {
-                        if let Ok(poller) = #async_class_name::new(self, #(#async_new_args_name_only),*) {
-                            while start.elapsed() <= timeout  {
-                              if let Some(result) = poller.poll()? {
-                                  return Ok(result);
-                              }
+                    impl #client_type {
+                        #[inline]
+                        pub fn #client_type_method_name_without_async #where_clause_async(&self #(
+                    , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+                            let start = std::time::Instant::now();
+                            loop {
+                                if let Ok(poller) = #async_class_name::new(self, #(#async_new_args_name_only),*) {
+                                    while start.elapsed() <= timeout  {
+                                      if let Some(result) = poller.poll()? {
+                                          return Ok(result);
+                                      }
+                                    #[cfg(debug_assertions)]
+                                    std::thread::sleep(std::time::Duration::from_millis(10));
+                                  }
+                                }
+                            if start.elapsed() > timeout {
+                                log::error!("failed async poll for {:?}", self);
+                                return Err(AeronErrorType::TimedOut.into());
+                            }
                             #[cfg(debug_assertions)]
                             std::thread::sleep(std::time::Duration::from_millis(10));
                           }
-                        }
-                    if start.elapsed() > timeout {
-                        log::error!("failed async poll for {:?}", self);
-                        return Err(AeronErrorType::TimedOut.into());
-                    }
-                    #[cfg(debug_assertions)]
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                  }
-                 }
             }
-
-            impl #async_class_name {
-                #[inline]
-                pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
-                    let resource_async = ManagedCResource::new(
-                        move |ctx_field| unsafe {
-                            #new_method_name(#(#async_init_args),*)
-                        },
-                        None,
-                        false
-                    )?;
-                    Ok(Self {
-                        inner: std::rc::Rc::new(resource_async), _aeron: #aeron_field
-                    })
-                }
-
-                pub fn poll(&self) -> Result<Option<#autoclose_class_name>, AeronCError> {
-                    match #main_class_name::new(self) {
-                        Ok(result) => Ok(Some(if let Some(aeron) = &self._aeron { #autoclose_class_name::new_with_aeron(result, aeron) } else { #autoclose_class_name::new(result)} )),
-                        Err(AeronCError {code }) if code == 0 => {
-                          Ok(None) // try again
-                        }
-                        Err(e) => Err(e)
-                    }
-                }
-
-                pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#autoclose_class_name, AeronCError> {
-                    if let Some(result) = self.poll()? {
-                        return Ok(result);
                     }
 
-                    let time = std::time::Instant::now();
-                    while time.elapsed() < timeout {
-                        if let Some(result) = self.poll()? {
-                            return Ok(result);
+                    impl #async_class_name {
+                        #[inline]
+                        pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
+                            let resource_async = ManagedCResource::new(
+                                move |ctx_field| unsafe {
+                                    #new_method_name(#(#async_init_args),*)
+                                },
+                                None,
+                                false
+                            )?;
+                            Ok(Self {
+                                inner: std::rc::Rc::new(resource_async),
+                            })
                         }
-                        #[cfg(debug_assertions)]
-                        std::thread::sleep(std::time::Duration::from_millis(10));
+
+                        pub fn poll(&self) -> Result<Option<#main_class_name>, AeronCError> {
+                            match #main_class_name::new(self) {
+                                Ok(result) => Ok(Some(result)),
+                                Err(AeronCError {code }) if code == 0 => {
+                                  Ok(None) // try again
+                                }
+                                Err(e) => Err(e)
+                            }
+                        }
+
+                        pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+                            if let Some(result) = self.poll()? {
+                                return Ok(result);
+                            }
+
+                            let time = std::time::Instant::now();
+                            while time.elapsed() < timeout {
+                                if let Some(result) = self.poll()? {
+                                    return Ok(result);
+                                }
+                                #[cfg(debug_assertions)]
+                                std::thread::sleep(std::time::Duration::from_millis(10));
+                            }
+                            log::error!("failed async poll for {:?}", self);
+                            Err(AeronErrorType::TimedOut.into())
+                        }
                     }
-                    log::error!("failed async poll for {:?}", self);
-                    Err(AeronErrorType::TimedOut.into())
-                }
-            }
-                        }
+                                }
         } else {
             quote! {}
         }
@@ -1995,84 +1918,29 @@ pub fn generate_rust_code(
         quote! {}
     };
 
-    let close_methods = wrapper
+    let mut additional_impls = vec![];
+
+    if wrapper
         .methods
         .iter()
-        .filter(|m| m.struct_method_name == "close")
-        .collect_vec();
-    if close_methods.len() == 1 {
-        let autoclose = format_ident!("AutoClose{}", class_name);
-        let close_result = ReturnType::new(close_methods[0].return_type.clone(), wrappers.clone())
-            .get_new_return_type(true, false);
-
-        let close_check = if wrapper
+        .any(|m| m.struct_method_name == "closed")
+        || wrapper
             .methods
             .iter()
             .any(|m| m.struct_method_name == "is_closed")
-        {
-            quote! { !self.is_closed() }
-        } else {
-            quote! { true }
-        };
-        let call_close = if wrapper
-            .methods
-            .iter()
-            .any(|m| m.struct_method_name == "close" && m.arguments.len() == 1)
-        {
-            quote! { self.inner.close() }
-        } else {
-            quote! { self.close_with_no_args() }
-        };
-
-        additional_impls.push(quote! {
-            #[derive(Debug, Clone)]
-            pub struct #autoclose {
-                inner: #class_name,
-                closed: std::rc::Rc<std::cell::Cell<bool>>,
-                _aeron: Option<Aeron>,
-            }
-
-            impl #autoclose {
-                pub fn new(inner: #class_name) -> Self {
-                    Self {
-                        inner,
-                        closed: std::rc::Rc::new(std::cell::Cell::new(false)),
-                        _aeron: None
+    {
+        if !wrapper.methods.iter().any(|m| m.fn_name.contains("_init")) {
+            additional_impls.push(quote! {
+                impl Drop for #class_name {
+                    fn drop(&mut self) {
+                        #[cfg(any(debug_assertions, feature = "extra-logging"))]
+                        if !self.inner.resource.is_null() && std::rc::Rc::strong_count(&self.inner) == 1 && !self.is_closed() {
+                            log::warn!("struct may have not been correctly closed {self:?}");
+                        }
                     }
                 }
-                pub fn new_with_aeron(inner: #class_name, aeron: &Aeron) -> Self {
-                    Self {
-                        inner,
-                        closed: std::rc::Rc::new(std::cell::Cell::new(false)),
-                        _aeron: Some(aeron.clone())
-                    }
-                }
-            }
-            impl Drop for #autoclose {
-                fn drop(&mut self) {
-                    if !self.closed.get() && #close_check && std::rc::Rc::strong_count(&self.closed) == 1 {
-                        log::info!("automatically closing {:?}", self.inner);
-                        let result = #call_close;
-                        log::info!("automatically closed {:?}", result);
-                    }
-                }
-            }
-
-            impl Deref for #autoclose {
-                type Target = #class_name;
-
-                fn deref(&self) -> &Self::Target {
-                    &self.inner
-                }
-            }
-
-            impl From<#class_name> for #autoclose {
-                #[inline]
-                fn from(value: #class_name) -> Self {
-                    #autoclose::new(value)
-                }
-            }
-        });
+            });
+        }
     }
 
     let common_code = if !include_common_code {
@@ -2156,12 +2024,6 @@ pub fn generate_rust_code(
         quote! {}
     };
 
-    let (aeron_field, aeron_field_use) = if add_aeron_ref {
-        (quote! { _aeron: Option<Aeron>}, quote! { _aeron: None })
-    } else {
-        (quote! {}, quote! {})
-    };
-
     quote! {
         #warning_code
 
@@ -2169,7 +2031,6 @@ pub fn generate_rust_code(
         #[derive(Clone)]
         pub struct #class_name {
             inner: std::rc::Rc<ManagedCResource<#type_name>>,
-            #aeron_field
         }
 
         impl core::fmt::Debug for  #class_name {
@@ -2223,8 +2084,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
-                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value)),
-                    #aeron_field_use
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
                 }
             }
         }
@@ -2254,8 +2114,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(value: *const #type_name) -> Self {
                 #class_name {
-                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value)),
-                    #aeron_field_use
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
                 }
             }
         }
@@ -2264,8 +2123,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(mut value: #type_name) -> Self {
                 #class_name {
-                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(&mut value as *mut #type_name)),
-                    #aeron_field_use
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(&mut value as *mut #type_name))
                 }
             }
         }
