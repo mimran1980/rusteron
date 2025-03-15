@@ -87,14 +87,17 @@ impl<T> ManagedCResource<T> {
                 .map_or(false, |f| f(self.resource))
     }
 
-    pub fn new_borrowed(value: *const T) -> Self {
+    pub fn new_borrowed(
+        value: *const T,
+        check_for_is_closed: Option<Box<dyn Fn(*mut T) -> bool>>,
+    ) -> Self {
         Self {
             resource: value as *mut _,
             cleanup: None,
             cleanup_struct: false,
             borrowed: true,
             close_already_called: std::cell::Cell::new(false),
-            check_for_is_closed: None,
+            check_for_is_closed,
             auto_close: std::cell::Cell::new(false),
             dependencies: UnsafeCell::new(vec![]),
         }

@@ -456,10 +456,10 @@ pub struct CWrapper {
 }
 
 impl CWrapper {
-
     pub fn find_methods(&self, name: &str) -> Vec<Method> {
-        self.methods.iter()
-            .filter(|m| m.struct_method_name == name )
+        self.methods
+            .iter()
+            .filter(|m| m.struct_method_name == name)
             .cloned()
             .collect_vec()
     }
@@ -472,11 +472,11 @@ impl CWrapper {
             None
         }
     }
-    
+
     fn get_close_method(&self) -> Option<Method> {
         self.find_unique_method("close")
     }
-    
+
     fn get_is_closed_method(&self) -> Option<Method> {
         self.find_unique_method("is_closed")
     }
@@ -493,9 +493,6 @@ impl CWrapper {
             }
         }
     }
-
-
-
 
     /// Generate methods for the struct
     fn generate_methods(
@@ -1060,8 +1057,6 @@ impl CWrapper {
                             .replace("create", "new")
                     );
 
-                    // panic!("{}", lets.clone().iter().map(|s|s.to_string()).join("\n"));
-
                     let generic_types: Vec<TokenStream> = method
                         .arguments
                         .iter()
@@ -1077,12 +1072,10 @@ impl CWrapper {
                         quote! { <#(#generic_types),*> }
                     };
 
-
                     let method_docs: Vec<TokenStream> =
                         get_docs(&method.docs, wrappers, Some(&new_args));
 
                     let is_closed_method = self.get_is_closed_method_quote();
-                    
                     quote! {
                         #(#method_docs)*
                         pub fn #fn_name #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
@@ -1198,7 +1191,6 @@ impl CWrapper {
                     Self::lets_for_copying_arguments(wrappers, &cloned_fields, false);
                 let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &self.fields);
                 let is_closed_method = self.get_is_closed_method_quote();
-
 
                 vec![quote! {
                     #[inline]
@@ -1691,7 +1683,6 @@ pub fn generate_rust_code(
     let class_name = Ident::new(&wrapper.class_name, proc_macro2::Span::call_site());
     let type_name = Ident::new(&wrapper.type_name, proc_macro2::Span::call_site());
 
-
     let mut additional_outer_impls = vec![];
 
     let methods = wrapper.generate_methods(wrappers, closure_handlers, &mut additional_outer_impls);
@@ -2002,10 +1993,8 @@ pub fn generate_rust_code(
 
     let mut additional_impls = vec![];
 
-    if let Some(close_method) = wrapper.get_close_method()
-    {
+    if let Some(close_method) = wrapper.get_close_method() {
         if !wrapper.methods.iter().any(|m| m.fn_name.contains("_init")) {
-
             let close_method_call = if close_method.arguments.len() > 1 {
                 let ident = format_ident!("close_with_no_args");
                 quote! {#ident}
@@ -2019,11 +2008,10 @@ pub fn generate_rust_code(
                 quote! { false }
             };
 
-
             additional_impls.push(quote! {
                 impl Drop for #class_name {
                     fn drop(&mut self) {
-                            if std::rc::Rc::strong_count(&self.inner) == 1 && self.inner.is_closed_already_called() {
+                            if self.inner.borrowed && std::rc::Rc::strong_count(&self.inner) == 1 && self.inner.is_closed_already_called() {
                                 if self.inner.auto_close.get() {
                                 let result = self.#close_method_call();
                                 log::info!("auto closing {} {:?}", stringify!(#class_name), result);
@@ -2118,6 +2106,8 @@ pub fn generate_rust_code(
         quote! {}
     };
 
+    let is_closed_method = wrapper.get_is_closed_method_quote();
+
     quote! {
         #warning_code
 
@@ -2178,7 +2168,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
-                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value, #is_closed_method))
                 }
             }
         }
@@ -2208,7 +2198,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(value: *const #type_name) -> Self {
                 #class_name {
-                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value, #is_closed_method))
                 }
             }
         }
@@ -2217,7 +2207,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(mut value: #type_name) -> Self {
                 #class_name {
-                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(&mut value as *mut #type_name))
+                    inner: std::rc::Rc::new(ManagedCResource::new_borrowed(&mut value as *mut #type_name, #is_closed_method))
                 }
             }
         }
