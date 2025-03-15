@@ -55,39 +55,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Ubuntu default
-            os: ubuntu-latest
-            runner: ubuntu-latest
-            features: default
-            rust-version: "stable"
-          - name: macOS x86
-            os: macos-latest default
-            runner: macos-latest
-            arch: x86_64
-            features: default
-            rust-version: "stable"
-          - name: macOS ARM default
-            os: macos-latest
-            arch: arm64
-            features: default
-            rust-version: "stable"
-          - name: Ubuntu static
-            os: ubuntu-latest
-            runner: ubuntu-latest
-            features: static
-            rust-version: "stable"
-          - name: macOS x86
-            os: macos-latest static
-            runner: macos-13
-            arch: x86_64
-            features: static
-            rust-version: "stable"
-          - name: macOS ARM static
-            os: macos-latest
-            arch: arm64
-            features: static
-            rust-version: "stable"
+#        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
+#        os: [ubuntu-latest]
+        features: [default, static]
+        #        rust-version: ["stable", "stable 6 months ago"]
+        rust-version: ["stable"]
 
     env:
       feature-flags: ${{ matrix.features != 'default' && format('--features {0}', matrix.features) || '' }}
@@ -118,7 +91,15 @@ jobs:
 
       - name: Build and Test
         run: |
+          rm -rf rusteron-archive/artifacts
+          rm -rf rusteron-client/artifacts
+          rm -rf rusteron-media-driver/artifacts
+          rm -rf rusteron-rb/artifacts
           cargo test --release --workspace --all --all-targets ${{ env.feature-flags }} -- --nocapture
+          rm -rf rusteron-archive/artifacts
+          rm -rf rusteron-client/artifacts
+          rm -rf rusteron-media-driver/artifacts
+          rm -rf rusteron-rb/artifacts
           cargo build --release --workspace ${{ env.feature-flags }}
 
 

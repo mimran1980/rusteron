@@ -49,6 +49,31 @@ jobs:
         run: |
           cargo build --workspace --release
           cargo test --workspace -- --nocapture
+          rm -rf rusteron-archive/artifacts
+          rm -rf rusteron-client/artifacts
+          rm -rf rusteron-media-driver/artifacts
+          rm -rf rusteron-rb/artifacts
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: downloaded-artifacts
+
+      - name: Move Artifacts to Their Respective Crates
+        run: |
+          mkdir -p rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts rusteron-rb/artifacts
+          mv downloaded-artifacts/build-artifacts*/* rusteron-archive/artifacts/ || true
+          mv downloaded-artifacts/build-artifacts*/* rusteron-client/artifacts/ || true
+          mv downloaded-artifacts/build-artifacts*/* rusteron-media-driver/artifacts/ || true
+          mv downloaded-artifacts/build-artifacts*/* rusteron-rb/artifacts/ || true
+
+      - name: Commit and Push Artifacts
+        run: |
+          git config --global user.email "mimran1980@example.com"
+          git config --global user.name "Mo Imran"
+          git add rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts rusteron-rb/artifacts
+          git commit -m "Add prebuilt artifacts from CI"
+          git push origin main
 
       - name: Install cargo-release
         run: cargo install cargo-release
