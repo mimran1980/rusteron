@@ -56,21 +56,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Ubuntu
+          - name: Ubuntu default
             os: ubuntu-latest
             runner: ubuntu-latest
-            features: [default, static]
+            features: default
             rust-version: "stable"
           - name: macOS x86
-            os: macos-latest
+            os: macos-latest default
             runner: macos-latest
             arch: x86_64
-            features: [default, static]
+            features: default
             rust-version: "stable"
-          - name: macOS ARM
+          - name: macOS ARM default
             os: macos-latest
             arch: arm64
-            features: [default, static]
+            features: default
+            rust-version: "stable"
+          - name: Ubuntu static
+            os: ubuntu-latest
+            runner: ubuntu-latest
+            features: static
+            rust-version: "stable"
+          - name: macOS x86
+            os: macos-latest static
+            runner: macos-latest
+            arch: x86_64
+            features: static
+            rust-version: "stable"
+          - name: macOS ARM static
+            os: macos-latest
+            arch: arm64
+            features: static
             rust-version: "stable"
 
     env:
