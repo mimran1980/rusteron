@@ -55,12 +55,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-#        os: [ubuntu-latest, windows-latest, macos-latest]
-        os: [ubuntu-latest, macos-latest]
-#        os: [ubuntu-latest]
-        features: [default, static]
-        #        rust-version: ["stable", "stable 6 months ago"]
-        rust-version: ["stable"]
+        include:
+          - name: Ubuntu
+            os: ubuntu-latest
+            runner: ubuntu-latest
+            features: [default, static]
+            rust-version: ["stable"]
+          - name: macOS x86
+            os: macos-latest
+            runner: macos-latest
+            arch: x86_64
+            features: [default, static]
+            rust-version: ["stable"]
+          - name: macOS ARM
+            os: macos-latest
+            runner: self-hosted-mac-arm  # Your self-hosted Apple Silicon runner label
+            arch: arm64
+            features: [default, static]
+            rust-version: ["stable"]
 
     env:
       feature-flags: ${{ matrix.features != 'default' && format('--features {0}', matrix.features) || '' }}
