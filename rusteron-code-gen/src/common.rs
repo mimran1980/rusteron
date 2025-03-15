@@ -9,6 +9,7 @@ use std::ops::{Deref, DerefMut};
 ///
 /// It handles initialisation and clean-up of the resource and ensures that resources
 /// are properly released when they go out of scope.
+#[allow(dead_code)]
 pub struct ManagedCResource<T> {
     resource: *mut T,
     cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
