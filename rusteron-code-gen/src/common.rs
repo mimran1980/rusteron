@@ -1,6 +1,9 @@
 use crate::AeronErrorType::Unknown;
+use std::any::Any;
 #[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
+use std::cell::UnsafeCell;
+use std::ops::{Deref, DerefMut};
 
 /// A custom struct for managing C resources with automatic cleanup.
 ///
@@ -17,6 +20,8 @@ pub struct ManagedCResource<T> {
     check_for_is_closed: Option<Box<dyn Fn(*mut T) -> bool>>,
     /// this will be called if closed hasn't already happened even if its borrowed
     auto_close: std::cell::Cell<bool>,
+    // to prevent the dependencies from being dropped as you have a copy here
+    dependencies: UnsafeCell<Vec<std::rc::Rc<dyn Any>>>,
 }
 
 impl<T> std::fmt::Debug for ManagedCResource<T> {
@@ -25,12 +30,17 @@ impl<T> std::fmt::Debug for ManagedCResource<T> {
 
         if !self.close_already_called.get()
             && !self.resource.is_null()
-            && !self.check_for_is_closed.as_ref().map_or(false, |f| f(self.resource))
+            && !self
+                .check_for_is_closed
+                .as_ref()
+                .map_or(false, |f| f(self.resource))
         {
             debug_struct.field("resource", &self.resource);
         }
 
-        debug_struct.field("type", &std::any::type_name::<T>()).finish()
+        debug_struct
+            .field("type", &std::any::type_name::<T>())
+            .finish()
     }
 }
 
@@ -61,10 +71,20 @@ impl<T> ManagedCResource<T> {
             close_already_called: std::cell::Cell::new(false),
             check_for_is_closed,
             auto_close: std::cell::Cell::new(false),
+            dependencies: UnsafeCell::new(vec![]),
         };
         #[cfg(feature = "extra-logging")]
         log::debug!("created c resource: {:?}", result);
         Ok(result)
+    }
+
+    pub fn is_closed_already_called(&self) -> bool {
+        self.close_already_called.get()
+            || self.resource.is_null()
+            || self
+                .check_for_is_closed
+                .as_ref()
+                .map_or(false, |f| f(self.resource))
     }
 
     pub fn new_borrowed(value: *const T) -> Self {
@@ -76,6 +96,7 @@ impl<T> ManagedCResource<T> {
             close_already_called: std::cell::Cell::new(false),
             check_for_is_closed: None,
             auto_close: std::cell::Cell::new(false),
+            dependencies: UnsafeCell::new(vec![]),
         }
     }
 
@@ -90,6 +111,13 @@ impl<T> ManagedCResource<T> {
         unsafe { &mut *self.resource }
     }
 
+    // to prevent the dependencies from being dropped as you have a copy here
+    pub fn add_dependency<D: Any>(&self, dep: D) {
+        unsafe {
+            (*self.dependencies.get()).push(std::rc::Rc::new(dep));
+        }
+    }
+
     /// Closes the resource by calling the cleanup function.
     ///
     /// If cleanup fails, it returns an `AeronError`.
@@ -99,7 +127,10 @@ impl<T> ManagedCResource<T> {
         }
         self.close_already_called.set(true);
 
-        let already_closed = self.check_for_is_closed.as_ref().map_or(false, |f| f(self.resource));
+        let already_closed = self
+            .check_for_is_closed
+            .as_ref()
+            .map_or(false, |f| f(self.resource));
 
         if let Some(mut cleanup) = self.cleanup.take() {
             if !self.resource.is_null() {
@@ -120,8 +151,11 @@ impl<T> ManagedCResource<T> {
 impl<T> Drop for ManagedCResource<T> {
     fn drop(&mut self) {
         if !self.resource.is_null() {
-            let already_closed =
-                self.close_already_called.get() || self.check_for_is_closed.as_ref().map_or(false, |f| f(self.resource));
+            let already_closed = self.close_already_called.get()
+                || self
+                    .check_for_is_closed
+                    .as_ref()
+                    .map_or(false, |f| f(self.resource));
             if !self.borrowed {
                 let resource = if already_closed {
                     self.resource
@@ -351,7 +385,7 @@ impl<T> Handler<T> {
     }
 }
 
-impl<T> std::ops::Deref for Handler<T> {
+impl<T> Deref for Handler<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -359,7 +393,7 @@ impl<T> std::ops::Deref for Handler<T> {
     }
 }
 
-impl<T> std::ops::DerefMut for Handler<T> {
+impl<T> DerefMut for Handler<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.raw_ptr as &mut T }
     }

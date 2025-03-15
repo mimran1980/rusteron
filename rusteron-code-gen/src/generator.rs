@@ -456,6 +456,47 @@ pub struct CWrapper {
 }
 
 impl CWrapper {
+
+    pub fn find_methods(&self, name: &str) -> Vec<Method> {
+        self.methods.iter()
+            .filter(|m| m.struct_method_name == name )
+            .cloned()
+            .collect_vec()
+    }
+
+    pub fn find_unique_method(&self, name: &str) -> Option<Method> {
+        let results = self.find_methods(name);
+        if results.len() == 1 {
+            results.into_iter().next()
+        } else {
+            None
+        }
+    }
+    
+    fn get_close_method(&self) -> Option<Method> {
+        self.find_unique_method("close")
+    }
+    
+    fn get_is_closed_method(&self) -> Option<Method> {
+        self.find_unique_method("is_closed")
+    }
+
+    fn get_is_closed_method_quote(&self) -> TokenStream {
+        if let Some(method) = self.get_is_closed_method() {
+            let fn_name = format_ident!("{}", method.fn_name);
+            quote! {
+                Some(Box::new(|c| unsafe{#fn_name(c)}))
+            }
+        } else {
+            quote! {
+                None
+            }
+        }
+    }
+
+
+
+
     /// Generate methods for the struct
     fn generate_methods(
         &self,
@@ -467,6 +508,15 @@ impl CWrapper {
             .iter()
             .filter(|m| !m.arguments.iter().any(|arg| arg.is_double_mut_pointer()))
             .map(|method| {
+
+                let set_closed = if method.struct_method_name == "close" {
+                    quote! { self.inner.close_already_called.set(true); }
+                } else {
+                    quote! {}
+                };
+
+
+
                 let fn_name =
                     Ident::new(&method.struct_method_name, proc_macro2::Span::call_site());
                 let return_type_helper =
@@ -631,6 +681,7 @@ impl CWrapper {
                         #[inline]
                         #(#method_docs)*
                         pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
+                            #set_closed
                             unsafe {
                                 let mut mut_result: #rt = Default::default();
                                 let err_code = #ffi_call(#(#arg_names),*);
@@ -650,6 +701,7 @@ impl CWrapper {
                         #[inline]
                         #(#method_docs)*
                         pub fn #fn_name #where_clause(#possible_self #(#fn_arguments),*) -> #return_type {
+                            #set_closed
                             unsafe {
                                 let result = #ffi_call(#(#arg_names),*);
                                 #converter
@@ -1029,6 +1081,8 @@ impl CWrapper {
                     let method_docs: Vec<TokenStream> =
                         get_docs(&method.docs, wrappers, Some(&new_args));
 
+                    let is_closed_method = self.get_is_closed_method_quote();
+                    
                     quote! {
                         #(#method_docs)*
                         pub fn #fn_name #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
@@ -1046,7 +1100,8 @@ impl CWrapper {
                                     }
                                     result
                                 })),
-                                false
+                                false,
+                                #is_closed_method,
                             )?;
 
                             Ok(Self { inner: std::rc::Rc::new(resource_constructor) })
@@ -1066,6 +1121,8 @@ impl CWrapper {
             .is_empty();
         if no_constructor {
             let type_name = format_ident!("{}", self.type_name);
+            let is_closed_method = self.get_is_closed_method_quote();
+
             let zeroed_impl = quote! {
                 #[inline]
                 /// creates zeroed struct where the underlying c struct is on the heap
@@ -1080,7 +1137,8 @@ impl CWrapper {
                             0
                         },
                         None,
-                        true
+                        true,
+                        #is_closed_method
                     )?;
 
                     Ok(Self { inner: std::rc::Rc::new(resource) })
@@ -1139,6 +1197,8 @@ impl CWrapper {
                 let lets: Vec<TokenStream> =
                     Self::lets_for_copying_arguments(wrappers, &cloned_fields, false);
                 let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &self.fields);
+                let is_closed_method = self.get_is_closed_method_quote();
+
 
                 vec![quote! {
                     #[inline]
@@ -1161,7 +1221,8 @@ impl CWrapper {
                                 }
                                 0
                             })),
-                            true
+                            true,
+                            #is_closed_method
                         )?;
 
                         Ok(Self { inner: std::rc::Rc::new(r_constructor) })
@@ -1831,7 +1892,8 @@ pub fn generate_rust_code(
                                     #poll_method_name(#(#init_args),*)
                                 },
                                 None,
-                                false
+                                false,
+                                None,
                             )?;
                             Ok(Self {
                                 inner: std::rc::Rc::new(resource),
@@ -1842,7 +1904,12 @@ pub fn generate_rust_code(
                     impl #client_type {
                         #[inline]
                         pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
-                            #async_class_name::new(self, #(#async_new_args_name_only),*)
+                            let result =  #async_class_name::new(self, #(#async_new_args_name_only),*);
+                            if let Ok(result) = &result {
+                                result.inner.add_dependency(self.clone());
+                            }
+
+                            result
                         }
                     }
 
@@ -1879,7 +1946,8 @@ pub fn generate_rust_code(
                                     #new_method_name(#(#async_init_args),*)
                                 },
                                 None,
-                                false
+                                false,
+                                None,
                             )?;
                             Ok(Self {
                                 inner: std::rc::Rc::new(resource_async),
@@ -1887,7 +1955,18 @@ pub fn generate_rust_code(
                         }
 
                         pub fn poll(&self) -> Result<Option<#main_class_name>, AeronCError> {
-                            match #main_class_name::new(self) {
+
+                            let result = #main_class_name::new(self);
+                            if let Ok(result) = &result {
+                            unsafe {
+                                for d in (&*self.inner.dependencies.get()).iter() {
+                                    result.inner.add_dependency(d.clone());
+                                }
+                                result.inner.auto_close.set(true);
+                                }
+                            }
+
+                            match result {
                                 Ok(result) => Ok(Some(result)),
                                 Err(AeronCError {code }) if code == 0 => {
                                   Ok(None) // try again
@@ -1923,23 +2002,35 @@ pub fn generate_rust_code(
 
     let mut additional_impls = vec![];
 
-    if wrapper
-        .methods
-        .iter()
-        .any(|m| m.struct_method_name == "closed")
-        || wrapper
-            .methods
-            .iter()
-            .any(|m| m.struct_method_name == "is_closed")
+    if let Some(close_method) = wrapper.get_close_method()
     {
         if !wrapper.methods.iter().any(|m| m.fn_name.contains("_init")) {
+
+            let close_method_call = if close_method.arguments.len() > 1 {
+                let ident = format_ident!("close_with_no_args");
+                quote! {#ident}
+            } else {
+                let ident = format_ident!("{}", close_method.struct_method_name);
+                quote! {#ident}
+            };
+            let is_closed_method = if wrapper.get_is_closed_method().is_some() {
+                quote! { self.is_closed() }
+            } else {
+                quote! { false }
+            };
+
+
             additional_impls.push(quote! {
                 impl Drop for #class_name {
                     fn drop(&mut self) {
-                        #[cfg(any(debug_assertions, feature = "extra-logging"))]
-                        if !self.inner.resource.is_null() && std::rc::Rc::strong_count(&self.inner) == 1 && !self.is_closed() {
-                            log::warn!("struct may have not been correctly closed {self:?}");
-                        }
+                            if std::rc::Rc::strong_count(&self.inner) == 1 && self.inner.is_closed_already_called() {
+                                if self.inner.auto_close.get() {
+                                let result = self.#close_method_call();
+                                log::info!("auto closing {} {:?}", stringify!(#class_name), result);
+                                } else {
+                                log::warn!("{} not closed", stringify!(#class_name));
+                                }
+                            }
                     }
                 }
             });

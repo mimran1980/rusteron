@@ -133,6 +133,15 @@ impl AeronArchive {
     }
 }
 
+impl AeronArchiveAsyncConnect {
+    #[inline]
+    pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
+        let resource_async = Self::new(ctx)?;
+        resource_async.inner.add_dependency(aeron.clone());
+        Ok(resource_async)
+    }
+}
+
 impl AeronArchiveContext {
     // The method below sets no credentials supplier, which is essential for the operation
     // of the Aeron Archive Context. The `set_credentials_supplier` must be set to prevent
@@ -626,7 +635,8 @@ mod tests {
 
         info!("connected to aeron");
 
-        let archive_connector = AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
+        let archive_connector =
+            AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to aeron archive media driver");

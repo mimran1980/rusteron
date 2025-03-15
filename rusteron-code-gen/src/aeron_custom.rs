@@ -21,6 +21,7 @@ impl AeronCnc {
                 0
             })),
             false,
+            None,
         )?;
 
         let result = Self {
@@ -69,6 +70,7 @@ impl AeronCncMetadata {
                 aeron_unmap(mapped_file2.borrow_mut().deref_mut() as *mut aeron_mapped_file_t)
             })),
             false,
+            None,
         )?;
 
         let result = Self {
@@ -78,43 +80,31 @@ impl AeronCncMetadata {
     }
 }
 
-impl AeronArchiveAsyncConnect {
-    #[inline]
-    pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
-        let resource_async = Self::new(ctx)?;
-        resource_async.add_drop_dependa
-        Ok(Self {
-            inner: std::rc::Rc::new(resource_async),
-            _aeron: Some(aeron.clone()),
-        })
-    }
-}
-
 impl AeronSubscription {
-    pub fn close_with_no_args(&mut self) -> Result<i32, AeronCError> {
-        self.closed.set(true);
-        self.inner.close(Handlers::no_notification_handler())
+    pub fn close_with_no_args(&mut self) -> Result<(), AeronCError> {
+        self.close(Handlers::no_notification_handler())?;
+        Ok(())
     }
 }
 
 impl AeronPublication {
-    pub fn close_with_no_args(&self) -> Result<i32, AeronCError> {
-        self.closed.set(true);
-        self.inner.close(Handlers::no_notification_handler())
+    pub fn close_with_no_args(&self) -> Result<(), AeronCError> {
+        self.close(Handlers::no_notification_handler())?;
+        Ok(())
     }
 }
 
 impl AeronExclusivePublication {
-    pub fn close_with_no_args(&self) -> Result<i32, AeronCError> {
-        self.closed.set(true);
-        self.inner.close(Handlers::no_notification_handler())
+    pub fn close_with_no_args(&self) -> Result<(), AeronCError> {
+        self.close(Handlers::no_notification_handler())?;
+        Ok(())
     }
 }
 
 impl AeronCounter {
-    pub fn close_with_no_args(&self) -> Result<i32, AeronCError> {
-        self.closed.set(true);
-        self.inner.close(Handlers::no_notification_handler())
+    pub fn close_with_no_args(&self) -> Result<(), AeronCError> {
+        self.close(Handlers::no_notification_handler())?;
+        Ok(())
     }
 }
 
