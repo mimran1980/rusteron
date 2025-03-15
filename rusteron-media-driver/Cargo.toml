@@ -56,6 +56,7 @@ static=[]
 # logs the backtrace on each AeronCError
 backtrace = []
 extra-logging = []
+precompile = []
 
 [[bin]]
 name = "media_driver"

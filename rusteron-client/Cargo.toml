@@ -63,6 +63,7 @@ static = ["rusteron-media-driver/static"]
 # logs the backtrace on each AeronCError
 backtrace = []
 extra-logging = []
+precompile = []
 
 [[bench]]
 name = "ping_pong"

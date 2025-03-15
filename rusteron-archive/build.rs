@@ -1,7 +1,6 @@
 use bindgen::EnumVariation;
 use cmake::Config;
 use dunce::canonicalize;
-use glob::glob;
 use log::info;
 use proc_macro2::TokenStream;
 use rusteron_code_gen::{append_to_file, format_with_rustfmt};
@@ -62,6 +61,7 @@ pub fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     // If the artifacts folder exists and contains files, use them.
+    #[cfg(feature = "precompile")]
     if artifacts_dir.exists() && fs::read_dir(&artifacts_dir).unwrap().next().is_some() {
         println!(
             "Artifacts found in {}. Using published artifacts.",
