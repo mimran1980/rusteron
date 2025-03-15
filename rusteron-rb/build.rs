@@ -45,6 +45,7 @@ impl LinkType {
 
 pub fn main() {
     // Determine the artifacts folder based on feature, OS, and architecture.
+    #[cfg(feature = "precompile")]
     let artifacts_dir = get_artifact_path();
 
     // Determine the output directory for generated files.
