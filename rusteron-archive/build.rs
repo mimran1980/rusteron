@@ -54,7 +54,7 @@ impl LinkType {
 pub fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=bindings.h");
-    
+
     // Determine the artifacts folder based on feature, OS, and architecture.
     #[cfg(feature = "precompile")]
     let artifacts_dir = get_artifact_path();
