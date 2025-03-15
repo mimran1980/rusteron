@@ -47,6 +47,8 @@ proc-macro2 = {  workspace = true }
 rusteron-code-gen = { workspace = true }
 log = { workspace = true}
 regex = { workspace = true}
+glob = { workspace = true}
+walkdir = { workspace = true}
 
 [dev-dependencies]
 rusteron-media-driver = {path = "../rusteron-media-driver"}

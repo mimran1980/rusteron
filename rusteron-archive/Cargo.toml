@@ -42,6 +42,9 @@ proc-macro2 = {  workspace = true }
 regex = { workspace = true}
 log = { workspace = true}
 rusteron-code-gen = { workspace = true }
+glob = { workspace = true}
+walkdir = { workspace = true}
+
 
 [dev-dependencies]
 serial_test = { workspace = true }

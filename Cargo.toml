@@ -26,6 +26,8 @@ criterion = "0.5"
 serial_test = "3.2"
 regex = "1.11"
 log = "0.4"
+glob = "0.3.2"
+walkdir = "2.5.0"
 
 [release]
 bump = "auto"

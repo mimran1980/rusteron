@@ -5,7 +5,9 @@ use proc_macro2::TokenStream;
 use rusteron_code_gen::{append_to_file, format_with_rustfmt};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use walkdir::WalkDir;
 
+#[derive(PartialEq)]
 pub enum LinkType {
     Dynamic,
     Static,
@@ -42,6 +44,50 @@ impl LinkType {
 }
 
 pub fn main() {
+    // Determine the artifacts folder based on feature, OS, and architecture.
+    let artifacts_dir = get_artifact_path();
+
+    // Determine the output directory for generated files.
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    // If the artifacts folder exists and contains files, use them.
+    if artifacts_dir.exists() && fs::read_dir(&artifacts_dir).unwrap().next().is_some() {
+        println!(
+            "Artifacts found in {}. Using published artifacts.",
+            artifacts_dir.display()
+        );
+        // Add the artifacts folder to the linker search path.
+
+        if cfg!(target_os = "macos") {
+            println!(
+                "cargo:rustc-link-arg=-Wl,-rpath,{}",
+                artifacts_dir.display()
+            );
+        }
+        println!("cargo:rustc-link-search=native={}", artifacts_dir.display());
+        let link_type = LinkType::detect();
+        println!(
+            "cargo:rustc-link-lib={}{}",
+            link_type.link_lib(),
+            link_type.target_name()
+        );
+
+        // Copy generated Rust files (*.rs) from the artifacts folder into OUT_DIR.
+        for entry in WalkDir::new(&artifacts_dir) {
+            let entry = entry.unwrap();
+            if entry.file_type().is_file()
+                && entry.path().extension().map(|s| s == "rs").unwrap_or(false)
+            {
+                let file_name = entry.path().file_name().unwrap();
+                let dest = out_path.join(file_name);
+                fs::copy(entry.path(), dest)
+                    .expect("Failed to copy generated Rust file from artifacts");
+            }
+        }
+
+        // Exit early to skip rebuild since artifacts are already published.
+        return;
+    }
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=bindings.h");
     println!("cargo:rerun-if-changed=aeron/version.txt");
@@ -198,6 +244,10 @@ pub fn main() {
     if std::env::var("COPY_BINDINGS").is_ok() {
         copy_binds(out);
     }
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let cmake_lib_dir = cmake_output;
+    publish_artifacts(&out_path, &cmake_lib_dir).expect("Failed to publish artifacts");
 }
 
 // helps with easier testing
@@ -214,4 +264,63 @@ fn copy_binds(out: PathBuf) {
             custom_bindings_path.display()
         );
     }
+}
+
+fn get_artifact_path() -> PathBuf {
+    let feature = if LinkType::detect() == LinkType::Static {
+        "static"
+    } else {
+        "default"
+    };
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap(); // e.g., "macos", "linux", "windows"
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap(); // e.g., "x86_64", "aarch64"
+    let artifacts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("artifacts")
+        .join(feature)
+        .join(&target_os)
+        .join(&target_arch);
+    let _ = fs::create_dir_all(&artifacts_dir);
+    artifacts_dir
+}
+
+fn publish_artifacts(out_path: &Path, cmake_build_path: &Path) -> std::io::Result<()> {
+    let publish_dir = get_artifact_path();
+
+    // Copy all generated Rust files (*.rs) from OUT_DIR.
+    for entry in WalkDir::new(out_path) {
+        let entry = entry.unwrap();
+        if entry.file_type().is_file()
+            && entry.path().extension().map(|s| s == "rs").unwrap_or(false)
+        {
+            let file_name = entry.path().file_name().unwrap();
+            fs::copy(entry.path(), publish_dir.join(file_name))?;
+        }
+    }
+
+    let lib_extensions = ["a", "so", "dylib", "lib"];
+
+    let mut libs_copied = 0;
+    for entry in WalkDir::new(cmake_build_path) {
+        if entry.is_err() {
+            continue;
+        }
+        let entry = entry.unwrap();
+        if entry.file_type().is_file() {
+            if let Some(ext) = entry.path().extension() {
+                if lib_extensions.iter().any(|&e| ext == e) {
+                    // Copy file preserving its file name.
+                    let file_name = entry.path().file_name().unwrap();
+                    fs::copy(entry.path(), publish_dir.join(file_name))?;
+                    libs_copied += 1;
+                }
+            }
+        }
+    }
+
+    assert!(
+        libs_copied > 0,
+        "No libraries found in the cmake build directory."
+    );
+    println!("Artifacts published to: {}", publish_dir.display());
+    Ok(())
 }
