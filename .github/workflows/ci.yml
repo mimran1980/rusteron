@@ -60,19 +60,18 @@ jobs:
             os: ubuntu-latest
             runner: ubuntu-latest
             features: [default, static]
-            rust-version: ["stable"]
+            rust-version: "stable"
           - name: macOS x86
             os: macos-latest
             runner: macos-latest
             arch: x86_64
             features: [default, static]
-            rust-version: ["stable"]
+            rust-version: "stable"
           - name: macOS ARM
             os: macos-latest
-            runner: self-hosted-mac-arm  # Your self-hosted Apple Silicon runner label
             arch: arm64
             features: [default, static]
-            rust-version: ["stable"]
+            rust-version: "stable"
 
     env:
       feature-flags: ${{ matrix.features != 'default' && format('--features {0}', matrix.features) || '' }}
