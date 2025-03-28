@@ -20,6 +20,7 @@ pub mod bindings {
 
 use bindings::*;
 use std::cell::Cell;
+use std::ops::Sub;
 use std::os::raw::c_int;
 use std::time::{Duration, Instant};
 
@@ -160,6 +161,94 @@ impl AeronArchiveAsyncConnect {
         let resource_async = Self::new(ctx)?;
         resource_async.inner.add_dependency(aeron.clone());
         Ok(resource_async)
+    }
+}
+
+impl AeronPublication {
+    /// Retrieves the current active live archive position using the Aeron counters.
+    /// Not found returns error
+    pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
+        if let Some(aeron) = unsafe {
+            (*self.inner.dependencies.get())
+                .iter()
+                .find_map(|x| x.downcast_ref::<std::rc::Rc<Aeron>>())
+        } {
+            let counter_reader = &aeron.counters_reader();
+            self.get_archive_position_with(&counter_reader)
+        } else {
+            Err(AeronCError::from_code(-1))
+        }
+    }
+
+    /// Retrieves the current active live archive position using the Aeron counters.
+    /// Not found returns error with provided counter reader
+    pub fn get_archive_position_with(
+        &self,
+        counters: &AeronCountersReader,
+    ) -> Result<i64, AeronCError> {
+        let session_id = self.get_constants()?.session_id();
+        let counter_id = RecordingPos::find_counter_id_by_session(counters, session_id);
+        if counter_id < 0 {
+            return Err(AeronCError::from_code(counter_id));
+        }
+        let position = counters.get_counter_value(counter_id);
+        if position < 0 {
+            return Err(AeronCError::from_code(position as i32));
+        }
+        return Ok(position);
+    }
+
+    /// Checks if the publication's current position is within a specified inclusive length of the archive position.
+    pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
+        let position = self.get_archive_position().unwrap_or(-1);
+        if position < 0 {
+            return false;
+        }
+        self.position().sub(position) <= length_inclusive as i64
+    }
+}
+
+impl AeronExclusivePublication {
+    /// Retrieves the current active live archive position using the Aeron counters.
+    /// Not found returns error
+    pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
+        if let Some(aeron) = unsafe {
+            (*self.inner.dependencies.get())
+                .iter()
+                .find_map(|x| x.downcast_ref::<std::rc::Rc<Aeron>>())
+        } {
+            let counter_reader = &aeron.counters_reader();
+            self.get_archive_position_with(&counter_reader)
+        } else {
+            Err(AeronCError::from_code(-1))
+        }
+    }
+
+    /// Retrieves the current active live archive position using the Aeron counters.
+    /// Not found returns error with provided counter reader
+    pub fn get_archive_position_with(
+        &self,
+        counters: &AeronCountersReader,
+    ) -> Result<i64, AeronCError> {
+        let session_id = self.get_constants()?.session_id();
+        let counter_id = RecordingPos::find_counter_id_by_session(counters, session_id);
+        if counter_id < 0 {
+            return Err(AeronCError::from_code(counter_id));
+        }
+        let position = counters.get_counter_value(counter_id);
+        if position < 0 {
+            return Err(AeronCError::from_code(position as i32));
+        }
+        return Ok(position);
+    }
+
+    /// Checks if the publication's current position is within a specified inclusive length of the archive position.
+    pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
+        let position = self.get_archive_position().unwrap_or(-1);
+        if position < 0 {
+            return false;
+        }
+        self.position().sub(position) <= length_inclusive as i64
     }
 }
 
@@ -377,7 +466,7 @@ mod tests {
         let counters_reader = aeron.counters_reader();
         let publisher_thread = thread::spawn(move || {
             let mut message_count = 0;
-            let mut counter_id = -1;
+            let counter_id = -1;
             let session_id = publication.get_constants().unwrap().session_id;
 
             while running.load(Ordering::Acquire) {
@@ -399,16 +488,10 @@ mod tests {
                 }
                 // slow down publishing so can catch up
                 if message_count > 10_000 {
-                    while counter_id < 0 {
-                        counter_id =
-                            RecordingPos::find_counter_id_by_session(&counters_reader, session_id);
-                    }
-
                     // ensure archiver is caught up
-                    while counters_reader.get_counter_value(counter_id) < publication.position() {
-                        thread::sleep(Duration::from_micros(1));
+                    while !publication.is_archive_position_with(0) {
+                        thread::sleep(Duration::from_micros(300));
                     }
-                    thread::sleep(Duration::from_micros(300));
                 }
             }
             info!("Publisher thread terminated");

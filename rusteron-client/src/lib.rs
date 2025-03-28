@@ -689,6 +689,57 @@ mod tests {
 
     #[test]
     #[serial]
+    pub fn should_be_able_to_drop_after_close_manually_being_called(
+    ) -> Result<(), Box<dyn error::Error>> {
+        let _ = env_logger::Builder::new()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Info)
+            .try_init();
+
+        let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
+        media_driver_ctx.set_dir_delete_on_shutdown(true)?;
+        media_driver_ctx.set_dir_delete_on_start(true)?;
+        media_driver_ctx.set_dir(&format!(
+            "{}{}",
+            media_driver_ctx.get_dir(),
+            Aeron::epoch_clock()
+        ))?;
+        let (_stop, driver_handle) =
+            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+
+        let ctx = AeronContext::new()?;
+        ctx.set_dir(media_driver_ctx.get_dir())?;
+        ctx.set_error_handler(Some(&Handler::leak(AeronErrorHandlerLogger)))?;
+
+        let aeron = Aeron::new(&ctx)?;
+        aeron.start()?;
+
+        {
+            let publisher = aeron.add_publication(AERON_IPC_STREAM, 123, Duration::from_secs(5))?;
+            info!("created publication [sessionId={}]", publisher.session_id());
+            publisher.close_with_no_args()?;
+            drop(publisher);
+        }
+
+        {
+            let publisher = aeron.add_publication(AERON_IPC_STREAM, 124, Duration::from_secs(5))?;
+            info!("created publication [sessionId={}]", publisher.session_id());
+            publisher.close(Handlers::no_notification_handler())?;
+            drop(publisher);
+        }
+
+        {
+            let publisher = aeron.add_publication(AERON_IPC_STREAM, 125, Duration::from_secs(5))?;
+            publisher.close_once(|| println!("on close"))?;
+            info!("created publication [sessionId={}]", publisher.session_id());
+            drop(publisher);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
     pub fn offer_on_closed_publication_error_test() -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
