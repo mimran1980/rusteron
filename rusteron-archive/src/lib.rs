@@ -204,7 +204,7 @@ impl AeronPublication {
         if position < 0 {
             return false;
         }
-        self.position().sub(position) <= length_inclusive as i64
+        self.position().sub(position) >= length_inclusive as i64
     }
 }
 
@@ -244,11 +244,11 @@ impl AeronExclusivePublication {
 
     /// Checks if the publication's current position is within a specified inclusive length of the archive position.
     pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
-        let position = self.get_archive_position().unwrap_or(-1);
-        if position < 0 {
+        let archive_position = self.get_archive_position().unwrap_or(-1);
+        if archive_position < 0 {
             return false;
         }
-        self.position().sub(position) <= length_inclusive as i64
+        self.position().sub(archive_position) >= length_inclusive as i64
     }
 }
 
