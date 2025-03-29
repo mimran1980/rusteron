@@ -114,6 +114,7 @@ impl<T> ManagedCResource<T> {
         unsafe { &mut *self.resource }
     }
 
+    #[inline]
     // to prevent the dependencies from being dropped as you have a copy here
     pub fn add_dependency<D: std::any::Any>(&self, dep: D) {
         if let Some(dep) =
@@ -129,6 +130,7 @@ impl<T> ManagedCResource<T> {
         }
     }
 
+    #[inline]
     pub fn get_dependency<V: Clone + 'static>(&self) -> Option<V> {
         unsafe {
             (*self.dependencies.get())

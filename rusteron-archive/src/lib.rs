@@ -165,89 +165,53 @@ impl AeronArchiveAsyncConnect {
     }
 }
 
-impl AeronPublication {
-    /// Retrieves the current active live archive position using the Aeron counters.
-    /// Not found returns error
-    pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
-        if let Some(aeron) = self.inner.get_dependency::<Aeron>() {
-            let counter_reader = &aeron.counters_reader();
-            self.get_archive_position_with(&counter_reader)
-        } else {
-            Err(AeronCError::from_code(-1))
-        }
-    }
+macro_rules! impl_archive_position_methods {
+    ($pub_type:ty) => {
+        impl $pub_type {
+            /// Retrieves the current active live archive position using the Aeron counters.
+            /// Returns an error if not found.
+            pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
+                if let Some(aeron) = self.inner.get_dependency::<Aeron>() {
+                    let counter_reader = &aeron.counters_reader();
+                    self.get_archive_position_with(counter_reader)
+                } else {
+                    Err(AeronCError::from_code(-1))
+                }
+            }
 
-    /// Retrieves the current active live archive position using the Aeron counters.
-    /// Not found returns error with provided counter reader
-    pub fn get_archive_position_with(
-        &self,
-        counters: &AeronCountersReader,
-    ) -> Result<i64, AeronCError> {
-        let session_id = self.get_constants()?.session_id();
-        let counter_id = RecordingPos::find_counter_id_by_session(counters, session_id);
-        if counter_id < 0 {
-            return Err(AeronCError::from_code(counter_id));
-        }
-        let position = counters.get_counter_value(counter_id);
-        if position < 0 {
-            return Err(AeronCError::from_code(position as i32));
-        }
-        return Ok(position);
-    }
+            /// Retrieves the current active live archive position using the provided counter reader.
+            /// Returns an error if not found.
+            pub fn get_archive_position_with(
+                &self,
+                counters: &AeronCountersReader,
+            ) -> Result<i64, AeronCError> {
+                let session_id = self.get_constants()?.session_id();
+                let counter_id = RecordingPos::find_counter_id_by_session(counters, session_id);
+                if counter_id < 0 {
+                    return Err(AeronCError::from_code(counter_id));
+                }
+                let position = counters.get_counter_value(counter_id);
+                if position < 0 {
+                    return Err(AeronCError::from_code(position as i32));
+                }
+                Ok(position)
+            }
 
-    /// Checks if the publication's current position is within a specified inclusive length of the archive position.
-    pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
-        let archive_position = self.get_archive_position().unwrap_or(-1);
-        if archive_position < 0 {
-            return false;
+            /// Checks if the publication's current position is within a specified inclusive length
+            /// of the archive position.
+            pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
+                let archive_position = self.get_archive_position().unwrap_or(-1);
+                if archive_position < 0 {
+                    return false;
+                }
+                self.position() - archive_position <= length_inclusive as i64
+            }
         }
-        self.position() - archive_position <= length_inclusive as i64
-    }
+    };
 }
 
-impl AeronExclusivePublication {
-    /// Retrieves the current active live archive position using the Aeron counters.
-    /// Not found returns error
-    pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
-        if let Some(aeron) = unsafe {
-            (*self.inner.dependencies.get())
-                .iter()
-                .find_map(|x| x.downcast_ref::<std::rc::Rc<Aeron>>())
-        } {
-            let counter_reader = &aeron.counters_reader();
-            self.get_archive_position_with(&counter_reader)
-        } else {
-            Err(AeronCError::from_code(-1))
-        }
-    }
-
-    /// Retrieves the current active live archive position using the Aeron counters.
-    /// Not found returns error with provided counter reader
-    pub fn get_archive_position_with(
-        &self,
-        counters: &AeronCountersReader,
-    ) -> Result<i64, AeronCError> {
-        let session_id = self.get_constants()?.session_id();
-        let counter_id = RecordingPos::find_counter_id_by_session(counters, session_id);
-        if counter_id < 0 {
-            return Err(AeronCError::from_code(counter_id));
-        }
-        let position = counters.get_counter_value(counter_id);
-        if position < 0 {
-            return Err(AeronCError::from_code(position as i32));
-        }
-        return Ok(position);
-    }
-
-    /// Checks if the publication's current position is within a specified inclusive length of the archive position.
-    pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
-        let archive_position = self.get_archive_position().unwrap_or(-1);
-        if archive_position < 0 {
-            return false;
-        }
-        self.position().sub(archive_position) >= length_inclusive as i64
-    }
-}
+impl_archive_position_methods!(AeronPublication);
+impl_archive_position_methods!(AeronExclusivePublication);
 
 impl AeronArchiveContext {
     // The method below sets no credentials supplier, which is essential for the operation
