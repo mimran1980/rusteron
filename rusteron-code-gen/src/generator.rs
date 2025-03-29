@@ -1856,6 +1856,20 @@ pub fn generate_rust_code(
                 .filter(|t| !t.is_empty())
                 .collect();
 
+            let async_dependancies = async_new_args
+                .iter()
+                .filter(|a| {
+                    a.to_string().contains(" : Aeron") || a.to_string().contains(" : & Aeron")
+                })
+                .map(|e| {
+                    let var_name =
+                        format_ident!("{}", e.to_string().split_whitespace().next().unwrap());
+                    quote! {
+                        result.inner.add_dependency(#var_name.clone());
+                    }
+                })
+                .collect_vec();
+
             let async_new_args_for_client = async_new_args.iter().skip(1).cloned().collect_vec();
 
             let async_new_args_name_only: Vec<TokenStream> = new_method
@@ -1945,9 +1959,11 @@ pub fn generate_rust_code(
                                 false,
                                 None,
                             )?;
-                            Ok(Self {
+                            let result = Self {
                                 inner: std::rc::Rc::new(resource_async),
-                            })
+                            };
+                            #(#async_dependancies)*
+                            Ok(result)
                         }
 
                         pub fn poll(&self) -> Result<Option<#main_class_name>, AeronCError> {

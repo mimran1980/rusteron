@@ -1,5 +1,4 @@
 use crate::AeronErrorType::Unknown;
-use std::any::Any;
 #[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::cell::UnsafeCell;
@@ -22,7 +21,7 @@ pub struct ManagedCResource<T> {
     /// this will be called if closed hasn't already happened even if its borrowed
     auto_close: std::cell::Cell<bool>,
     // to prevent the dependencies from being dropped as you have a copy here
-    dependencies: UnsafeCell<Vec<std::rc::Rc<dyn Any>>>,
+    dependencies: UnsafeCell<Vec<std::rc::Rc<dyn std::any::Any>>>,
 }
 
 impl<T> std::fmt::Debug for ManagedCResource<T> {
@@ -116,9 +115,26 @@ impl<T> ManagedCResource<T> {
     }
 
     // to prevent the dependencies from being dropped as you have a copy here
-    pub fn add_dependency<D: Any>(&self, dep: D) {
+    pub fn add_dependency<D: std::any::Any>(&self, dep: D) {
+        if let Some(dep) =
+            (&dep as &dyn std::any::Any).downcast_ref::<std::rc::Rc<dyn std::any::Any>>()
+        {
+            unsafe {
+                (*self.dependencies.get()).push(dep.clone());
+            }
+        } else {
+            unsafe {
+                (*self.dependencies.get()).push(std::rc::Rc::new(dep));
+            }
+        }
+    }
+
+    pub fn get_dependency<V: Clone + 'static>(&self) -> Option<V> {
         unsafe {
-            (*self.dependencies.get()).push(std::rc::Rc::new(dep));
+            (*self.dependencies.get())
+                .iter()
+                .filter_map(|x| x.as_ref().downcast_ref::<V>().cloned())
+                .next()
         }
     }
 
