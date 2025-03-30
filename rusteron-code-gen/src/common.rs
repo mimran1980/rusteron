@@ -380,8 +380,11 @@ impl std::error::Error for AeronCError {}
 ///
 /// `Handler` is a struct that wraps a raw pointer and a drop flag.
 ///
-/// **Important:** `Handler` does not get dropped automatically.
+/// **Important:** `Handler` *MAY* not get dropped automatically. It depends if aeron takes ownership.
+/// For example for global level handlers e.g. error handler aeron will release this handle when closing.
+///
 /// You need to call the `release` method if you want to clear the memory manually.
+/// Its important that you test this out as aeron may do it when closing aeron client.
 ///
 /// ## Example
 ///
@@ -514,7 +517,7 @@ impl ControlMode {
 
 #[cfg(test)]
 #[allow(dead_code)]
-mod test_alloc {
+pub(crate) mod test_alloc {
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::sync::atomic::{AtomicIsize, Ordering};
 
