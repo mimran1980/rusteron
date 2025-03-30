@@ -20,7 +20,6 @@ pub mod bindings {
 
 use bindings::*;
 use std::cell::Cell;
-use std::ops::Sub;
 use std::os::raw::c_int;
 use std::time::{Duration, Instant};
 
@@ -213,6 +212,9 @@ macro_rules! impl_archive_position_methods {
 impl_archive_position_methods!(AeronPublication);
 impl_archive_position_methods!(AeronExclusivePublication);
 
+const NO_OP_AERON_IDEL_STRAT_HANDLER: std::sync::LazyLock<Handler<NoOpAeronIdleStrategyFunc>> =
+    std::sync::LazyLock::new(|| Handler::leak(NoOpAeronIdleStrategyFunc));
+
 impl AeronArchiveContext {
     // The method below sets no credentials supplier, which is essential for the operation
     // of the Aeron Archive Context. The `set_credentials_supplier` must be set to prevent
@@ -241,7 +243,7 @@ impl AeronArchiveContext {
         context.set_control_response_channel(response_control_channel)?;
         context.set_recording_events_channel(recording_events_channel)?;
         // see https://github.com/mimran1980/rusteron/issues/18
-        context.set_idle_strategy(Some(&Handler::leak(NoOpAeronIdleStrategyFunc)))?;
+        context.set_idle_strategy(Some(&NO_OP_AERON_IDEL_STRAT_HANDLER))?;
         Ok(context)
     }
 }
@@ -615,25 +617,6 @@ mod tests {
         assert_eq!(aeron_version, cargo_version);
     }
 
-    // #[test]
-    // #[serial]
-    // pub fn test_failed_connect() -> Result<(), Box<dyn error::Error>> {
-    //         env_logger::Builder::new()
-    //         .is_test(true)
-    //         .filter_level(log::LevelFilter::Info)
-    //         .init();
-    //     let ctx = AeronArchiveContext::new()?;
-    //     std::env::set_var("AERON_DRIVER_TIMEOUT", "1");
-    //     let connect = AeronArchiveAsyncConnect::new(&ctx);
-    //     std::env::remove_var("AERON_DRIVER_TIMEOUT");
-    //
-    //     assert_eq!(
-    //         Some(AeronErrorType::NullOrNotConnected.into()),
-    //         connect.err()
-    //     );
-    //     Ok(())
-    // }
-
     use std::thread;
 
     pub fn start_aeron_archive() -> Result<
@@ -837,11 +820,12 @@ mod tests {
         info!("archive id: {}", archive.get_archive_id());
 
         info!("add subscription {}", channel_replay);
+        let available_handler = Handler::leak(AeronAvailableImageLogger);
         let subscription = aeron
             .async_add_subscription(
                 &channel_replay,
                 replay_stream_id,
-                Some(&Handler::leak(AeronAvailableImageLogger)),
+                Some(&available_handler),
                 Some(&Handler::leak(AeronUnavailableImageLogger)),
             )?
             .poll_blocking(Duration::from_secs(10))?;
@@ -860,7 +844,8 @@ mod tests {
             }
         }
 
-        let poll = Handler::leak(FragmentHandler::default());
+        let handler = FragmentHandler::default();
+        let poll = Handler::leak(handler);
 
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(10) && subscription.poll(Some(&poll), 100)? <= 0

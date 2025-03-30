@@ -25,6 +25,7 @@ include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_alloc::current_allocs;
     use log::{error, info};
     use serial_test::serial;
     use std::error;
@@ -54,19 +55,27 @@ mod tests {
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
             .try_init();
-        let major = unsafe { crate::aeron_version_major() };
-        let minor = unsafe { crate::aeron_version_minor() };
-        let patch = unsafe { crate::aeron_version_patch() };
 
-        let cargo_version = "1.47.4";
-        let aeron_version = format!("{}.{}.{}", major, minor, patch);
-        assert_eq!(aeron_version, cargo_version);
+        let alloc_count = current_allocs();
+        {
+            let major = unsafe { crate::aeron_version_major() };
+            let minor = unsafe { crate::aeron_version_minor() };
+            let patch = unsafe { crate::aeron_version_patch() };
 
-        let ctx = AeronContext::new()?;
-        let error_count = 1;
-        ctx.set_error_handler(Some(&Handler::leak(ErrorCount::default())))?;
+            let cargo_version = "1.47.4";
+            let aeron_version = format!("{}.{}.{}", major, minor, patch);
+            assert_eq!(aeron_version, cargo_version);
 
-        assert!(Aeron::epoch_clock() > 0);
+            let ctx = AeronContext::new()?;
+            let error_count = 1;
+            let mut handler = Handler::leak(ErrorCount::default());
+            ctx.set_error_handler(Some(&handler))?;
+
+            assert!(Aeron::epoch_clock() > 0);
+            handler.release();
+        }
+
+        assert!(current_allocs() <= alloc_count);
 
         Ok(())
     }

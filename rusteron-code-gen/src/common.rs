@@ -511,3 +511,46 @@ impl ControlMode {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod test_alloc {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicIsize, Ordering};
+
+    /// A simple global allocator that tracks the net allocation count.
+    pub struct CountingAllocator {
+        allocs: AtomicIsize,
+    }
+
+    impl CountingAllocator {
+        pub const fn new() -> Self {
+            Self {
+                allocs: AtomicIsize::new(0),
+            }
+        }
+        /// Returns the current allocation counter value.
+        fn current(&self) -> isize {
+            self.allocs.load(Ordering::SeqCst)
+        }
+    }
+
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            self.allocs.fetch_add(1, Ordering::SeqCst);
+            System.alloc(layout)
+        }
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            self.allocs.fetch_sub(1, Ordering::SeqCst);
+            System.dealloc(ptr, layout)
+        }
+    }
+
+    #[global_allocator]
+    static GLOBAL: CountingAllocator = CountingAllocator::new();
+
+    /// Returns the current allocation counter value.
+    pub fn current_allocs() -> isize {
+        GLOBAL.current()
+    }
+}
