@@ -20,7 +20,9 @@ pub struct ManagedCResource<T> {
     check_for_is_closed: Option<Box<dyn Fn(*mut T) -> bool>>,
     /// this will be called if closed hasn't already happened even if its borrowed
     auto_close: std::cell::Cell<bool>,
-    // to prevent the dependencies from being dropped as you have a copy here
+    /// to prevent the dependencies from being dropped as you have a copy here,
+    /// for example, you want to have a dependency to aeron for any async jobs so aeron doesnt get dropped first
+    /// when you have a publication/subscription
     dependencies: UnsafeCell<Vec<std::rc::Rc<dyn std::any::Any>>>,
 }
 
