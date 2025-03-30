@@ -524,6 +524,9 @@ pub(crate) mod test_alloc {
     use std::sync::atomic::{AtomicIsize, Ordering};
 
     /// A simple global allocator that tracks the net allocation count.
+    /// For very simple examples can do allocation count before and after your test.
+    /// This does not work well with logger, running media driver, etc. Only for the most
+    /// basic controlled examples
     pub struct CountingAllocator {
         allocs: AtomicIsize,
     }
