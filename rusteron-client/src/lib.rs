@@ -698,7 +698,7 @@ mod tests {
 
     #[test]
     #[serial]
-    pub fn should_be_able_to_drop_after_close_manually_being_called(
+    pub fn should_be_able_to_drop_after_close_manually_being_closed(
     ) -> Result<(), Box<dyn error::Error>> {
         let _ = env_logger::Builder::new()
             .is_test(true)
