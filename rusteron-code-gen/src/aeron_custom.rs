@@ -25,7 +25,7 @@ impl AeronCnc {
         )?;
 
         let result = Self {
-            inner: std::rc::Rc::new(resource),
+            inner: resource,
         };
         Ok(result)
     }
@@ -214,7 +214,7 @@ impl AeronCncMetadata {
         )?;
 
         let result = Self {
-            inner: std::rc::Rc::new(resource),
+            inner: resource,
         };
         Ok(result)
     }

@@ -30,13 +30,15 @@ include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
 
 unsafe impl Sync for AeronDriverContext {}
 unsafe impl Send for AeronDriverContext {}
+unsafe impl Sync for AeronDriver {}
+unsafe impl Send for AeronDriver {}
 
 impl AeronDriver {
     pub fn launch_embedded(
-        aeron_context: AeronDriverContext,
+        aeron_context: &AeronDriverContext,
         register_sigint: bool,
     ) -> (Arc<AtomicBool>, JoinHandle<Result<(), AeronCError>>) {
-        AeronDriver::wait_for_previous_media_driver_to_timeout(&aeron_context);
+        AeronDriver::wait_for_previous_media_driver_to_timeout(aeron_context);
 
         let stop = Arc::new(AtomicBool::new(false));
         let stop_copy = stop.clone();
@@ -53,8 +55,8 @@ impl AeronDriver {
         let started2 = started.clone();
 
         info!("Starting media driver [dir={}]", aeron_context.get_dir());
+        let aeron_driver = AeronDriver::new(&aeron_context).unwrap();
         let handle = std::thread::spawn(move || {
-            let aeron_driver = AeronDriver::new(&aeron_context)?;
             aeron_driver.start(true)?;
 
             info!(
@@ -152,7 +154,7 @@ mod tests {
         aeron_context.set_dir_delete_on_shutdown(true)?;
         aeron_context.set_dir_delete_on_start(true)?;
 
-        let (stop, _driver_handle) = AeronDriver::launch_embedded(aeron_context.clone(), false);
+        let (stop, _driver_handle) = AeronDriver::launch_embedded(&aeron_context, false);
 
         // aeron_driver
         //     .conductor()
@@ -244,12 +246,12 @@ mod tests {
 
     #[test]
     pub fn test_debug() -> Result<(), Box<dyn std::error::Error>> {
-        let ctx = AeronDriverContext::new()?;
+        let ctx = Arc::new(AeronDriverContext::new()?);
 
         println!("{:#?}", ctx);
 
         struct AgentStartHandler {
-            ctx: AeronDriverContext,
+            ctx: Arc<AeronDriverContext>,
         }
 
         impl AeronAgentStartFuncCallback for AgentStartHandler {
@@ -263,8 +265,9 @@ mod tests {
             }
         }
 
+        let copy = ctx.clone();
         ctx.set_agent_on_start_function(Some(&Handler::leak(AgentStartHandler {
-            ctx: ctx.clone(),
+            ctx: copy,
         })))?;
 
         println!("{:#?}", ctx);

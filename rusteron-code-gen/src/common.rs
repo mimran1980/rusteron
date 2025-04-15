@@ -75,8 +75,8 @@ impl<T> ManagedCResource<T> {
             auto_close: std::cell::Cell::new(false),
             dependencies: UnsafeCell::new(vec![]),
         };
-        #[cfg(feature = "extra-logging")]
-        log::debug!("created c resource: {:?}", result);
+        // #[cfg(feature = "extra-logging")]
+        println!("created c resource: {:?}", result);
         Ok(result)
     }
 
@@ -190,15 +190,15 @@ impl<T> Drop for ManagedCResource<T> {
 
                 if !already_closed {
                     // Ensure the clean-up function is called when the resource is dropped.
-                    #[cfg(feature = "extra-logging")]
-                    log::debug!("closing c resource: {:?}", self);
+                    // #[cfg(feature = "extra-logging")]
+                    println!("closing c resource: {:?}", self);
                     let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
                 }
                 self.close_already_called.set(true);
 
                 if self.cleanup_struct {
-                    #[cfg(feature = "extra-logging")]
-                    log::debug!("closing rust struct resource: {:?}", resource);
+                    // #[cfg(feature = "extra-logging")]
+                    println!("closing rust struct resource: {:?}", resource);
                     unsafe {
                         let _ = Box::from_raw(resource);
                     }
@@ -427,8 +427,8 @@ impl<T> Handler<T> {
     pub fn release(&mut self) {
         if self.should_drop && !self.raw_ptr.is_null() {
             unsafe {
-                #[cfg(feature = "extra-logging")]
-                log::debug!("dropping handler {:?}", self.raw_ptr);
+                // #[cfg(feature = "extra-logging")]
+                println!("dropping handler {:?}", self.raw_ptr);
                 let _ = Box::from_raw(self.raw_ptr as *mut Box<T>);
                 self.should_drop = false;
             }

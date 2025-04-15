@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let running_publisher = Arc::clone(&running);
     let running_subscriber = Arc::clone(&running);
 
-    let rb = AeronSpscRb::new_with_capacity(1024 * 1024, MESSAGE_LENGTH)?;
+    let rb = Arc::new(AeronSpscRb::new_with_capacity(1024 * 1024, MESSAGE_LENGTH)?);
 
     let publisher_thread = {
         let rb = rb.clone();
@@ -54,11 +54,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 struct Publisher {
     running: Arc<AtomicBool>,
-    publication: AeronSpscRb,
+    publication: Arc<AeronSpscRb>,
 }
 
 impl Publisher {
-    fn new(running: Arc<AtomicBool>, publication: AeronSpscRb) -> Self {
+    fn new(running: Arc<AtomicBool>, publication: Arc<AeronSpscRb>) -> Self {
         Publisher {
             running,
             publication,
@@ -92,7 +92,7 @@ impl Publisher {
 
 struct ImageRateSubscriber {
     running: Arc<AtomicBool>,
-    subscription: AeronSpscRb,
+    subscription: Arc<AeronSpscRb>,
     handler: Handler<AeronRingBufferHandlerWrapper<MsgCount>>,
     message_length: usize,
     start_time: Instant,
@@ -111,7 +111,7 @@ impl AeronRingBufferHandlerCallback for MsgCount {
 }
 
 impl ImageRateSubscriber {
-    fn new(running: Arc<AtomicBool>, subscription: AeronSpscRb, message_length: usize) -> Self {
+    fn new(running: Arc<AtomicBool>, subscription: Arc<AeronSpscRb>, message_length: usize) -> Self {
         let poll_handler = AeronRingBufferHandlerWrapper::new(MsgCount { message_count: 0 });
         ImageRateSubscriber {
             running,

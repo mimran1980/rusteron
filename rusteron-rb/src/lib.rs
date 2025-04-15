@@ -24,10 +24,11 @@ include!(concat!(env!("OUT_DIR"), "/rb_custom.rs"));
 mod tests {
     use super::*;
     use std::error;
+    use std::rc::Rc;
 
     #[test]
     pub fn spsc_normal() -> Result<(), Box<dyn error::Error>> {
-        let rb = AeronSpscRb::new_with_capacity(1024 * 1024, 1024)?;
+        let rb = Rc::new(AeronSpscRb::new_with_capacity(1024 * 1024, 1024)?);
         let rb2 = rb.clone();
 
         for i in 0..100 {
@@ -95,7 +96,7 @@ mod tests {
 
     #[test]
     pub fn mpsc_normal() -> Result<(), Box<dyn error::Error>> {
-        let rb = AeronMpscRb::new_with_capacity(1024 * 1024, 1024)?;
+        let rb = Rc::new(AeronMpscRb::new_with_capacity(1024 * 1024, 1024)?);
 
         for i in 0..100 {
             // msg_type_id must >0
@@ -125,7 +126,7 @@ mod tests {
 
     #[test]
     pub fn mpsc_control() -> Result<(), Box<dyn error::Error>> {
-        let rb = AeronMpscRb::new_with_capacity(1024 * 1024, 1024)?;
+        let rb = Rc::new(AeronMpscRb::new_with_capacity(1024 * 1024, 1024)?);
 
         for i in 0..100 {
             // msg_type_id must >0

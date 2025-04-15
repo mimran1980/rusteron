@@ -95,7 +95,7 @@ fn run_pong(running_pong: Arc<AtomicBool>) -> Result<(), Box<dyn std::error::Err
     }
 
     let handler = Handler::leak(PongRoundTripHandler {
-        publisher: ping_publication.clone(),
+        publisher: ping_publication,
         buffer_claim: Default::default(),
         header_values: Default::default(),
     });

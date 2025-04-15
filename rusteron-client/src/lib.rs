@@ -96,7 +96,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -278,7 +278,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -411,7 +411,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -466,12 +466,12 @@ mod tests {
         aeron.start()?;
         info!("client started [counters test]");
 
-        let counter = aeron.add_counter(
+        let counter = Arc::new(aeron.add_counter(
             123,
             "key".as_bytes(),
             "label_buffer",
             Duration::from_secs(5),
-        )?;
+        )?);
         let constants = counter.get_constants()?;
         let counter_id = constants.counter_id;
 
@@ -551,7 +551,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -626,7 +626,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (_stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -714,7 +714,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (_stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -764,7 +764,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (_stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
@@ -810,7 +810,7 @@ mod tests {
             Aeron::epoch_clock()
         ))?;
         let (_stop, driver_handle) =
-            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+            rusteron_media_driver::AeronDriver::launch_embedded(&media_driver_ctx, false);
 
         let ctx = AeronContext::new()?;
         ctx.set_dir(media_driver_ctx.get_dir())?;
