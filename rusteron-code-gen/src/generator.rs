@@ -508,7 +508,7 @@ impl CWrapper {
 
                 let set_closed = if method.struct_method_name == "close" {
                     quote! {
-                        if let Some(inner) = self.owned_inner.as_mut() {
+                        if let Some(inner) = self.owned_inner.as_ref() {
                             inner.close_already_called.set(true);
                         }
                     }
@@ -1982,7 +1982,7 @@ pub fn generate_rust_code(
                             Ok(result)
                         }
 
-                        pub fn poll(&mut self) -> Result<Option<#main_class_name>, AeronCError> {
+                        pub fn poll(&self) -> Result<Option<#main_class_name>, AeronCError> {
 
                             let mut result = #main_class_name::new(self);
                             if let Ok(result) = &mut result {
