@@ -266,9 +266,7 @@ mod tests {
         }
 
         let copy = ctx.clone();
-        ctx.set_agent_on_start_function(Some(&Handler::leak(AgentStartHandler {
-            ctx: copy,
-        })))?;
+        ctx.set_agent_on_start_function(Some(&Handler::leak(AgentStartHandler { ctx: copy })))?;
 
         println!("{:#?}", ctx);
 

@@ -111,7 +111,11 @@ impl AeronRingBufferHandlerCallback for MsgCount {
 }
 
 impl ImageRateSubscriber {
-    fn new(running: Arc<AtomicBool>, subscription: Arc<AeronSpscRb>, message_length: usize) -> Self {
+    fn new(
+        running: Arc<AtomicBool>,
+        subscription: Arc<AeronSpscRb>,
+        message_length: usize,
+    ) -> Self {
         let poll_handler = AeronRingBufferHandlerWrapper::new(MsgCount { message_count: 0 });
         ImageRateSubscriber {
             running,

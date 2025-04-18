@@ -466,12 +466,12 @@ mod tests {
         aeron.start()?;
         info!("client started [counters test]");
 
-        let counter = Arc::new(aeron.add_counter(
+        let counter = aeron.add_counter(
             123,
             "key".as_bytes(),
             "label_buffer",
             Duration::from_secs(5),
-        )?);
+        )?;
         let constants = counter.get_constants()?;
         let counter_id = constants.counter_id;
 

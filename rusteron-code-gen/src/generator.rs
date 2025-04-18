@@ -204,7 +204,7 @@ impl ReturnType {
                 let new_type =
                     parse_str::<Type>(&wrapper.class_name).expect("Invalid class name in wrapper");
                 if use_ref_for_cwrapper {
-                    return quote! { &#new_type };
+                    return quote! { &'a #new_type };
                 } else {
                     return quote! { #new_type };
                 }
@@ -1105,7 +1105,8 @@ impl CWrapper {
                                 #is_closed_method,
                             )?;
 
-                            Ok(Self { inner: resource_constructor })
+                            Ok(Self { inner: resource_constructor,
+                            _marker: Default::default() })
                         }
                     }
                 } else {
@@ -1142,7 +1143,8 @@ impl CWrapper {
                         #is_closed_method
                     )?;
 
-                    Ok(Self { inner: resource })
+                    Ok(Self { inner: resource,
+                            _marker: Default::default() })
                 }
             };
             if self.has_default_method() {
@@ -1220,7 +1222,8 @@ impl CWrapper {
                             #is_closed_method
                         )?;
 
-                        Ok(Self { inner: r_constructor })
+                        Ok(Self { inner: r_constructor,
+                            _marker: Default::default() })
                     }
 
                     #zeroed_impl
@@ -1895,7 +1898,7 @@ pub fn generate_rust_code(
                 .collect();
 
             quote! {
-                    impl #main_class_name {
+                    impl<'a> #main_class_name<'a> {
                         #[inline]
                         pub fn new #where_clause_main (#(#new_args),*) -> Result<Self, AeronCError> {
                             let resource = ManagedCResource::new(
@@ -1908,11 +1911,12 @@ pub fn generate_rust_code(
                             )?;
                             Ok(Self {
                                 inner: resource,
+                            _marker: Default::default()
                             })
                         }
                     }
 
-                    impl #client_type {
+                    impl<'a> #client_type<'a> {
                         #[inline]
                         pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
                             let result =  #async_class_name::new(self, #(#async_new_args_name_only),*);
@@ -1924,7 +1928,7 @@ pub fn generate_rust_code(
                         }
                     }
 
-                    impl #client_type {
+                    impl<'a> #client_type<'a> {
                         #[inline]
                         pub fn #client_type_method_name_without_async #where_clause_async(&self #(
                     , #async_new_args_for_client)*,  timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
@@ -1933,7 +1937,7 @@ pub fn generate_rust_code(
                                 if let Ok(poller) = #async_class_name::new(self, #(#async_new_args_name_only),*) {
                                     while start.elapsed() <= timeout  {
                                       if let Some(result) = poller.poll()? {
-                                          return Ok(result);
+                                          return Ok(result.inner.get().into());
                                       }
                                     #[cfg(debug_assertions)]
                                     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -1949,7 +1953,7 @@ pub fn generate_rust_code(
             }
                     }
 
-                    impl #async_class_name {
+                    impl<'a> #async_class_name<'a> {
                         #[inline]
                         pub fn new #where_clause_async (#(#async_new_args),*) -> Result<Self, AeronCError> {
                             let resource_async = ManagedCResource::new(
@@ -1962,6 +1966,7 @@ pub fn generate_rust_code(
                             )?;
                             let result = Self {
                                 inner: resource_async,
+                            _marker: Default::default()
                             };
                             #(#async_dependancies)*
                             Ok(result)
@@ -1970,14 +1975,14 @@ pub fn generate_rust_code(
                         pub fn poll(&self) -> Result<Option<#main_class_name>, AeronCError> {
 
                             let result = #main_class_name::new(self);
-                            if let Ok(result) = &result {
-                            unsafe {
+                            // if let Ok(result) = &result {
+                            // unsafe {
                                 // for d in (&*self.inner.dependencies.get()).iter() {
                                 //     result.inner.add_dependency(d.clone());
                                 // }
                                 // result.inner.auto_close.set(true);
-                                }
-                            }
+                                // }
+                            // }
 
                             match result {
                                 Ok(result) => Ok(Some(result)),
@@ -1988,15 +1993,15 @@ pub fn generate_rust_code(
                             }
                         }
 
-                        pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#main_class_name, AeronCError> {
+                        pub fn poll_blocking(&self, timeout: std::time::Duration) -> Result<#main_class_name<'a>, AeronCError> {
                             if let Some(result) = self.poll()? {
-                                return Ok(result);
+                                return Ok(result.inner.get().into());
                             }
 
                             let time = std::time::Instant::now();
                             while time.elapsed() < timeout {
                                 if let Some(result) = self.poll()? {
-                                    return Ok(result);
+                                    return Ok(result.inner.get().into());
                                 }
                                 #[cfg(debug_assertions)]
                                 std::thread::sleep(std::time::Duration::from_millis(10));
@@ -2031,7 +2036,7 @@ pub fn generate_rust_code(
             };
 
             additional_impls.push(quote! {
-                impl Drop for #class_name {
+                impl<'a> Drop for #class_name<'a> {
                     fn drop(&mut self) {
                             if (self.inner.borrowed || self.inner.cleanup.is_none() ) && !self.inner.is_closed_already_called() {
                                     if self.inner.auto_close.get() {
@@ -2103,13 +2108,13 @@ pub fn generate_rust_code(
     {
         quote! {
             /// This will create an instance where the struct is zeroed, use with care
-            impl Default for #class_name {
+            impl<'a> Default for #class_name<'a> {
                 fn default() -> Self {
                     #class_name::new_zeroed().expect("failed to create struct")
                 }
             }
 
-            impl #class_name {
+            impl<'a> #class_name<'a> {
                 /// Regular clone just increases the reference count of underlying count.
                 /// `clone_struct` shallow copies the content of the underlying struct on heap.
                 ///
@@ -2135,11 +2140,13 @@ pub fn generate_rust_code(
         #warning_code
 
         #(#class_docs)*
-        pub struct #class_name {
+        pub struct #class_name<'a> {
             inner: ManagedCResource<#type_name>,
+            // used to arguments passed in new constructor can obey the lifetime
+            _marker: std::marker::PhantomData<&'a #type_name>,
         }
 
-        impl core::fmt::Debug for  #class_name {
+        impl<'a> core::fmt::Debug for  #class_name<'a> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 if self.inner.resource.is_null() {
                     f.debug_struct(stringify!(#class_name))
@@ -2154,7 +2161,7 @@ pub fn generate_rust_code(
             }
         }
 
-        impl #class_name {
+        impl<'a> #class_name<'a> {
             #(#constructor)*
             #(#fields)*
             #(#methods)*
@@ -2178,7 +2185,7 @@ pub fn generate_rust_code(
 
         }
 
-        impl std::ops::Deref for #class_name {
+        impl<'a> std::ops::Deref for #class_name<'a> {
             type Target = #type_name;
 
             fn deref(&self) -> &Self::Target {
@@ -2186,50 +2193,53 @@ pub fn generate_rust_code(
             }
         }
 
-        impl From<*mut #type_name> for #class_name {
+        impl<'a> From<*mut #type_name> for #class_name<'a> {
             #[inline]
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
-                    inner: ManagedCResource::new_borrowed(value, #is_closed_method)
+                    inner: ManagedCResource::new_borrowed(value, #is_closed_method),
+                            _marker: Default::default()
                 }
             }
         }
 
-        impl From<#class_name> for *mut #type_name {
+        impl<'a> From<#class_name<'a>> for *mut #type_name {
             #[inline]
             fn from(value: #class_name) -> Self {
                 value.get_inner()
             }
         }
 
-        impl From<&#class_name> for *mut #type_name {
+        impl<'a> From<&#class_name<'a>> for *mut #type_name {
             #[inline]
             fn from(value: &#class_name) -> Self {
                 value.get_inner()
             }
         }
 
-        impl From<#class_name> for #type_name {
+        impl<'a> From<#class_name<'a>> for #type_name {
             #[inline]
             fn from(value: #class_name) -> Self {
                 unsafe { *value.get_inner().clone() }
             }
         }
 
-        impl From<*const #type_name> for #class_name {
+        impl<'a> From<*const #type_name> for #class_name<'a> {
             #[inline]
             fn from(value: *const #type_name) -> Self {
                 #class_name {
-                    inner: ManagedCResource::new_borrowed(value, #is_closed_method)
+                    inner: ManagedCResource::new_borrowed(value, #is_closed_method),
+                            _marker: Default::default()
                 }
             }
         }
 
-        impl From<#type_name> for #class_name {
+        impl<'a> From<#type_name> for #class_name<'a> {
             #[inline]
             fn from(mut value: #type_name) -> Self {
                 #class_name {
-                    inner: ManagedCResource::new_borrowed(&mut value as *mut #type_name, #is_closed_method)
+                    inner: ManagedCResource::new_borrowed(&mut value as *mut #type_name, #is_closed_method),
+                            _marker: Default::default()
                 }
             }
         }
@@ -2238,7 +2248,7 @@ pub fn generate_rust_code(
 
         // impl *mut #type_name {
         //     #[inline]
-        //     pub fn as_struct(value: *mut #type_name) -> #class_name {
+        //     pub fn as_struct(value: *mut #type_name) -> #class_name<'a> {
         //         #class_name {
         //             inner: ManagedCResource::new_borrowed(value)
         //         }
