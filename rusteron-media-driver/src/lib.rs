@@ -54,8 +54,10 @@ impl AeronDriver {
         let started = Arc::new(AtomicBool::new(false));
         let started2 = started.clone();
 
-        info!("Starting media driver [dir={}]", aeron_context.get_dir());
+        let dir = aeron_context.get_dir().to_string();
+        info!("Starting media driver [dir={}]", dir);
         let handle = std::thread::spawn(move || {
+            let aeron_context = aeron_context.clone();
             let aeron_driver = AeronDriver::new(&aeron_context)?;
             aeron_driver.start(true)?;
 
@@ -85,7 +87,7 @@ impl AeronDriver {
         if handle.is_finished() {
             panic!("failed to start media driver {:?}", handle.join())
         }
-        info!("started media driver");
+        info!("started media driver [dir={}]", dir);
 
         (stop_copy, handle)
     }
