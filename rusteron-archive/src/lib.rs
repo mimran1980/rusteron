@@ -159,7 +159,11 @@ impl AeronArchiveAsyncConnect {
     /// recommend using this method instead of standard `new` as it will link the archive to aeron so if a drop occurs archive is dropped before aeron
     pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
         let resource_async = Self::new(ctx)?;
-        // resource_async.inner.add_dependency(aeron.clone());
+        resource_async
+            .owned_inner
+            .clone()
+            .unwrap()
+            .add_dependency(aeron.clone());
         Ok(resource_async)
     }
 }

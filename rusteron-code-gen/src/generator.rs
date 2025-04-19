@@ -2092,11 +2092,11 @@ pub fn generate_rust_code(
 
                             let mut result = #main_class_name::new(self);
                             if let Ok(result) = &mut result {
-                            unsafe {
-                                // for d in (self.owned_inner.as_mut().unwrap().dependencies.get_mut()).iter_mut() {
-                                //     result.owned_inner.as_mut().unwrap().add_dependency(d.clone());
-                                // }
-                                result.owned_inner.as_mut().unwrap().auto_close.set(true);
+                                unsafe {
+                                    for d in (&mut *self.owned_inner.as_ref().unwrap().dependencies.get()).iter_mut() {
+                                      result.owned_inner.as_mut().unwrap().add_dependency(d.clone());
+                                    }
+                                    result.owned_inner.as_mut().unwrap().auto_close.set(true);
                                 }
                             }
 

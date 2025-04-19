@@ -6,13 +6,8 @@ use log::info;
 use log::{error, warn};
 use regex::Regex;
 use std::backtrace::Backtrace;
-use std::error::Error;
-use std::ops::Deref;
 use std::path::Path;
-use std::pin::Pin;
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::rc::Rc;
-use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use std::{fs, io, panic, process};
@@ -24,14 +19,6 @@ pub struct EmbeddedArchiveMediaDriverProcess {
     pub control_request_channel: String,
     pub control_response_channel: String,
     pub recording_events_channel: String,
-}
-
-pub struct AeronResources {
-    pub aeron_context: AeronContext,
-    pub aeron: Aeron,
-    pub archive_context: AeronArchiveContext,
-    pub connect: AeronArchiveAsyncConnect,
-    pub archive: AeronArchive,
 }
 
 impl EmbeddedArchiveMediaDriverProcess {
