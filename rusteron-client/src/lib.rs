@@ -873,19 +873,6 @@ mod tests {
             .try_init();
 
         let (md_ctx, stop, md) = start_media_driver(1)?;
-        let (_a_ctx1, aeron_pub) = create_client(&md_ctx)?;
-        info!("creating publisher");
-        assert!(!aeron_pub.is_closed());
-        let publisher = aeron_pub
-            .add_publication(
-                "aeron:udp?endpoint=localhost:4040|control-mode=manual|alias=test|tags=100",
-                123,
-                Duration::from_secs(5),
-            )
-            .map_err(|e| {
-                error!("aeron error={}", aeron_pub.errmsg());
-                e
-            })?;
 
         let (_a_ctx2, aeron_sub) = create_client(&md_ctx)?;
 
@@ -917,13 +904,36 @@ mod tests {
             Duration::from_secs(50),
         )?;
 
+        let (_a_ctx1, aeron_pub) = create_client(&md_ctx)?;
+        info!("creating publisher");
+        assert!(!aeron_pub.is_closed());
+        let publisher = aeron_pub
+            .add_publication(
+                "aeron:udp?endpoint=localhost:4040|alias=test|tags=100",
+                123,
+                Duration::from_secs(5),
+            )
+            .map_err(|e| {
+                error!("aeron error={}", aeron_pub.errmsg());
+                e
+            })?;
+
         info!("publishing msg");
 
-        while publisher.offer(
-            "213".as_bytes(),
-            Handlers::no_reserved_value_supplier_handler(),
-        ) < 0
-        {}
+        loop {
+            let result = publisher.offer(
+                "213".as_bytes(),
+                Handlers::no_reserved_value_supplier_handler(),
+            );
+            if result < 0 {
+                error!(
+                    "failed to publish {:?}",
+                    AeronCError::from_code(result as i32)
+                );
+            } else {
+                break;
+            }
+        }
 
         sub.poll_once(
             |msg, _header| {
