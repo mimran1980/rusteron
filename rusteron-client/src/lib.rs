@@ -27,13 +27,15 @@ mod tests {
     use super::*;
     use crate::test_alloc::current_allocs;
     use log::{error, info};
+    use rusteron_media_driver::AeronDriverContext;
     use serial_test::serial;
     use std::error;
+    use std::error::Error;
     use std::io::Write;
     use std::os::raw::c_int;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
-    use std::thread::sleep;
+    use std::thread::{sleep, JoinHandle};
     use std::time::{Duration, Instant};
 
     #[derive(Default, Debug)]
@@ -527,6 +529,12 @@ mod tests {
         pub error_count: usize,
     }
 
+    impl Drop for TestErrorCount {
+        fn drop(&mut self) {
+            info!("TestErrorCount dropped with {} errors", self.error_count);
+        }
+    }
+
     impl AeronErrorHandlerCallback for TestErrorCount {
         fn handle_aeron_error_handler(&mut self, error_code: c_int, msg: &str) {
             error!("Aeron error {}: {}", error_code, msg);
@@ -853,6 +861,112 @@ mod tests {
         _stop.store(true, Ordering::SeqCst);
         let _ = driver_handle.join().unwrap();
         Ok(())
+    }
+
+    /// Test sending and receiving an empty (zero-length) message using inline closures with poll_once.
+    #[test]
+    #[serial]
+    pub fn tags() -> Result<(), Box<dyn error::Error>> {
+        let _ = env_logger::Builder::new()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Debug)
+            .try_init();
+
+        let (md_ctx1, stop1, md1) = start_media_driver(1)?;
+        let (a_ctx1, aeron_pub) = create_client(&md_ctx1)?;
+        info!("creating publisher");
+        assert!(!aeron_pub.is_closed());
+        let publisher = aeron_pub.add_publication(
+            "aeron:udp?localhost:4040|alias=test|tags=100",
+            123,
+            Duration::from_secs(5),
+        )?;
+
+        let (md_ctx2, stop2, md2) = start_media_driver(2)?;
+        let (a_ctx2, aeron_sub) = create_client(&md_ctx2)?;
+
+        info!("creating suscriber 1");
+        let sub = aeron_sub.add_subscription(
+            "aeron:udp?tag=100",
+            123,
+            Handlers::no_available_image_handler(),
+            Handlers::no_unavailable_image_handler(),
+            Duration::from_secs(50),
+        )?;
+
+        let ctx = AeronContext::new()?;
+        ctx.set_dir(aeron_sub.context().get_dir())?;
+        let aeron = Aeron::new(&ctx)?;
+        aeron.start()?;
+
+        info!("creating suscriber 2");
+        let sub2 = aeron_sub.add_subscription(
+            "aeron:udp?tag=100",
+            123,
+            Handlers::no_available_image_handler(),
+            Handlers::no_unavailable_image_handler(),
+            Duration::from_secs(50),
+        )?;
+
+        while publisher.offer(
+            "213".as_bytes(),
+            Handlers::no_reserved_value_supplier_handler(),
+        ) <= 0
+        {}
+
+        sub.poll_once(
+            |msg, _header| {
+                println!("Received message: {:?}", msg);
+            },
+            128,
+        )?;
+        sub2.poll_once(
+            |msg, _header| {
+                println!("Received message: {:?}", msg);
+            },
+            128,
+        )?;
+
+        stop1.store(true, Ordering::SeqCst);
+        stop2.store(true, Ordering::SeqCst);
+
+        Ok(())
+    }
+
+    fn create_client(
+        media_driver_ctx: &AeronDriverContext,
+    ) -> Result<(AeronContext, Aeron), Box<dyn Error>> {
+        let ctx = AeronContext::new()?;
+        ctx.set_dir(media_driver_ctx.get_dir())?;
+        ctx.set_error_handler(Some(&Handler::leak(TestErrorCount::default())))?;
+
+        let aeron = Aeron::new(&ctx)?;
+        aeron.start()?;
+        Ok((ctx, aeron))
+    }
+
+    fn start_media_driver(
+        instance: u64,
+    ) -> Result<
+        (
+            AeronDriverContext,
+            Arc<AtomicBool>,
+            JoinHandle<Result<(), rusteron_media_driver::AeronCError>>,
+        ),
+        Box<dyn Error>,
+    > {
+        let media_driver_ctx = rusteron_media_driver::AeronDriverContext::new()?;
+        media_driver_ctx.set_dir_delete_on_shutdown(true)?;
+        media_driver_ctx.set_dir_delete_on_start(true)?;
+        media_driver_ctx.set_dir(&format!(
+            "{}{}-{}",
+            media_driver_ctx.get_dir(),
+            Aeron::epoch_clock(),
+            instance
+        ))?;
+        let (_stop, driver_handle) =
+            rusteron_media_driver::AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
+        Ok((media_driver_ctx, _stop, driver_handle))
     }
 
     #[doc = include_str!("../../README.md")]
