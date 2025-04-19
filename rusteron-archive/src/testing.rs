@@ -142,53 +142,58 @@ impl EmbeddedArchiveMediaDriverProcess {
     pub fn archive_connect<'a>(
         &self,
     ) -> Result<
-        // (
-        //     Pin<Box<AeronArchive<'a>>>,
-        //     Pin<Box<Aeron<'a>>>,
-        //     Pin<Box<AeronArchiveContext<'a>>>,
-        //     Pin<Box<AeronContext<'a>>>,
-        //     Pin<Box<AeronArchiveAsyncConnect<'a>>>,
-        // ),
-        ArchiveClient<'a>,
+        (
+            Pin<&'a AeronArchive<'a>>,
+            Pin<&'a Aeron<'a>>,
+            Pin<&'a AeronArchiveContext<'a>>,
+            Pin<&'a AeronContext<'a>>,
+            Pin<&'a AeronArchiveAsyncConnect<'a>>,
+        ),
         io::Error,
     > {
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(30) {
             if let Ok(aeron_context) = AeronContext::new() {
-                let aeron_context = Box::pin(aeron_context);
+                let aeron_context = Pin::new(&aeron_context);
                 aeron_context.set_dir(&self.aeron_dir).expect("invalid dir");
                 aeron_context
                     .set_client_name("unit_test_client")
                     .expect("invalid client name");
-                if let Ok(aeron) = Aeron::new(&aeron_context) {
-                    let aeron = Box::pin(aeron);
+                if let Ok(aeron) = Aeron::new(aeron_context) {
+                    let aeron = Pin::new(&aeron);
                     if aeron.start().is_ok() {
                         if let Ok(archive_context) =
                             AeronArchiveContext::new_with_no_credentials_supplier(
-                                &aeron,
+                                aeron,
                                 &self.control_request_channel,
                                 &self.control_response_channel,
                                 &self.recording_events_channel,
                             )
                         {
-                            let archive_context = Box::pin(archive_context);
+                            let archive_context = Pin::new(&archive_context);
                             archive_context
                                 .set_idle_strategy(Some(&Handler::leak(NoOpAeronIdleStrategyFunc)))
                                 .expect("unable to set idle strategy");
                             // let archive_ctx_copy = archive_context.clone();
                             if let Ok(connect) =
                                 // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)
-                                AeronArchiveAsyncConnect::new(&archive_context)
+                                AeronArchiveAsyncConnect::new(archive_context)
                             {
-                                let connect = Box::pin(connect);
+                                let connect = Pin::new(&connect);
                                 if let Ok(archive) = connect.poll_blocking(Duration::from_secs(10))
                                 {
-                                    let archive = Box::pin(archive);
+                                    let archive = Pin::new(&archive);
                                     let i = archive.get_archive_id();
                                     assert!(i > 0);
                                     info!("aeron archive media driver is up [connected with archive id {i}]");
                                     sleep(Duration::from_millis(100));
-                                    return Ok(ArchiveClient::new());
+                                    return Ok((
+                                        archive,
+                                        aeron,
+                                        archive_context,
+                                        aeron_context,
+                                        connect,
+                                    ));
                                 };
                             }
                         }

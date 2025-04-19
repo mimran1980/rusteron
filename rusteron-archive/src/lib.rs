@@ -221,7 +221,7 @@ impl<'a> AeronArchiveContext<'a> {
     /// If you do not set a credentials supplier, it will segfault.
     /// This method ensures that a non-functional credentials supplier is set to avoid the segfault.
     pub fn new_with_no_credentials_supplier(
-        aeron: &'a Aeron,
+        aeron: std::pin::Pin<&'a Aeron>,
         request_control_channel: &str,
         response_control_channel: &str,
         recording_events_channel: &str,
@@ -348,11 +348,11 @@ mod tests {
             .archive_connect()
             .expect("Could not connect to archive client");
         
-        let archive = &archive_client.archive;
-        let aeron = &archive_client.aeron;
-        // let (archive, aeron, archive_ctx, ctx, _) = media_driver
-        //     .archive_connect()
-        //     .expect("Could not connect to archive client");
+        // let archive = &archive_client.archive;
+        // let aeron = &archive_client.aeron;
+        let (archive, aeron, archive_ctx, ctx, _) = media_driver
+            .archive_connect()
+            .expect("Could not connect to archive client");
 
         let running = Arc::new(AtomicBool::new(true));
 

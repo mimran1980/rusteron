@@ -204,7 +204,7 @@ impl ReturnType {
                 let new_type =
                     parse_str::<Type>(&wrapper.class_name).expect("Invalid class name in wrapper");
                 if use_ref_for_cwrapper {
-                    return quote! { &'a #new_type };
+                    return quote! { std::pin::Pin<&'a #new_type<'a>> };
                 } else {
                     return quote! { #new_type };
                 }
@@ -979,7 +979,12 @@ impl CWrapper {
     }
 
     /// Generate the constructor for the struct
-    fn generate_constructor(&self, wrappers: &BTreeMap<String, CWrapper>) -> Vec<TokenStream> {
+    fn generate_constructor(
+        &self,
+        wrappers: &BTreeMap<String, CWrapper>,
+        constructor_fields: &mut Vec<TokenStream>,
+        new_ref_set_none: &mut Vec<TokenStream>,
+    ) -> Vec<TokenStream> {
         let constructors = self
             .methods
             .iter()
@@ -1034,6 +1039,20 @@ impl CWrapper {
                         .collect();
                     let lets: Vec<TokenStream> =
                         Self::lets_for_copying_arguments(wrappers, &method.arguments, true);
+
+                    constructor_fields.clear();
+                    constructor_fields.extend(Self::constructor_fields(
+                        wrappers,
+                        &method.arguments,
+                        &self.class_name,
+                    ));
+
+                    let new_ref_args =
+                        Self::new_args(wrappers, &method.arguments, &self.class_name, false);
+
+                    new_ref_set_none.clear();
+                    new_ref_set_none.extend(Self::new_args(wrappers, &method.arguments, &self.class_name, true));
+
                     // let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &method.arguments);
 
                     let new_args: Vec<TokenStream> = method
@@ -1106,7 +1125,9 @@ impl CWrapper {
                             )?;
 
                             Ok(Self { inner: resource_constructor,
-                            _marker: Default::default() })
+                                _marker: Default::default(),
+                                #(#new_ref_args)*
+                            })
                         }
                     }
                 } else {
@@ -1199,6 +1220,7 @@ impl CWrapper {
                     .collect_vec();
                 let lets: Vec<TokenStream> =
                     Self::lets_for_copying_arguments(wrappers, &cloned_fields, false);
+
                 // let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &self.fields);
                 let is_closed_method = self.get_is_closed_method_quote();
 
@@ -1223,7 +1245,8 @@ impl CWrapper {
                         )?;
 
                         Ok(Self { inner: r_constructor,
-                            _marker: Default::default() })
+                            _marker: Default::default(),
+                             })
                     }
 
                     #zeroed_impl
@@ -1328,6 +1351,83 @@ impl CWrapper {
                 }
             })
             .filter(|t| !t.is_empty())
+            .collect()
+    }
+
+    fn constructor_fields(
+        wrappers: &BTreeMap<String, CWrapper>,
+        arguments: &Vec<Arg>,
+        class_name: &String,
+    ) -> Vec<TokenStream> {
+        if class_name == "AeronAsyncDestination" {
+            return vec![];
+        }
+
+        arguments
+            .iter()
+            .enumerate()
+            .filter_map(|(_idx, arg)| {
+                if arg.is_double_mut_pointer() {
+                    None
+                } else {
+                    let arg_name = arg.as_ident();
+                    let rtype = arg.as_type();
+                    if arg.is_single_mut_pointer()
+                        && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap())
+                    {
+                        let return_type = ReturnType::new(arg.clone(), wrappers.clone());
+                        let return_type = return_type.get_new_return_type(false, true);
+
+                        let arg_copy = format_ident!("_{}", arg.name);
+                        Some(quote! {
+                            #arg_copy: Option<#return_type>,
+                        })
+                    } else {
+                        None
+                    }
+                }
+            })
+            .collect()
+    }
+
+    fn new_args(
+        wrappers: &BTreeMap<String, CWrapper>,
+        arguments: &Vec<Arg>,
+        class_name: &String,
+        set_none: bool,
+    ) -> Vec<TokenStream> {
+        if class_name == "AeronAsyncDestination" {
+            return vec![];
+        }
+
+        arguments
+            .iter()
+            .enumerate()
+            .filter_map(|(_idx, arg)| {
+                if arg.is_double_mut_pointer() {
+                    None
+                } else {
+                    let arg_name = arg.as_ident();
+                    let rtype = arg.as_type();
+                    if arg.is_single_mut_pointer()
+                        && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap())
+                    {
+                        let arg_f = format_ident!("_{}", &arg.name);
+                        let arg_copy = format_ident!("{}_copy", &arg.name);
+                        if set_none {
+                            Some(quote! {
+                                #arg_f: None,
+                            })
+                        } else {
+                            Some(quote! {
+                                #arg_f: Some(#arg_copy),
+                            })
+                        }
+                    } else {
+                        None
+                    }
+                }
+            })
             .collect()
     }
 
@@ -1695,7 +1795,9 @@ pub fn generate_rust_code(
     let mut additional_outer_impls = vec![];
 
     let methods = wrapper.generate_methods(wrappers, closure_handlers, &mut additional_outer_impls);
-    let constructor = wrapper.generate_constructor(wrappers);
+    let mut constructor_fields = vec![];
+    let mut new_ref_set_none = vec![];
+    let constructor = wrapper.generate_constructor(wrappers, &mut constructor_fields, &mut new_ref_set_none);
 
     let async_impls = if wrapper.type_name.starts_with("aeron_async_")
         || wrapper.type_name.starts_with("aeron_archive_async_")
@@ -2144,6 +2246,7 @@ pub fn generate_rust_code(
             inner: ManagedCResource<#type_name>,
             // used to arguments passed in new constructor can obey the lifetime
             _marker: std::marker::PhantomData<&'a #type_name>,
+            #(#constructor_fields)*
         }
 
         impl<'a> core::fmt::Debug for  #class_name<'a> {
@@ -2198,7 +2301,8 @@ pub fn generate_rust_code(
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
                     inner: ManagedCResource::new_borrowed(value, #is_closed_method),
-                            _marker: Default::default()
+                    _marker: Default::default(),
+                    #(#new_ref_set_none)*
                 }
             }
         }
@@ -2229,7 +2333,8 @@ pub fn generate_rust_code(
             fn from(value: *const #type_name) -> Self {
                 #class_name {
                     inner: ManagedCResource::new_borrowed(value, #is_closed_method),
-                            _marker: Default::default()
+                    _marker: Default::default(),
+                    #(#new_ref_set_none)*
                 }
             }
         }
@@ -2239,7 +2344,8 @@ pub fn generate_rust_code(
             fn from(mut value: #type_name) -> Self {
                 #class_name {
                     inner: ManagedCResource::new_borrowed(&mut value as *mut #type_name, #is_closed_method),
-                            _marker: Default::default()
+                    _marker: Default::default(),
+                    #(#new_ref_set_none)*
                 }
             }
         }
