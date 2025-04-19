@@ -11,7 +11,7 @@ pub const AERON_BROADCAST_BUFFER_TRAILER_LENGTH: usize = size_of::<aeron_broadca
 
 macro_rules! impl_buffer_methods {
     ($t:ty) => {
-        impl<'a> $t {
+        impl $t {
             #[inline]
             pub fn buffer_mut(&self) -> &mut [u8] {
                 debug_assert!(!self.buffer.is_null());
@@ -28,10 +28,10 @@ macro_rules! impl_buffer_methods {
     };
 }
 
-impl_buffer_methods!(AeronBroadcastTransmitter<'a>);
-impl_buffer_methods!(AeronBroadcastReceiver<'a>);
-impl_buffer_methods!(AeronSpscRb<'a>);
-impl_buffer_methods!(AeronMpscRb<'a>);
+impl_buffer_methods!(AeronBroadcastTransmitter);
+impl_buffer_methods!(AeronBroadcastReceiver);
+impl_buffer_methods!(AeronSpscRb);
+impl_buffer_methods!(AeronMpscRb);
 
 macro_rules! impl_from_vec_and_new_with_capacity {
     ($t:ident, $slot:ident, $descriptor:ty) => {
@@ -122,15 +122,15 @@ macro_rules! impl_from_vec_and_new_with_capacity {
 impl_from_vec_and_new_with_capacity!(AeronSpscRb, AeronSpscRbSlot, AeronRbDescriptor);
 impl_from_vec_and_new_with_capacity!(AeronMpscRb, AeronMpscRbSlot, AeronRbDescriptor);
 
-impl<'a> AeronBroadcastTransmitter<'a> {
-    pub fn from_slice(buffer: &mut [u8], max_msg_size: usize, descriptor: &'a AeronBroadcastDescriptor) -> Result<Self, AeronCError> {
+impl AeronBroadcastTransmitter {
+    pub fn from_slice(buffer: &mut [u8], max_msg_size: usize) -> Result<Self, AeronCError> {
         assert!(!buffer.is_empty());
         assert!((buffer.len() - AERON_BROADCAST_BUFFER_TRAILER_LENGTH).is_power_of_two());
 
         let ptr = buffer.as_mut_ptr();
         let broadcast = Self::new(
             ptr,
-            descriptor,
+            &AeronBroadcastDescriptor::default(),
             buffer.len(),
             max_msg_size,
         )?;
@@ -145,7 +145,7 @@ impl<'a> AeronBroadcastTransmitter<'a> {
     }
 }
 
-impl<'a> AeronBroadcastReceiver<'a> {
+impl AeronBroadcastReceiver {
     pub fn from_slice(buffer: &mut [u8]) -> Result<Self, AeronCError> {
         assert!(!buffer.is_empty());
         let capacity = buffer.len();
@@ -168,7 +168,7 @@ impl<'a> AeronBroadcastReceiver<'a> {
     }
 }
 
-impl<'a> AeronSpscRb<'a> {
+impl AeronSpscRb {
     pub fn read_msgs<T: AeronRingBufferHandlerCallback>(
         &self,
         handler: &Handler<AeronRingBufferHandlerWrapper<T>>,
@@ -186,7 +186,7 @@ impl<'a> AeronSpscRb<'a> {
     }
 }
 
-impl<'a> AeronMpscRb<'a> {
+impl AeronMpscRb {
     pub fn read_msgs<T: AeronRingBufferHandlerCallback>(
         &self,
         handler: &Handler<AeronRingBufferHandlerWrapper<T>>,

@@ -148,30 +148,41 @@ unsafe extern "C" fn default_encoded_credentials(
     Box::into_raw(empty_credentials)
 }
 
-impl<'a> AeronArchive<'a> {
-    pub fn aeron(&self) -> Aeron<'a> {
-        self.get_archive_context().get_aeron().inner.get().into()
+impl AeronArchive {
+    pub fn aeron(&self) -> Aeron {
+        self.get_archive_context().get_aeron()
     }
 }
 
-// impl<'a> AeronArchiveAsyncConnect<'a> {
-//     #[inline]
-//     /// recommend using this method instead of standard `new` as it will link the archive to aeron so if a drop occurs archive is dropped before aeron
-//     pub fn new_with_aeron(ctx: &'a AeronArchiveContext, aeron: &'a Aeron) -> Result<Self, AeronCError> {
-//         let resource_async = Self::new(ctx)?;
-//         // resource_async.inner.add_dependency(aeron.clone());
-//         Ok(resource_async)
-//     }
-// }
+impl AeronArchiveAsyncConnect {
+    #[inline]
+    /// recommend using this method instead of standard `new` as it will link the archive to aeron so if a drop occurs archive is dropped before aeron
+    pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
+        let resource_async = Self::new(ctx)?;
+        // resource_async.inner.add_dependency(aeron.clone());
+        Ok(resource_async)
+    }
+}
 
 macro_rules! impl_archive_position_methods {
     ($pub_type:ty) => {
-        impl<'a> $pub_type {
+        impl $pub_type {
+            /// Retrieves the current active live archive position using the Aeron counters.
+            /// Returns an error if not found.
+            pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
+                if let Some(aeron) = self.owned_inner.clone().unwrap().get_dependency::<Aeron>() {
+                    let counter_reader = &aeron.counters_reader();
+                    self.get_archive_position_with(counter_reader)
+                } else {
+                    Err(AeronCError::from_code(-1))
+                }
+            }
+
             /// Retrieves the current active live archive position using the provided counter reader.
             /// Returns an error if not found.
             pub fn get_archive_position_with(
                 &self,
-                counters: &'a AeronCountersReader,
+                counters: &AeronCountersReader,
             ) -> Result<i64, AeronCError> {
                 let session_id = self.get_constants()?.session_id();
                 let counter_id = RecordingPos::find_counter_id_by_session(counters, session_id);
@@ -187,12 +198,8 @@ macro_rules! impl_archive_position_methods {
 
             /// Checks if the publication's current position is within a specified inclusive length
             /// of the archive position.
-            pub fn is_archive_position_with(
-                &self,
-                counters: &'a AeronCountersReader,
-                length_inclusive: usize,
-            ) -> bool {
-                let archive_position = self.get_archive_position_with(counters).unwrap_or(-1);
+            pub fn is_archive_position_with(&self, length_inclusive: usize) -> bool {
+                let archive_position = self.get_archive_position().unwrap_or(-1);
                 if archive_position < 0 {
                     return false;
                 }
@@ -202,10 +209,10 @@ macro_rules! impl_archive_position_methods {
     };
 }
 
-impl_archive_position_methods!(AeronPublication<'a>);
-impl_archive_position_methods!(AeronExclusivePublication<'a>);
+impl_archive_position_methods!(AeronPublication);
+impl_archive_position_methods!(AeronExclusivePublication);
 
-impl<'a> AeronArchiveContext<'a> {
+impl AeronArchiveContext {
     // The method below sets no credentials supplier, which is essential for the operation
     // of the Aeron Archive Context. The `set_credentials_supplier` must be set to prevent
     // segmentation faults in the C bindings.
@@ -221,11 +228,11 @@ impl<'a> AeronArchiveContext<'a> {
     /// If you do not set a credentials supplier, it will segfault.
     /// This method ensures that a non-functional credentials supplier is set to avoid the segfault.
     pub fn new_with_no_credentials_supplier(
-        aeron: &'a Aeron,
+        aeron: &Aeron,
         request_control_channel: &str,
         response_control_channel: &str,
         recording_events_channel: &str,
-    ) -> Result<AeronArchiveContext<'a>, AeronCError> {
+    ) -> Result<AeronArchiveContext, AeronCError> {
         let context = Self::new()?;
         context.set_no_credentials_supplier()?;
         context.set_aeron(aeron)?;
@@ -334,7 +341,7 @@ mod tests {
         let archive_dir = format!("target/aeron/{}/archive", id);
 
         info!("starting archive media driver");
-        let mut media_driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
+        let media_driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
             &aeron_dir,
             &format!("{}/archive", aeron_dir),
             ARCHIVE_CONTROL_REQUEST,
@@ -344,15 +351,9 @@ mod tests {
         .expect("Failed to start embedded media driver");
 
         info!("connecting to archive");
-        media_driver
+        let (archive, aeron) = media_driver
             .archive_connect()
             .expect("Could not connect to archive client");
-        
-        let archive = media_driver.archive.as_ref().unwrap();
-        let aeron = media_driver.aeron.as_ref().unwrap();
-        // let (archive, aeron, archive_ctx, ctx, _) = media_driver
-        //     .archive_connect()
-        //     .expect("Could not connect to archive client");
 
         let running = Arc::new(AtomicBool::new(true));
 
@@ -360,7 +361,7 @@ mod tests {
         assert!(!aeron.is_closed());
 
         let (session_id, publisher_thread) =
-            reply_merge_publisher(&archive, &aeron, running.clone())?;
+            reply_merge_publisher(&archive, aeron.clone(), running.clone())?;
 
         {
             let context = AeronContext::new()?;
@@ -377,11 +378,10 @@ mod tests {
                 aeron_archive_context.get_recording_events_channel(),
             )?;
             aeron_archive_context.set_error_handler(Some(&error_handler))?;
-            // let archive = AeronArchiveAsyncConnect::new_with_aeron(&aeron_archive_context, &aeron)?
-            let archive = AeronArchiveAsyncConnect::new(&aeron_archive_context)?
+            let archive = AeronArchiveAsyncConnect::new_with_aeron(&aeron_archive_context, &aeron)?
                 .poll_blocking(Duration::from_secs(30))
                 .expect("failed to connect to archive");
-            replay_merge_subscription(&archive, &aeron, session_id)?;
+            replay_merge_subscription(&archive, aeron.clone(), session_id)?;
         }
 
         running.store(false, Ordering::Release);
@@ -390,9 +390,9 @@ mod tests {
         Ok(())
     }
 
-    fn reply_merge_publisher<'a>(
+    fn reply_merge_publisher(
         archive: &AeronArchive,
-        aeron: &Aeron,
+        aeron: Aeron,
         running: Arc<AtomicBool>,
     ) -> Result<(i32, JoinHandle<()>), AeronCError> {
         let publication = aeron.add_publication(
@@ -422,9 +422,8 @@ mod tests {
             thread::sleep(Duration::from_millis(100));
         }
         info!("publisher to be connected");
-        let counters_reader = aeron.counters_reader().inner.get().into();
+        let counters_reader = aeron.counters_reader();
         let mut caught_up_count = 0;
-        let publication: AeronPublication = publication.inner.get().into();
         let publisher_thread = thread::spawn(move || {
             let mut message_count = 0;
 
@@ -448,7 +447,7 @@ mod tests {
                 // slow down publishing so can catch up
                 if message_count > 10_000 {
                     // ensure archiver is caught up
-                    while !publication.is_archive_position_with(&counters_reader, 0) {
+                    while !publication.is_archive_position_with(0) {
                         thread::sleep(Duration::from_micros(300));
                     }
                     caught_up_count += 1;
@@ -462,7 +461,7 @@ mod tests {
 
     fn replay_merge_subscription(
         archive: &AeronArchive,
-        aeron: &Aeron,
+        aeron: Aeron,
         session_id: i32,
     ) -> Result<(), AeronCError> {
         // let replay_channel = format!("aeron:udp?control-mode=manual|session-id={session_id}");
@@ -617,11 +616,11 @@ mod tests {
 
     use std::thread;
 
-    pub fn start_aeron_archive<'a>() -> Result<
+    pub fn start_aeron_archive() -> Result<
         (
-            Aeron<'a>,
-            AeronArchiveContext<'a>,
-            EmbeddedArchiveMediaDriverProcess<'a>,
+            Aeron,
+            AeronArchiveContext,
+            EmbeddedArchiveMediaDriverProcess,
         ),
         Box<dyn Error>,
     > {
@@ -666,11 +665,7 @@ mod tests {
             recording_events_channel,
         )?;
         archive_context.set_error_handler(Some(&error_handler))?;
-        Ok((
-            aeron.inner.get().into(),
-            archive_context.inner.get().into(),
-            archive_media_driver,
-        ))
+        Ok((aeron, archive_context, archive_media_driver))
     }
 
     #[test]
@@ -690,8 +685,7 @@ mod tests {
         info!("connected to aeron");
 
         let archive_connector =
-            // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
-            AeronArchiveAsyncConnect::new(&archive_context)?;
+            AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to aeron archive media driver");
@@ -872,8 +866,7 @@ mod tests {
     fn test_invalid_recording_channel() -> Result<(), Box<dyn Error>> {
         let (aeron, archive_context, _media_driver) = start_aeron_archive()?;
         let archive_connector =
-            // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
-            AeronArchiveAsyncConnect::new(&archive_context)?;
+            AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to archive");
@@ -893,8 +886,7 @@ mod tests {
     fn test_stop_recording_on_nonexistent_channel() -> Result<(), Box<dyn Error>> {
         let (aeron, archive_context, _media_driver) = start_aeron_archive()?;
         let archive_connector =
-            // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
-            AeronArchiveAsyncConnect::new(&archive_context)?;
+            AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to archive");
@@ -913,8 +905,7 @@ mod tests {
     fn test_replay_with_invalid_recording_id() -> Result<(), Box<dyn Error>> {
         let (aeron, archive_context, _media_driver) = start_aeron_archive()?;
         let archive_connector =
-            // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
-            AeronArchiveAsyncConnect::new(&archive_context)?;
+            AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to archive");
@@ -939,16 +930,14 @@ mod tests {
     fn test_archive_reconnect_after_close() -> Result<(), Box<dyn std::error::Error>> {
         let (aeron, archive_context, media_driver) = start_aeron_archive()?;
         let archive_connector =
-            // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
-            AeronArchiveAsyncConnect::new(&archive_context)?;
+            AeronArchiveAsyncConnect::new_with_aeron(&archive_context.clone(), &aeron)?;
         let archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to connect to archive");
 
         drop(archive);
 
-        // let archive_connector = AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
-        let archive_connector = AeronArchiveAsyncConnect::new(&archive_context)?;
+        let archive_connector = AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)?;
         let new_archive = archive_connector
             .poll_blocking(Duration::from_secs(30))
             .expect("failed to reconnect to archive");

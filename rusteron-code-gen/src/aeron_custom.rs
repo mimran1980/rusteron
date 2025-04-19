@@ -1,18 +1,18 @@
 // code here is included in all modules and extends generated classes
 pub const AERON_IPC_STREAM: &'static str = "aeron:ipc";
 
-unsafe impl<'a> Send for AeronCountersReader<'a> {}
-unsafe impl<'a> Send for AeronSubscription<'a> {}
-unsafe impl<'a> Sync for AeronSubscription<'a> {}
-unsafe impl<'a> Send for AeronPublication<'a> {}
-unsafe impl<'a> Sync for AeronPublication<'a> {}
-unsafe impl<'a> Send for AeronExclusivePublication<'a> {}
-unsafe impl<'a> Sync for AeronExclusivePublication<'a> {}
-unsafe impl<'a> Send for AeronCounter<'a> {}
-unsafe impl<'a> Sync for AeronCounter<'a> {}
+unsafe impl Send for AeronCountersReader {}
+unsafe impl Send for AeronSubscription {}
+unsafe impl Sync for AeronSubscription {}
+unsafe impl Send for AeronPublication {}
+unsafe impl Sync for AeronPublication {}
+unsafe impl Send for AeronExclusivePublication {}
+unsafe impl Sync for AeronExclusivePublication {}
+unsafe impl Send for AeronCounter {}
+unsafe impl Sync for AeronCounter {}
 
-impl<'a> AeronCnc<'a> {
-    pub fn new(aeron_dir: &str) -> Result<AeronCnc<'a>, AeronCError> {
+impl AeronCnc {
+    pub fn new(aeron_dir: &str) -> Result<AeronCnc, AeronCError> {
         let c_string = std::ffi::CString::new(aeron_dir).expect("CString conversion failed");
         let resource = ManagedCResource::new(
             move |cnc| unsafe { aeron_cnc_init(cnc, c_string.as_ptr(), 0) },
@@ -25,8 +25,8 @@ impl<'a> AeronCnc<'a> {
         )?;
 
         let result = Self {
-            inner: resource,
-            _marker: Default::default()
+            inner: resource.get(),
+            owned_inner: Some(std::rc::Rc::new(resource)),
         };
         Ok(result)
     }
@@ -179,12 +179,12 @@ impl std::convert::TryFrom<i32> for AeronSystemCounterType {
             38 => Ok(AeronSystemCounterType::ErrorFramesReceived),
             39 => Ok(AeronSystemCounterType::ErrorFramesSent),
             40 => Ok(AeronSystemCounterType::DummyLast),
-            _  => Err(AeronCError::from_code(-1)),
+            _ => Err(AeronCError::from_code(-1)),
         }
     }
 }
 
-impl<'a> AeronCncMetadata<'a> {
+impl AeronCncMetadata {
     pub fn load_from_file(aeron_dir: &str) -> Result<Self, AeronCError> {
         let aeron_dir = std::ffi::CString::new(aeron_dir).expect("CString::new failed");
         let mapped_file = std::rc::Rc::new(std::cell::RefCell::new(aeron_mapped_file_t {
@@ -215,21 +215,21 @@ impl<'a> AeronCncMetadata<'a> {
         )?;
 
         let result = Self {
-            inner: resource,
-            _marker: Default::default()
+            inner: resource.get(),
+            owned_inner: Some(std::rc::Rc::new(resource)),
         };
         Ok(result)
     }
 }
 
-impl<'a> AeronSubscription<'a> {
+impl AeronSubscription {
     pub fn close_with_no_args(&mut self) -> Result<(), AeronCError> {
         self.close(Handlers::no_notification_handler())?;
         Ok(())
     }
 }
 
-impl<'a> AeronPublication<'a> {
+impl AeronPublication {
     pub fn close_with_no_args(&self) -> Result<(), AeronCError> {
         self.close(Handlers::no_notification_handler())?;
         Ok(())
@@ -242,7 +242,7 @@ impl<'a> AeronPublication<'a> {
     }
 }
 
-impl<'a> AeronExclusivePublication<'a> {
+impl AeronExclusivePublication {
     pub fn close_with_no_args(&self) -> Result<(), AeronCError> {
         self.close(Handlers::no_notification_handler())?;
         Ok(())
@@ -255,24 +255,24 @@ impl<'a> AeronExclusivePublication<'a> {
     }
 }
 
-impl<'a> AeronCounter<'a> {
+impl AeronCounter {
     pub fn close_with_no_args(&self) -> Result<(), AeronCError> {
         self.close(Handlers::no_notification_handler())?;
         Ok(())
     }
 }
 
-impl<'a> AeronCounter<'a> {
+impl AeronCounter {
     #[inline]
     pub fn addr_atomic(&self) -> &std::sync::atomic::AtomicI64 {
         unsafe { std::sync::atomic::AtomicI64::from_ptr(self.addr()) }
     }
 }
 
-impl<'a> AeronSubscription<'a> {
+impl AeronSubscription {
     pub fn async_add_destination(
         &mut self,
-        client: &'a Aeron,
+        client: &Aeron,
         destination: &str,
     ) -> Result<AeronAsyncDestination, AeronCError> {
         AeronAsyncDestination::aeron_subscription_async_add_destination(client, self, destination)
@@ -280,7 +280,7 @@ impl<'a> AeronSubscription<'a> {
 
     pub fn add_destination(
         &mut self,
-        client: &'a Aeron,
+        client: &Aeron,
         destination: &str,
         timeout: std::time::Duration,
     ) -> Result<(), AeronCError> {
@@ -309,10 +309,10 @@ impl<'a> AeronSubscription<'a> {
     }
 }
 
-impl<'a> AeronExclusivePublication<'a> {
+impl AeronExclusivePublication {
     pub fn async_add_destination(
         &mut self,
-        client: &'a Aeron,
+        client: &Aeron,
         destination: &str,
     ) -> Result<AeronAsyncDestination, AeronCError> {
         AeronAsyncDestination::aeron_exclusive_publication_async_add_destination(
@@ -324,7 +324,7 @@ impl<'a> AeronExclusivePublication<'a> {
 
     pub fn add_destination(
         &mut self,
-        client: &'a Aeron,
+        client: &Aeron,
         destination: &str,
         timeout: std::time::Duration,
     ) -> Result<(), AeronCError> {
@@ -353,10 +353,10 @@ impl<'a> AeronExclusivePublication<'a> {
     }
 }
 
-impl<'a> AeronPublication<'a> {
+impl AeronPublication {
     pub fn async_add_destination(
         &mut self,
-        client: &'a Aeron,
+        client: &Aeron,
         destination: &str,
     ) -> Result<AeronAsyncDestination, AeronCError> {
         AeronAsyncDestination::aeron_publication_async_add_destination(client, self, destination)
@@ -364,7 +364,7 @@ impl<'a> AeronPublication<'a> {
 
     pub fn add_destination(
         &mut self,
-        client: &'a Aeron,
+        client: &Aeron,
         destination: &str,
         timeout: std::time::Duration,
     ) -> Result<(), AeronCError> {
@@ -393,7 +393,7 @@ impl<'a> AeronPublication<'a> {
     }
 }
 
-impl<'a> std::str::FromStr for AeronUriStringBuilder<'a> {
+impl std::str::FromStr for AeronUriStringBuilder {
     type Err = AeronCError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -403,7 +403,7 @@ impl<'a> std::str::FromStr for AeronUriStringBuilder<'a> {
     }
 }
 
-impl<'a> AeronUriStringBuilder<'a> {
+impl AeronUriStringBuilder {
     #[inline]
     pub fn build(&self, max_str_length: usize) -> Result<String, AeronCError> {
         let mut result = String::with_capacity(max_str_length);
@@ -632,7 +632,7 @@ impl<'a> AeronUriStringBuilder<'a> {
     }
 }
 
-impl<'a> AeronCountersReader<'a> {
+impl AeronCountersReader {
     #[inline]
     #[doc = "Get the label for a counter."]
     #[doc = ""]
@@ -723,9 +723,9 @@ impl<'a> AeronCountersReader<'a> {
     }
 }
 
-impl<'a> Aeron<'a> {
+impl Aeron {
     pub fn new_blocking(
-        context: &'a AeronContext,
+        context: &AeronContext,
         timeout: std::time::Duration,
     ) -> Result<Self, AeronCError> {
         if let Ok(aeron) = Aeron::new(&context) {
@@ -744,7 +744,7 @@ impl<'a> Aeron<'a> {
     }
 }
 
-impl<'a> AeronFragmentHandlerCallback for AeronFragmentAssembler<'a> {
+impl AeronFragmentHandlerCallback for AeronFragmentAssembler {
     fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) -> () {
         unsafe {
             aeron_fragment_assembler_handler(
@@ -757,7 +757,7 @@ impl<'a> AeronFragmentHandlerCallback for AeronFragmentAssembler<'a> {
     }
 }
 
-impl<'a> AeronControlledFragmentHandlerCallback for AeronControlledFragmentAssembler<'a> {
+impl AeronControlledFragmentHandlerCallback for AeronControlledFragmentAssembler {
     fn handle_aeron_controlled_fragment_handler(
         &mut self,
         buffer: &[u8],
@@ -774,10 +774,10 @@ impl<'a> AeronControlledFragmentHandlerCallback for AeronControlledFragmentAssem
     }
 }
 
-impl<'a, T: AeronFragmentHandlerCallback> Handler<T> {
+impl<T: AeronFragmentHandlerCallback> Handler<T> {
     pub fn leak_with_fragment_assembler(
         handler: T,
-    ) -> Result<(Handler<AeronFragmentAssembler<'a>>, Handler<T>), AeronCError> {
+    ) -> Result<(Handler<AeronFragmentAssembler>, Handler<T>), AeronCError> {
         let handler = Handler::leak(handler);
         Ok((
             Handler::leak(AeronFragmentAssembler::new(Some(&handler))?),
@@ -785,10 +785,10 @@ impl<'a, T: AeronFragmentHandlerCallback> Handler<T> {
         ))
     }
 }
-impl<'a, T: AeronControlledFragmentHandlerCallback> Handler<T> {
+impl<T: AeronControlledFragmentHandlerCallback> Handler<T> {
     pub fn leak_with_controlled_fragment_assembler(
         handler: T,
-    ) -> Result<(Handler<AeronControlledFragmentAssembler<'a>>, Handler<T>), AeronCError> {
+    ) -> Result<(Handler<AeronControlledFragmentAssembler>, Handler<T>), AeronCError> {
         let handler = Handler::leak(handler);
         Ok((
             Handler::leak(AeronControlledFragmentAssembler::new(Some(&handler))?),
@@ -797,7 +797,7 @@ impl<'a, T: AeronControlledFragmentHandlerCallback> Handler<T> {
     }
 }
 
-impl<'a> AeronBufferClaim<'a> {
+impl AeronBufferClaim {
     #[inline]
     pub fn data_mut(&self) -> &mut [u8] {
         debug_assert!(!self.data.is_null());
