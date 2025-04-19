@@ -221,7 +221,7 @@ impl<'a> AeronArchiveContext<'a> {
     /// If you do not set a credentials supplier, it will segfault.
     /// This method ensures that a non-functional credentials supplier is set to avoid the segfault.
     pub fn new_with_no_credentials_supplier(
-        aeron: std::pin::Pin<&'a Aeron>,
+        aeron: &'a Aeron,
         request_control_channel: &str,
         response_control_channel: &str,
         recording_events_channel: &str,
@@ -334,7 +334,7 @@ mod tests {
         let archive_dir = format!("target/aeron/{}/archive", id);
 
         info!("starting archive media driver");
-        let media_driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
+        let mut media_driver = EmbeddedArchiveMediaDriverProcess::build_and_start(
             &aeron_dir,
             &format!("{}/archive", aeron_dir),
             ARCHIVE_CONTROL_REQUEST,
@@ -344,15 +344,15 @@ mod tests {
         .expect("Failed to start embedded media driver");
 
         info!("connecting to archive");
-        let archive_client = media_driver
+        media_driver
             .archive_connect()
             .expect("Could not connect to archive client");
         
-        // let archive = &archive_client.archive;
-        // let aeron = &archive_client.aeron;
-        let (archive, aeron, archive_ctx, ctx, _) = media_driver
-            .archive_connect()
-            .expect("Could not connect to archive client");
+        let archive = media_driver.archive.as_ref().unwrap();
+        let aeron = media_driver.aeron.as_ref().unwrap();
+        // let (archive, aeron, archive_ctx, ctx, _) = media_driver
+        //     .archive_connect()
+        //     .expect("Could not connect to archive client");
 
         let running = Arc::new(AtomicBool::new(true));
 
@@ -621,7 +621,7 @@ mod tests {
         (
             Aeron<'a>,
             AeronArchiveContext<'a>,
-            EmbeddedArchiveMediaDriverProcess,
+            EmbeddedArchiveMediaDriverProcess<'a>,
         ),
         Box<dyn Error>,
     > {

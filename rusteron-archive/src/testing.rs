@@ -16,13 +16,19 @@ use std::{fs, io, panic, process};
 use std::ops::Deref;
 use std::pin::Pin;
 
-pub struct EmbeddedArchiveMediaDriverProcess {
+pub struct EmbeddedArchiveMediaDriverProcess<'a> {
     child: Child,
     pub aeron_dir: String,
     pub archive_dir: String,
     pub control_request_channel: String,
     pub control_response_channel: String,
     pub recording_events_channel: String,
+    
+    pub aeron_context: Option<Pin<Box<AeronContext<'a>>>>,
+    pub archive_context: Option<Pin<Box<AeronArchiveContext<'a>>>>,
+    pub aeron: Option<Pin<Box<Aeron<'a>>>>,
+    pub archive: Option<Pin<Box<AeronArchive<'a>>>>,
+    pub connect: Option<Pin<Box<AeronArchiveAsyncConnect<'a>>>>,
 }
 
 // #[self_referencing]
@@ -42,7 +48,7 @@ pub struct EmbeddedArchiveMediaDriverProcess {
 //     archive:         AeronArchive<'this>,
 // }
 
-impl EmbeddedArchiveMediaDriverProcess {
+impl EmbeddedArchiveMediaDriverProcess<'_> {
     /// Builds the Aeron Archive project and starts an embedded Aeron Archive Media Driver process.
     ///
     /// This function ensures that the necessary Aeron `.jar` files are built using Gradle. If the required
@@ -139,61 +145,60 @@ impl EmbeddedArchiveMediaDriverProcess {
             .spawn()
     }
 
-    pub fn archive_connect<'a>(
-        &self,
+    pub fn archive_connect(
+        &mut self,
     ) -> Result<
-        (
-            Pin<&'a AeronArchive<'a>>,
-            Pin<&'a Aeron<'a>>,
-            Pin<&'a AeronArchiveContext<'a>>,
-            Pin<&'a AeronContext<'a>>,
-            Pin<&'a AeronArchiveAsyncConnect<'a>>,
-        ),
+        // (
+        //     Box<AeronArchive<'a>>,
+        //     Box<Aeron<'a>>,
+        //     Box<AeronArchiveContext<'a>>,
+        //     Box<AeronContext<'a>>,
+        //     Box<AeronArchiveAsyncConnect<'a>>,
+        // ),
+        (),
         io::Error,
     > {
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(30) {
             if let Ok(aeron_context) = AeronContext::new() {
-                let aeron_context = Pin::new(&aeron_context);
                 aeron_context.set_dir(&self.aeron_dir).expect("invalid dir");
                 aeron_context
                     .set_client_name("unit_test_client")
                     .expect("invalid client name");
-                if let Ok(aeron) = Aeron::new(aeron_context) {
-                    let aeron = Pin::new(&aeron);
+                self.aeron_context = Some(Box::pin(aeron_context));
+                if let Ok(aeron) = Aeron::new(self.aeron_context.as_ref().unwrap()) {
                     if aeron.start().is_ok() {
+                        self.aeron = Some(Box::pin(aeron));
                         if let Ok(archive_context) =
                             AeronArchiveContext::new_with_no_credentials_supplier(
-                                aeron,
+                                &self.aeron.as_ref().unwrap(),
                                 &self.control_request_channel,
                                 &self.control_response_channel,
                                 &self.recording_events_channel,
                             )
                         {
-                            let archive_context = Pin::new(&archive_context);
+                            let archive_context = Box::pin(archive_context);
                             archive_context
                                 .set_idle_strategy(Some(&Handler::leak(NoOpAeronIdleStrategyFunc)))
                                 .expect("unable to set idle strategy");
+                            self.archive_context = Some(archive_context);
                             // let archive_ctx_copy = archive_context.clone();
                             if let Ok(connect) =
                                 // AeronArchiveAsyncConnect::new_with_aeron(&archive_context, &aeron)
-                                AeronArchiveAsyncConnect::new(archive_context)
+                                AeronArchiveAsyncConnect::new(&self.archive_context.as_ref().unwrap())
                             {
-                                let connect = Pin::new(&connect);
+                                let connect = Box::pin(connect);
                                 if let Ok(archive) = connect.poll_blocking(Duration::from_secs(10))
                                 {
-                                    let archive = Pin::new(&archive);
+                                    self.connect = Some(connect);
+                                    let archive = Box::pin(archive);
                                     let i = archive.get_archive_id();
                                     assert!(i > 0);
                                     info!("aeron archive media driver is up [connected with archive id {i}]");
                                     sleep(Duration::from_millis(100));
-                                    return Ok((
-                                        archive,
-                                        aeron,
-                                        archive_context,
-                                        aeron_context,
-                                        connect,
-                                    ));
+
+                                    self.archive = Some(archive);
+                                    return Ok(());
                                 };
                             }
                         }
@@ -364,6 +369,11 @@ impl EmbeddedArchiveMediaDriverProcess {
             control_request_channel: control_request_channel.to_string(),
             control_response_channel: control_response_channel.to_string(),
             recording_events_channel: recording_events_channel.to_string(),
+            aeron_context: None,
+            archive_context: None,
+            aeron: None,
+            archive: None,
+            connect: None,
         })
     }
 
@@ -390,7 +400,7 @@ impl EmbeddedArchiveMediaDriverProcess {
 }
 
 // Use the Drop trait to ensure process cleanup and directory removal after test completion
-impl Drop for EmbeddedArchiveMediaDriverProcess {
+impl Drop for EmbeddedArchiveMediaDriverProcess<'_> {
     fn drop(&mut self) {
         warn!("WARN: stopping aeron archive media driver!!!!");
         // Attempt to kill the Java process if it’s still running

@@ -204,7 +204,7 @@ impl ReturnType {
                 let new_type =
                     parse_str::<Type>(&wrapper.class_name).expect("Invalid class name in wrapper");
                 if use_ref_for_cwrapper {
-                    return quote! { std::pin::Pin<&'a #new_type<'a>> };
+                    return quote! { &'a #new_type<'a> };
                 } else {
                     return quote! { #new_type };
                 }
