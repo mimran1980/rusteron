@@ -1062,8 +1062,6 @@ impl CWrapper {
                         true,
                     ));
 
-                    // let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &method.arguments);
-
                     let new_args: Vec<TokenStream> = method
                         .arguments
                         .iter()
@@ -1117,18 +1115,9 @@ impl CWrapper {
                         pub fn #fn_name #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
                             #(#lets)*
                             // new by using constructor
-                            // let drop_copies_closure = std::rc::Rc::new(std::cell::RefCell::new(Some(|| {
-                            //     #(#drop_copies);*
-                            // })));
                             let resource_constructor = ManagedCResource::new(
                                 move |ctx_field| unsafe { #init_fn(#(#init_args),*) },
-                                Some(Box::new(move |ctx_field| {
-                                    let result = unsafe { #close_fn(#(#close_args),*) };
-                                    // if let Some(drop_closure) = drop_copies_closure.borrow_mut().take() {
-                                    //    drop_closure();
-                                    // }
-                                    result
-                                })),
+                                Some(Box::new(move |ctx_field| unsafe { #close_fn(#(#close_args),*)} )),
                                 false,
                                 #is_closed_method,
                             )?;
@@ -1257,7 +1246,6 @@ impl CWrapper {
                 let lets: Vec<TokenStream> =
                     Self::lets_for_copying_arguments(wrappers, &cloned_fields, false);
 
-                // let drop_copies: Vec<TokenStream> = Self::drop_copies(wrappers, &self.fields);
                 let is_closed_method = self.get_is_closed_method_quote();
 
                 vec![quote! {
@@ -1265,9 +1253,6 @@ impl CWrapper {
                     pub fn new #where_clause(#(#new_args),*) -> Result<Self, AeronCError> {
                         #(#lets)*
                         // no constructor in c bindings
-                        // let drop_copies_closure = std::cell::RefCell::new(Some(|| {
-                        //     #(#drop_copies);*
-                        // }));
                         let r_constructor = ManagedCResource::new(
                             move |ctx_field| {
                                 let inst = #type_name { #(#init_args),* };
@@ -2393,15 +2378,6 @@ pub fn generate_rust_code(
         }
 
         #(#additional_impls)*
-
-        // impl *mut #type_name {
-        //     #[inline]
-        //     pub fn as_struct(value: *mut #type_name) -> #class_name {
-        //         #class_name {
-        //             inner: std::rc::Rc::new(ManagedCResource::new_borrowed(value))
-        //         }
-        //     }
-        // }
 
         #async_impls
         #default_impl
