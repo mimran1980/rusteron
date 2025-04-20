@@ -28,7 +28,7 @@ criterion = "0.5"
 serial_test = "3.2"
 regex = "1.11"
 log = "0.4"
-walkdir = "2.5.0"
+walkdir = "2.5"
 
 [release]
 bump = "auto"
@@ -50,3 +50,6 @@ compression = "best"
 debug = false
 panic = "unwind"
 
+#[profile.bench]
+#debug = true
+#opt-level = 0

@@ -330,7 +330,7 @@ mod tests {
     fn test_simple_replay_merge() -> Result<(), AeronCError> {
         let _ = env_logger::Builder::new()
             .is_test(true)
-            .filter_level(log::LevelFilter::Debug)
+            .filter_level(log::LevelFilter::Info)
             .try_init();
 
         EmbeddedArchiveMediaDriverProcess::kill_all_java_processes()

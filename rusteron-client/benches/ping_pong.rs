@@ -99,14 +99,13 @@ fn run_pong(stop: Arc<AtomicBool>, dir: &str) -> Result<(), Box<dyn std::error::
     pub struct PongRoundTripHandler {
         publisher: AeronPublication,
         buffer_claim: AeronBufferClaim,
-        header_values: AeronHeaderValues,
     }
 
     impl AeronFragmentHandlerCallback for PongRoundTripHandler {
         #[inline]
         fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) {
-            header.values(&self.header_values).unwrap();
-            let flags = self.header_values.frame.flags;
+            let header_values = header.get_values().unwrap();
+            let flags = header_values.frame.flags;
 
             while self.publisher.try_claim(buffer.len(), &self.buffer_claim) < 0 {}
             self.buffer_claim.frame_header_mut().flags = flags;
@@ -118,7 +117,6 @@ fn run_pong(stop: Arc<AtomicBool>, dir: &str) -> Result<(), Box<dyn std::error::
     let handler = Handler::leak(PongRoundTripHandler {
         publisher: ping_publication.clone(),
         buffer_claim: Default::default(),
-        header_values: Default::default(),
     });
     while !stop.load(Ordering::Acquire) {
         let _ = pong_subscription.poll(Some(&handler), FRAGMENT_COUNT_LIMIT);

@@ -26,6 +26,7 @@ impl AeronCnc {
 
         let result = Self {
             inner: resource.get(),
+            _owned_on_stack: None,
             owned_inner: Some(std::rc::Rc::new(resource)),
         };
         Ok(result)
@@ -216,6 +217,7 @@ impl AeronCncMetadata {
 
         let result = Self {
             inner: resource.get(),
+            _owned_on_stack: None,
             owned_inner: Some(std::rc::Rc::new(resource)),
         };
         Ok(result)

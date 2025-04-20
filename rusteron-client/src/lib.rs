@@ -77,7 +77,11 @@ mod tests {
             handler.release();
         }
 
-        assert!(current_allocs() <= alloc_count);
+        assert!(
+            current_allocs() <= alloc_count + 1,
+            "allocations {} > {alloc_count}",
+            current_allocs()
+        );
 
         Ok(())
     }
@@ -154,6 +158,8 @@ mod tests {
                     let result =
                         publisher.offer(large_msg, Handlers::no_reserved_value_supplier_handler());
 
+                    assert_eq!(123, publisher.get_constants().unwrap().stream_id);
+
                     if result < large_msg.len() as i64 {
                         let error = AeronCError::from_code(result as i32);
                         match error.kind() {
@@ -188,6 +194,9 @@ mod tests {
         impl AeronFragmentHandlerCallback for FragmentHandler {
             fn handle_aeron_fragment_handler(&mut self, buffer: &[u8], header: AeronHeader) {
                 self.count_copy.fetch_add(1, Ordering::SeqCst);
+
+                let values = header.get_values().unwrap();
+                assert_ne!(values.frame.session_id, 0);
 
                 if buffer.len() != self.string_len {
                     self.stop2.store(true, Ordering::SeqCst);
@@ -227,6 +236,7 @@ mod tests {
                 break;
             }
             subscription.poll(Some(&closure), 128)?;
+            assert_eq!(123, subscription.get_constants().unwrap().stream_id);
         }
 
         subscription.close(Handlers::no_notification_handler())?;

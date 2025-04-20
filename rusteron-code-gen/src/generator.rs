@@ -853,7 +853,10 @@ impl CWrapper {
                         #[inline]
                         #(#method_docs)*
                         pub fn #getter_method #where_clause(#possible_self) -> Result<#return_type, AeronCError> {
-                            let result = #return_type::default();
+                            let mut result = #return_type::new_zeroed_on_stack();
+                            if let Some(stack) = result._owned_on_stack.as_mut() {
+                                result.inner = stack.as_mut_ptr();
+                            }
                             self.#fn_name(&result)?;
                             Ok(result)
                         }
@@ -1124,6 +1127,7 @@ impl CWrapper {
 
                             Ok(Self {
                                 inner: resource_constructor.get(),
+                                _owned_on_stack: None,
                                 owned_inner: Some(std::rc::Rc::new(resource_constructor)),
                                 #(#new_ref_args)*
                             })
@@ -1148,11 +1152,11 @@ impl CWrapper {
             let zeroed_impl = quote! {
                 #[inline]
                 /// creates zeroed struct where the underlying c struct is on the heap
-                pub fn new_zeroed() -> Result<Self, AeronCError> {
+                pub fn new_zeroed_on_heap() -> Self {
                     let resource = ManagedCResource::new(
                         move |ctx_field| {
-                            #[cfg(debug_assertions)]
-                            log::debug!("creating zeroed empty resource on heap {}", stringify!(#type_name));
+                            #[cfg(feature = "extra-logging")]
+                            log::info!("creating zeroed empty resource on heap {}", stringify!(#type_name));
                             let inst: #type_name = unsafe { std::mem::zeroed() };
                             let inner_ptr: *mut #type_name = Box::into_raw(Box::new(inst));
                             unsafe { *ctx_field = inner_ptr };
@@ -1161,37 +1165,32 @@ impl CWrapper {
                         None,
                         true,
                         #is_closed_method
-                    )?;
+                    ).unwrap();
 
-                    Ok(Self {
+                    Self {
                         inner: resource.get(),
+                        _owned_on_stack: None,
                         owned_inner: Some(std::rc::Rc::new(resource))
-                    })
+                    }
                 }
 
-                // #[inline]
-                // /// creates zeroed struct where the underlying c struct is on the stack
-                // /// _(Use with care)_
-                // pub fn new_zeroed_on_stack() -> Result<Self, AeronCError> {
-                //     let resource = ManagedCResource::new(
-                //         move |ctx_field| {
-                //             #[cfg(feature = "extra-logging")]
-                //             log::debug!("creating zeroed empty resource on stack {}", stringify!(#type_name));
-                //             let mut inst: std::mem::MaybeUninit<#type_name> = std::mem::MaybeUninit::new(unsafe { std::mem::zeroed() });
-                //             let inner_ptr: *mut #type_name = inst.as_mut_ptr();
-                //             unsafe { *ctx_field = inner_ptr };
-                //             0
-                //         },
-                //         None,
-                //         true,
-                //         #is_closed_method
-                //     )?;
-                //
-                //     Ok(Self {
-                //         inner: resource.get(),
-                //         owned_inner: Some(std::rc::Rc::new(resource))
-                //     })
-                // }
+                #[inline]
+                /// creates zeroed struct where the underlying c struct is on the stack
+                /// _(Use with care)_
+                pub fn new_zeroed_on_stack() -> Self {
+                    #[cfg(feature = "extra-logging")]
+                    log::debug!("creating zeroed empty resource on stack {}", stringify!(#type_name));
+
+                    let mut result = Self {
+                        inner: std::ptr::null_mut(),
+                        _owned_on_stack: Some(std::mem::MaybeUninit::zeroed()),
+                        owned_inner: None
+                    };
+                    if let Some(stack) = result._owned_on_stack.as_mut() {
+                        result.inner = stack.as_mut_ptr();
+                    }
+                    result
+                }
             };
             if self.has_default_method() {
                 let type_name = format_ident!("{}", self.type_name);
@@ -1267,6 +1266,7 @@ impl CWrapper {
 
                         Ok(Self {
                             inner: r_constructor.get(),
+                            _owned_on_stack: None,
                             owned_inner: Some(std::rc::Rc::new(r_constructor))
                         })
                     }
@@ -2008,6 +2008,7 @@ pub fn generate_rust_code(
                             )?;
                             Ok(Self {
                                 inner: resource.get(),
+                                _owned_on_stack: None,
                                 owned_inner: Some(std::rc::Rc::new(resource)),
                             })
                         }
@@ -2063,6 +2064,7 @@ pub fn generate_rust_code(
                             )?;
                             let mut result = Self {
                                 inner: resource_async.get(),
+                                _owned_on_stack: None,
                                 owned_inner: Some(std::rc::Rc::new(resource_async)),
                             };
                             #(#async_dependancies)*
@@ -2206,11 +2208,21 @@ pub fn generate_rust_code(
             .trim()
             .is_empty()
     {
+        // let default_method_call = if wrapper.has_any_methods() {
+        //     quote! {
+        //         #class_name::new_zeroed_on_heap()
+        //     }
+        //  } else {
+        //     quote! {
+        //         #class_name::new_zeroed_on_stack()
+        //     }
+        // };
+
         quote! {
             /// This will create an instance where the struct is zeroed, use with care
             impl Default for #class_name {
                 fn default() -> Self {
-                    #class_name::new_zeroed().expect("failed to create struct")
+                    #class_name::new_zeroed_on_heap()
                 }
             }
 
@@ -2237,14 +2249,33 @@ pub fn generate_rust_code(
 
     let is_closed_method = wrapper.get_is_closed_method_quote();
 
+    let sync_stack_var = if wrapper.methods.is_empty() && wrapper.has_default_method() {
+        quote! {
+            // since we storing variable on stack, its actually not safe, as variable can be moved.
+            // should being using the heap. But for AeronPublicationConstants, you just want to access the
+            // fields. So we need to keep updating reference everytime we access it
+            if let Some(stack) = self._owned_on_stack.as_ref() {
+                unsafe {
+                    let me: *mut #class_name = self  as *const _ as *mut _;
+                    (*me).inner = stack.as_ptr() as *mut _;
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         #warning_code
 
         #(#class_docs)*
         #[derive(Clone)]
         pub struct #class_name {
+            // stored on heap
             owned_inner: Option<std::rc::Rc<ManagedCResource<#type_name>>>,
             inner: *mut #type_name,
+            // stored on stack, unsafe, use with care
+            _owned_on_stack: Option<std::mem::MaybeUninit<#type_name>>,
             #(#constructor_fields)*
         }
 
@@ -2271,6 +2302,7 @@ pub fn generate_rust_code(
 
             #[inline(always)]
             pub fn get_inner(&self) -> *mut #type_name {
+                #sync_stack_var
                 self.inner
             }
         }
@@ -2279,6 +2311,7 @@ pub fn generate_rust_code(
             type Target = #type_name;
 
             fn deref(&self) -> &Self::Target {
+                #sync_stack_var
                 unsafe { &*self.inner }
             }
         }
@@ -2288,6 +2321,7 @@ pub fn generate_rust_code(
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
                     owned_inner: None,
+                    _owned_on_stack: None,
                     inner: value,
                     #(#new_ref_set_none)*
                 }
@@ -2320,6 +2354,7 @@ pub fn generate_rust_code(
             fn from(value: *const #type_name) -> Self {
                 #class_name {
                     owned_inner: None,
+                    _owned_on_stack: None,
                     inner: value as *mut #type_name,
                     #(#new_ref_set_none)*
                 }
@@ -2331,6 +2366,7 @@ pub fn generate_rust_code(
             fn from(mut value: #type_name) -> Self {
                 #class_name {
                     owned_inner: None,
+                    _owned_on_stack: None,
                     inner: &mut value as *mut #type_name,
                     #(#new_ref_set_none)*
                 }
