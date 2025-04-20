@@ -53,8 +53,7 @@ jobs:
           cargo test --doc
 
   build:
-    # only run mac-os, windows if branch is main else only do ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && (matrix.os == 'ubuntu-latest' || github.ref == 'refs/heads/main')"
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     name: Build
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
