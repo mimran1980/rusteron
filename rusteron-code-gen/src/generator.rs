@@ -1281,34 +1281,6 @@ impl CWrapper {
         }
     }
 
-    fn drop_copies(
-        wrappers: &BTreeMap<String, CWrapper>,
-        arguments: &Vec<Arg>,
-    ) -> Vec<TokenStream> {
-        arguments
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, arg)| {
-                if idx == 0 {
-                    None
-                } else {
-                    // check if I need to make copy of object for reference counting
-                    if arg.is_single_mut_pointer()
-                        && wrappers.contains_key(arg.c_type.split_whitespace().last().unwrap())
-                    {
-                        let arg_copy = format_ident!("{}_copy", arg.name);
-                        return Some(quote! {
-                        drop(#arg_copy)
-                        });
-                    } else {
-                        return None;
-                    };
-                }
-            })
-            .filter(|t| !t.is_empty())
-            .collect_vec()
-    }
-
     fn lets_for_copying_arguments(
         wrappers: &BTreeMap<String, CWrapper>,
         arguments: &Vec<Arg>,
@@ -2164,10 +2136,11 @@ pub fn generate_rust_code(
                 impl Drop for #class_name {
                     fn drop(&mut self) {
                         if let Some(inner) = self.owned_inner.as_mut() {
-                            if (inner.borrowed || inner.cleanup.is_none() ) && std::rc::Rc::strong_count(&inner) == 1 && !inner.is_closed_already_called() {
-                                    if inner.auto_close.get() {
+                            if (inner.cleanup.is_none() ) && std::rc::Rc::strong_count(&inner) == 1 && !inner.is_closed_already_called() {
+                                if inner.auto_close.get() {
+                                    log::info!("auto closing {}", stringify!(#class_name));
                                     let result = self.#close_method_call();
-                                    log::info!("auto closing {} {:?}", stringify!(#class_name), result);
+                                    log::debug!("result {:?}", result);
                                 } else {
                                     #[cfg(feature = "extra-logging")]
                                     log::warn!("{} not closed", stringify!(#class_name));
@@ -2300,19 +2273,6 @@ pub fn generate_rust_code(
             pub fn get_inner(&self) -> *mut #type_name {
                 self.inner
             }
-
-            // #[inline(always)]
-            // pub fn get_inner_and_disable_drop(&self) -> *mut #type_name {
-            //     unsafe {
-            //         if !*self.inner.borrowed.get() {
-            //             log::info!("{:?} disabling auto-drop as being used in another place, must be manually dropped", self);
-            //             self.inner.disable_drop();
-            //         }
-            //     }
-            //     self.inner
-            // }
-
-
         }
 
         impl std::ops::Deref for #class_name {

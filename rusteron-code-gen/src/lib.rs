@@ -379,21 +379,6 @@ mod test {
         assert!(!flag.load(Ordering::SeqCst));
     }
 
-    fn panic_for_close(v: *mut i32) -> bool {
-        panic!("check_for_is_closed should not be called for borrowed resources")
-    }
-
-    #[test]
-    fn test_drop_does_not_call_cleanup_for_borrowed() {
-        let resource_ptr = make_resource(40);
-
-        let check_fn = Some(panic_for_close as fn(_) -> bool);
-
-        {
-            let _resource = ManagedCResource::new_borrowed(resource_ptr as *const i32, check_fn);
-        }
-    }
-
     #[test]
     fn test_drop_does_not_call_cleanup_if_check_for_is_closed_returns_true() {
         let flag = Arc::new(AtomicBool::new(false));

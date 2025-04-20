@@ -13,7 +13,6 @@ pub struct ManagedCResource<T> {
     resource: *mut T,
     cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
     cleanup_struct: bool,
-    borrowed: bool,
     /// if someone externally rusteron calls close
     close_already_called: std::cell::Cell<bool>,
     /// if there is a c method to verify it someone has closed it, only few structs have this functionality
@@ -70,7 +69,6 @@ impl<T> ManagedCResource<T> {
             resource,
             cleanup,
             cleanup_struct,
-            borrowed: false,
             close_already_called: std::cell::Cell::new(false),
             check_for_is_closed,
             auto_close: std::cell::Cell::new(false),
@@ -88,19 +86,6 @@ impl<T> ManagedCResource<T> {
                 .check_for_is_closed
                 .as_ref()
                 .map_or(false, |f| f(self.resource))
-    }
-
-    pub fn new_borrowed(value: *const T, check_for_is_closed: Option<fn(*mut T) -> bool>) -> Self {
-        Self {
-            resource: value as *mut _,
-            cleanup: None,
-            cleanup_struct: false,
-            borrowed: true,
-            close_already_called: std::cell::Cell::new(false),
-            check_for_is_closed,
-            auto_close: std::cell::Cell::new(false),
-            dependencies: UnsafeCell::new(vec![]),
-        }
     }
 
     /// Gets a raw pointer to the resource.
@@ -173,33 +158,31 @@ impl<T> ManagedCResource<T> {
 impl<T> Drop for ManagedCResource<T> {
     fn drop(&mut self) {
         if !self.resource.is_null() {
-            if !self.borrowed {
-                let already_closed = self.close_already_called.get()
-                    || self
-                        .check_for_is_closed
-                        .as_ref()
-                        .map_or(false, |f| f(self.resource));
+            let already_closed = self.close_already_called.get()
+                || self
+                    .check_for_is_closed
+                    .as_ref()
+                    .map_or(false, |f| f(self.resource));
 
-                let resource = if already_closed {
-                    self.resource
-                } else {
-                    self.resource.clone()
-                };
+            let resource = if already_closed {
+                self.resource
+            } else {
+                self.resource.clone()
+            };
 
-                if !already_closed {
-                    // Ensure the clean-up function is called when the resource is dropped.
-                    #[cfg(feature = "extra-logging")]
-                    log::info!("closing c resource: {:?}", self);
-                    let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
-                }
-                self.close_already_called.set(true);
+            if !already_closed {
+                // Ensure the clean-up function is called when the resource is dropped.
+                #[cfg(feature = "extra-logging")]
+                log::info!("closing c resource: {:?}", self);
+                let _ = self.close(); // Ignore errors during an automatic drop to avoid panics.
+            }
+            self.close_already_called.set(true);
 
-                if self.cleanup_struct {
-                    #[cfg(feature = "extra-logging")]
-                    log::info!("closing rust struct resource: {:?}", resource);
-                    unsafe {
-                        let _ = Box::from_raw(resource);
-                    }
+            if self.cleanup_struct {
+                #[cfg(feature = "extra-logging")]
+                log::info!("closing rust struct resource: {:?}", resource);
+                unsafe {
+                    let _ = Box::from_raw(resource);
                 }
             }
         }
