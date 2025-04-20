@@ -54,8 +54,6 @@ The library is divided into several modules, each focusing on specific parts of 
   Aeron Media Driver, a core component for managing messaging between producers and consumers. It uses the Aeron C
   bindings from aeron-driver module.
 
-- **[rusteron-rb](https://github.com/mimran1980/rusteron/tree/main/rusteron-rb)**: Provides ring buffer and broadcast functionalities via aeron c bindings, allowing efficient, low-latency message passing between different threads or processes. This module implements Single Producer, Single Consumer (SPSC) ring buffers, Multi-Producer, Single Consumer (MPSC) ring buffers, and broadcast channels.
-
 - **[rusteron-docker-samples](https://github.com/mimran1980/rusteron/tree/main/rusteron-docker-samples)**: A collection of simple examples demonstrating how Docker configurations might look for Aeron-based applications. The examples include Dockerfiles for Aeron Media Driver and dummy components like ticker writer and ticker reader, showcasing shared resource management and environment configurations. These are not production-ready configurations but can serve as inspiration for setting up your own Docker-based workflows. For details, see the module's [README](https://github.com/mimran1980/rusteron/tree/main/rusteron-docker-samples/README.md).
 
 ## Installation
@@ -65,7 +63,6 @@ Add the following line to your `Cargo.toml` to include the specific **rusteron**
 - **rusteron-client**: For core Aeron client functionalities.
 - **rusteron-archive**: For Aeron client with archive capabilities.
 - **rusteron-media-driver**: For the Aeron media driver.
-- **rusteron-rb**: Ring buffer (single and multi producer) and broadcast transmitter/receiver
 
 For detailed instructions on how to build **rusteron-archive**, please refer to the [HOW_TO_BUILD.md](./HOW_TO_BUILD.md) file.
 
@@ -88,7 +85,7 @@ rusteron-client = { version = "0.1", features= ["static", "precompile"] }
 ```
 
 
-Replace `rusteron-client` with `rusteron-archive`/`rusteron-media-driver`/`rusteron-rb` as per your requirement.
+Replace `rusteron-client` with `rusteron-archive`/`rusteron-media-driver` as per your requirement.
 
 ## Usage Example
 

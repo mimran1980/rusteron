@@ -485,7 +485,7 @@ impl CWrapper {
         if let Some(method) = self.get_is_closed_method() {
             let fn_name = format_ident!("{}", method.fn_name);
             quote! {
-                Some(Box::new(|c| unsafe{#fn_name(c)}))
+                Some(|c| unsafe{#fn_name(c)})
             }
         } else {
             quote! {
@@ -1179,6 +1179,30 @@ impl CWrapper {
                         owned_inner: Some(std::rc::Rc::new(resource))
                     })
                 }
+
+                // #[inline]
+                // /// creates zeroed struct where the underlying c struct is on the stack
+                // /// _(Use with care)_
+                // pub fn new_zeroed_on_stack() -> Result<Self, AeronCError> {
+                //     let resource = ManagedCResource::new(
+                //         move |ctx_field| {
+                //             #[cfg(feature = "extra-logging")]
+                //             log::debug!("creating zeroed empty resource on stack {}", stringify!(#type_name));
+                //             let mut inst: std::mem::MaybeUninit<#type_name> = std::mem::MaybeUninit::new(unsafe { std::mem::zeroed() });
+                //             let inner_ptr: *mut #type_name = inst.as_mut_ptr();
+                //             unsafe { *ctx_field = inner_ptr };
+                //             0
+                //         },
+                //         None,
+                //         true,
+                //         #is_closed_method
+                //     )?;
+                //
+                //     Ok(Self {
+                //         inner: resource.get(),
+                //         owned_inner: Some(std::rc::Rc::new(resource))
+                //     })
+                // }
             };
             if self.has_default_method() {
                 let type_name = format_ident!("{}", self.type_name);

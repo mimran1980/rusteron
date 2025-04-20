@@ -28,17 +28,14 @@ clean:
   rm -rf rusteron-archive/target
   rm -rf rusteron-client/target
   rm -rf rusteron-media-driver/target
-  rm -rf rusteron-rb/target
   rm -rf rusteron-archive/artifacts
   rm -rf rusteron-client/artifacts
   rm -rf rusteron-media-driver/artifacts
-  rm -rf rusteron-rb/artifacts
   rm -rf rusteron-docker-samples/target
   rm -rf rusteron-docker-samples/rusteron-dummy-example/target
   cd rusteron-archive/aeron && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && cd -
   cd rusteron-client/aeron && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && cd -
   cd rusteron-media-driver/aeron && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && cd -
-  cd rusteron-rb/aeron && git submodule update --init --recursive --checkout && git reset --hard && git clean -fdx && cd -
   cargo clean
 
 # Build the project in debug mode

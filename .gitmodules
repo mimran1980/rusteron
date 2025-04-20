@@ -7,6 +7,3 @@
 [submodule "rusteron-client/aeron"]
 	path = rusteron-client/aeron
 	url = https://github.com/real-logic/aeron.git
-[submodule "rusteron-rb/aeron"]
-	path = rusteron-rb/aeron
-	url = https://github.com/real-logic/aeron.git

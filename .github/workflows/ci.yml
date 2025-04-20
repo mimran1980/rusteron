@@ -98,7 +98,7 @@ jobs:
 
       - name: Build and Test
         run: |
-          rm -rf rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts rusteron-rb/artifacts
+          rm -rf rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts
           # uncomment if we need to add back support for mac x86
           # RUSTFLAGS="-C opt-level=z -C codegen-units=1 -C debuginfo=0 -C panic=abort -C link-arg=-s"  PUBLISH_ARTIFACTS=true cargo build --release --workspace ${{ env.feature-flags }}
           PUBLISH_ARTIFACTS=true cargo build --release --workspace ${{ env.feature-flags }}
@@ -114,7 +114,6 @@ jobs:
             rusteron-archive/artifacts
             rusteron-client/artifacts
             rusteron-media-driver/artifacts
-            rusteron-rb/artifacts
 
   merge-artifacts:
     name: Merge Artifacts and Commit
@@ -134,19 +133,18 @@ jobs:
 
       - name: Merge Artifacts into Repository
         run: |
-          rm -rf rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts rusteron-rb/artifacts
-          mkdir -p rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts rusteron-rb/artifacts
+          rm -rf rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts 
+          mkdir -p rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts
           for artifact in $(find ./merged-artifacts -mindepth 1 -maxdepth 1 -type d); do
             cp -r "$artifact"/rusteron-archive/artifacts/* rusteron-archive/artifacts/ 2>/dev/null || true
             cp -r "$artifact"/rusteron-client/artifacts/* rusteron-client/artifacts/ 2>/dev/null || true
             cp -r "$artifact"/rusteron-media-driver/artifacts/* rusteron-media-driver/artifacts/ 2>/dev/null || true
-            cp -r "$artifact"/rusteron-rb/artifacts/* rusteron-rb/artifacts/ 2>/dev/null || true
           done
 
       - name: Commit and Push Artifacts
         run: |
           git config --global user.email "mimran1980@example.com"
           git config --global user.name "Mo Imran"
-          git add rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts rusteron-rb/artifacts
+          git add rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts 
           git commit -m "Add prebuilt binaries from CI [skip ci]" || echo "No changes to commit"
           git push --force-with-lease origin main

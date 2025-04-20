@@ -17,12 +17,13 @@ pub struct ManagedCResource<T> {
     /// if someone externally rusteron calls close
     close_already_called: std::cell::Cell<bool>,
     /// if there is a c method to verify it someone has closed it, only few structs have this functionality
-    check_for_is_closed: Option<Box<dyn Fn(*mut T) -> bool>>,
+    check_for_is_closed: Option<fn(*mut T) -> bool>,
     /// this will be called if closed hasn't already happened even if its borrowed
     auto_close: std::cell::Cell<bool>,
     /// to prevent the dependencies from being dropped as you have a copy here,
     /// for example, you want to have a dependency to aeron for any async jobs so aeron doesnt get dropped first
     /// when you have a publication/subscription
+    /// Note empty vec does not allocate on heap
     dependencies: UnsafeCell<Vec<std::rc::Rc<dyn std::any::Any>>>,
 }
 
@@ -57,7 +58,7 @@ impl<T> ManagedCResource<T> {
         init: impl FnOnce(*mut *mut T) -> i32,
         cleanup: Option<Box<dyn FnMut(*mut *mut T) -> i32>>,
         cleanup_struct: bool,
-        check_for_is_closed: Option<Box<dyn Fn(*mut T) -> bool>>,
+        check_for_is_closed: Option<fn(*mut T) -> bool>,
     ) -> Result<Self, AeronCError> {
         let mut resource: *mut T = std::ptr::null_mut();
         let result = init(&mut resource);
@@ -89,10 +90,7 @@ impl<T> ManagedCResource<T> {
                 .map_or(false, |f| f(self.resource))
     }
 
-    pub fn new_borrowed(
-        value: *const T,
-        check_for_is_closed: Option<Box<dyn Fn(*mut T) -> bool>>,
-    ) -> Self {
+    pub fn new_borrowed(value: *const T, check_for_is_closed: Option<fn(*mut T) -> bool>) -> Self {
         Self {
             resource: value as *mut _,
             cleanup: None,
