@@ -18,7 +18,6 @@ pub mod bindings {
 }
 
 use bindings::*;
-use std::ffi::CStr;
 
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
