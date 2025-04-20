@@ -12,7 +12,30 @@ unsafe impl Send for AeronCounter {}
 unsafe impl Sync for AeronCounter {}
 
 impl AeronCnc {
-    pub fn new(aeron_dir: &str) -> Result<AeronCnc, AeronCError> {
+    /// Note this allocates the rust component on stack but the C aeron_cnc_t struct is still on the heap,
+    /// as Aeron does the allocation.
+    #[inline]
+    pub fn read_on_partial_stack(
+        aeron_dir: &std::ffi::CString,
+        mut handler: impl FnMut(&mut AeronCnc),
+    ) -> Result<(), AeronCError> {
+        let cnc = ManagedCResource::initialise(move |cnc| unsafe {
+            aeron_cnc_init(cnc, aeron_dir.as_ptr(), 0)
+        })?;
+        let mut cnc = Self {
+            inner: cnc,
+            _owned_on_stack: None,
+            owned_inner: None,
+        };
+        handler(&mut cnc);
+        unsafe { aeron_cnc_close(cnc.get_inner()) };
+        Ok(())
+    }
+
+    /// Note this allocates on the heap, cannot be stored this on stack. As Aeron will do the allocation.
+    /// Try to use `read_on_partial_stack` which performs less allocations
+    #[inline]
+    pub fn new_on_heap(aeron_dir: &str) -> Result<AeronCnc, AeronCError> {
         let c_string = std::ffi::CString::new(aeron_dir).expect("CString conversion failed");
         let resource = ManagedCResource::new(
             move |cnc| unsafe { aeron_cnc_init(cnc, c_string.as_ptr(), 0) },
@@ -33,6 +56,7 @@ impl AeronCnc {
     }
 
     #[doc = " Gets the timestamp of the last heartbeat sent to the media driver from any client.\n\n @param aeron_cnc to query\n @return last heartbeat timestamp in ms."]
+    #[inline]
     pub fn get_to_driver_heartbeat_ms(&self) -> Result<i64, AeronCError> {
         unsafe {
             let timestamp = aeron_cnc_to_driver_heartbeat(self.get_inner());
@@ -186,6 +210,7 @@ impl std::convert::TryFrom<i32> for AeronSystemCounterType {
 }
 
 impl AeronCncMetadata {
+    #[inline]
     pub fn load_from_file(aeron_dir: &str) -> Result<Self, AeronCError> {
         let aeron_dir = std::ffi::CString::new(aeron_dir).expect("CString::new failed");
         let mapped_file = std::rc::Rc::new(std::cell::RefCell::new(aeron_mapped_file_t {
@@ -239,6 +264,7 @@ impl AeronPublication {
 
     /// sometimes when you first connect, is_connected = true, but you get backpressure as position is 0
     /// this will check if both publication is connected and position > 0
+    #[inline]
     pub fn is_ready(&self) -> bool {
         self.is_connected() && self.position_limit() != 0
     }
@@ -252,6 +278,7 @@ impl AeronExclusivePublication {
 
     /// sometimes when you first connect, is_connected = true, but you get backpressure as position is 0
     /// this will check if both publication is connected and position > 0
+    #[inline]
     pub fn is_ready(&self) -> bool {
         self.is_connected() && self.position_limit() != 0
     }

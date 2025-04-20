@@ -18,6 +18,7 @@ pub mod bindings {
 }
 
 use bindings::*;
+use std::ffi::CStr;
 
 include!(concat!(env!("OUT_DIR"), "/aeron.rs"));
 include!(concat!(env!("OUT_DIR"), "/aeron_custom.rs"));
@@ -127,7 +128,13 @@ mod tests {
         info!("created publisher");
 
         assert!(AeronCncMetadata::load_from_file(ctx.get_dir())?.pid > 0);
-        assert!(AeronCnc::new(ctx.get_dir())?.get_to_driver_heartbeat_ms()? > 0);
+        assert!(AeronCnc::new_on_heap(ctx.get_dir())?.get_to_driver_heartbeat_ms()? > 0);
+        let cstr = std::ffi::CString::new(ctx.get_dir()).unwrap();
+        for _ in 0..50 {
+            AeronCnc::read_on_partial_stack(&cstr, |cnc| {
+                assert!(cnc.get_to_driver_heartbeat_ms().unwrap() > 0);
+            })?;
+        }
 
         let subscription = aeron.add_subscription(
             AERON_IPC_STREAM,
@@ -247,7 +254,7 @@ mod tests {
         let _ = publisher_handler.join().unwrap();
         let _ = driver_handle.join().unwrap();
 
-        let cnc = AeronCnc::new(ctx.get_dir())?;
+        let cnc = AeronCnc::new_on_heap(ctx.get_dir())?;
         cnc.counters_reader().foreach_counter_once(
             |value: i64, id: i32, type_id: i32, key: &[u8], label: &str| {
                 println!("counter reader id={id}, type_id={type_id}, key={key:?}, label={label}, value={value} [type={:?}]",

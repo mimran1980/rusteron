@@ -59,11 +59,7 @@ impl<T> ManagedCResource<T> {
         cleanup_struct: bool,
         check_for_is_closed: Option<fn(*mut T) -> bool>,
     ) -> Result<Self, AeronCError> {
-        let mut resource: *mut T = std::ptr::null_mut();
-        let result = init(&mut resource);
-        if result < 0 || resource.is_null() {
-            return Err(AeronCError::from_code(result));
-        }
+        let resource = Self::initialise(init)?;
 
         let result = Self {
             resource,
@@ -77,6 +73,17 @@ impl<T> ManagedCResource<T> {
         #[cfg(feature = "extra-logging")]
         log::info!("created c resource: {:?}", result);
         Ok(result)
+    }
+
+    pub fn initialise(
+        init: impl FnOnce(*mut *mut T) -> i32 + Sized,
+    ) -> Result<*mut T, AeronCError> {
+        let mut resource: *mut T = std::ptr::null_mut();
+        let result = init(&mut resource);
+        if result < 0 || resource.is_null() {
+            return Err(AeronCError::from_code(result));
+        }
+        Ok(resource)
     }
 
     pub fn is_closed_already_called(&self) -> bool {
