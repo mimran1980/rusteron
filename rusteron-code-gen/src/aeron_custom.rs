@@ -211,6 +211,7 @@ impl std::convert::TryFrom<i32> for AeronSystemCounterType {
 
 impl AeronCncMetadata {
     #[inline]
+    /// allocates on heap
     pub fn load_from_file(aeron_dir: &str) -> Result<Self, AeronCError> {
         let aeron_dir = std::ffi::CString::new(aeron_dir).expect("CString::new failed");
         let mapped_file = std::rc::Rc::new(std::cell::RefCell::new(aeron_mapped_file_t {
@@ -246,6 +247,42 @@ impl AeronCncMetadata {
             owned_inner: Some(std::rc::Rc::new(resource)),
         };
         Ok(result)
+    }
+
+    #[inline]
+    /// allocates on stack
+    pub fn read_from_file(
+        aeron_dir: &std::ffi::CString,
+        mut handler: impl FnMut(Self),
+    ) -> Result<(), AeronCError> {
+        let mut mapped_file = aeron_mapped_file_t {
+            addr: std::ptr::null_mut(),
+            length: 0,
+        };
+        let ctx = ManagedCResource::initialise(move |ctx| {
+            let result = unsafe {
+                aeron_cnc_map_file_and_load_metadata(
+                    aeron_dir.as_ptr(),
+                    &mut mapped_file as *mut aeron_mapped_file_t,
+                    ctx,
+                )
+            };
+            if result == aeron_cnc_load_result_t::AERON_CNC_LOAD_SUCCESS {
+                1
+            } else {
+                -1
+            }
+        })?;
+
+        let result = Self {
+            inner: ctx,
+            _owned_on_stack: None,
+            owned_inner: None,
+        };
+
+        handler(result);
+        unsafe { aeron_unmap(&mut mapped_file as *mut aeron_mapped_file_t) };
+        Ok(())
     }
 }
 

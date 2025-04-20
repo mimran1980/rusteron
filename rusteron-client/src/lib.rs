@@ -127,6 +127,10 @@ mod tests {
         info!("created publisher");
 
         assert!(AeronCncMetadata::load_from_file(ctx.get_dir())?.pid > 0);
+        let cstr = std::ffi::CString::new(ctx.get_dir()).unwrap();
+        AeronCncMetadata::read_from_file(&cstr, |cnc| {
+            assert!(cnc.pid > 0);
+        })?;
         assert!(AeronCnc::new_on_heap(ctx.get_dir())?.get_to_driver_heartbeat_ms()? > 0);
         let cstr = std::ffi::CString::new(ctx.get_dir()).unwrap();
         for _ in 0..50 {
