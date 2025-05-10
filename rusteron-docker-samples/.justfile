@@ -35,8 +35,8 @@ k8s-clean:
 run-aeron-archive-driver:
     java \
       --add-opens java.base/jdk.internal.misc=ALL-UNNAMED \
-      -javaagent:../rusteron-archive/aeron/aeron-agent/build/libs/aeron-agent-1.47.4.jar \
-      -cp ../rusteron-archive/aeron/aeron-all/build/libs/aeron-all-1.47.4.jar:../rusteron-archive/aeron/aeron-archive/build/libs/aeron-archive-1.47.4.jar \
+      -javaagent:../rusteron-archive/aeron/aeron-agent/build/libs/aeron-agent-1.47.5.jar \
+      -cp ../rusteron-archive/aeron/aeron-all/build/libs/aeron-all-1.47.5.jar:../rusteron-archive/aeron/aeron-archive/build/libs/aeron-archive-1.47.5.jar \
       -Daeron.archive.dir=target/aeron/archive \
       -Daeron.event.log=admin \
       -Daeron.event.archive.log=all \

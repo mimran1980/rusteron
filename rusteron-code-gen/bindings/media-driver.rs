@@ -14483,8 +14483,6 @@ pub struct aeron_publication_image_stct {
     pub nano_clock: aeron_clock_func_t,
     pub epoch_clock: aeron_clock_func_t,
     pub cached_clock: *mut aeron_clock_cache_t,
-    pub loss_reporter: *mut aeron_loss_reporter_t,
-    pub loss_reporter_offset: aeron_loss_reporter_entry_offset_t,
     pub log_file_name: *mut ::std::os::raw::c_char,
     pub session_id: i32,
     pub stream_id: i32,
@@ -14541,6 +14539,11 @@ pub struct aeron_publication_image_stct_aeron_publication_image_conductor_fields
     pub untethered_window_limit_timeout_ns: i64,
     pub untethered_resting_timeout_ns: i64,
     pub clean_position: i64,
+    pub loss_report_term_id: i32,
+    pub loss_report_term_offset: i32,
+    pub loss_report_length: usize,
+    pub loss_report: *mut aeron_loss_reporter_t,
+    pub loss_report_entry_offset: aeron_loss_reporter_entry_offset_t,
     pub endpoint: *mut aeron_receive_channel_endpoint_t,
     pub flags: u8,
 }
@@ -14549,7 +14552,7 @@ const _: () = {
     ["Size of aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct"]
         [::std::mem::size_of::<
             aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct,
-        >() - 168usize];
+        >() - 200usize];
     ["Alignment of aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct"]
         [::std::mem::align_of::<
             aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct,
@@ -14563,8 +14566,13 @@ const _: () = {
     ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::untethered_window_limit_timeout_ns"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , untethered_window_limit_timeout_ns) - 128usize] ;
     ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::untethered_resting_timeout_ns"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , untethered_resting_timeout_ns) - 136usize] ;
     ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::clean_position"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , clean_position) - 144usize] ;
-    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::endpoint"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , endpoint) - 152usize] ;
-    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::flags"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , flags) - 160usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::loss_report_term_id"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , loss_report_term_id) - 152usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::loss_report_term_offset"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , loss_report_term_offset) - 156usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::loss_report_length"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , loss_report_length) - 160usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::loss_report"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , loss_report) - 168usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::loss_report_entry_offset"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , loss_report_entry_offset) - 176usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::endpoint"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , endpoint) - 184usize] ;
+    ["Offset of field: aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct::flags"] [:: std :: mem :: offset_of ! (aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct , flags) - 192usize] ;
 };
 impl Default for aeron_publication_image_stct_aeron_publication_image_conductor_fields_stct {
     fn default() -> Self {
@@ -14627,7 +14635,7 @@ const _: () = {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of aeron_publication_image_stct"]
-        [::std::mem::size_of::<aeron_publication_image_stct>() - 1104usize];
+        [::std::mem::size_of::<aeron_publication_image_stct>() - 1120usize];
     ["Alignment of aeron_publication_image_stct"]
         [::std::mem::align_of::<aeron_publication_image_stct>() - 8usize];
     ["Offset of field: aeron_publication_image_stct::padding_before"]
@@ -14635,143 +14643,139 @@ const _: () = {
     ["Offset of field: aeron_publication_image_stct::conductor_fields"]
         [::std::mem::offset_of!(aeron_publication_image_stct, conductor_fields) - 64usize];
     ["Offset of field: aeron_publication_image_stct::padding_after"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, padding_after) - 232usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, padding_after) - 264usize];
     ["Offset of field: aeron_publication_image_stct::connections"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, connections) - 296usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, connections) - 328usize];
     ["Offset of field: aeron_publication_image_stct::source_address"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, source_address) - 320usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, source_address) - 352usize];
     ["Offset of field: aeron_publication_image_stct::source_identity_length"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, source_identity_length) - 448usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, source_identity_length) - 480usize];
     ["Offset of field: aeron_publication_image_stct::source_identity"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, source_identity) - 456usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, source_identity) - 488usize];
     ["Offset of field: aeron_publication_image_stct::loss_detector"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_detector) - 512usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, loss_detector) - 544usize];
     ["Offset of field: aeron_publication_image_stct::feedback_delay_state"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, feedback_delay_state) - 576usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, feedback_delay_state) - 608usize];
     ["Offset of field: aeron_publication_image_stct::mapped_raw_log"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, mapped_raw_log) - 632usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, mapped_raw_log) - 664usize];
     ["Offset of field: aeron_publication_image_stct::rcv_hwm_position"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, rcv_hwm_position) - 720usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, rcv_hwm_position) - 752usize];
     ["Offset of field: aeron_publication_image_stct::rcv_pos_position"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, rcv_pos_position) - 736usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, rcv_pos_position) - 768usize];
     ["Offset of field: aeron_publication_image_stct::log_meta_data"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, log_meta_data) - 752usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, log_meta_data) - 784usize];
     ["Offset of field: aeron_publication_image_stct::endpoint"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, endpoint) - 760usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, endpoint) - 792usize];
     ["Offset of field: aeron_publication_image_stct::congestion_control"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, congestion_control) - 768usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, congestion_control) - 800usize];
     ["Offset of field: aeron_publication_image_stct::nano_clock"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, nano_clock) - 776usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, nano_clock) - 808usize];
     ["Offset of field: aeron_publication_image_stct::epoch_clock"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, epoch_clock) - 784usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, epoch_clock) - 816usize];
     ["Offset of field: aeron_publication_image_stct::cached_clock"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, cached_clock) - 792usize];
-    ["Offset of field: aeron_publication_image_stct::loss_reporter"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_reporter) - 800usize];
-    ["Offset of field: aeron_publication_image_stct::loss_reporter_offset"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_reporter_offset) - 808usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, cached_clock) - 824usize];
     ["Offset of field: aeron_publication_image_stct::log_file_name"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, log_file_name) - 816usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, log_file_name) - 832usize];
     ["Offset of field: aeron_publication_image_stct::session_id"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, session_id) - 824usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, session_id) - 840usize];
     ["Offset of field: aeron_publication_image_stct::stream_id"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, stream_id) - 828usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, stream_id) - 844usize];
     ["Offset of field: aeron_publication_image_stct::initial_term_id"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, initial_term_id) - 832usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, initial_term_id) - 848usize];
     ["Offset of field: aeron_publication_image_stct::active_term_id"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, active_term_id) - 836usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, active_term_id) - 852usize];
     ["Offset of field: aeron_publication_image_stct::term_length"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, term_length) - 840usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, term_length) - 856usize];
     ["Offset of field: aeron_publication_image_stct::mtu_length"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, mtu_length) - 844usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, mtu_length) - 860usize];
     ["Offset of field: aeron_publication_image_stct::term_length_mask"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, term_length_mask) - 848usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, term_length_mask) - 864usize];
     ["Offset of field: aeron_publication_image_stct::log_file_name_length"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, log_file_name_length) - 856usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, log_file_name_length) - 872usize];
     ["Offset of field: aeron_publication_image_stct::position_bits_to_shift"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, position_bits_to_shift) - 864usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, position_bits_to_shift) - 880usize];
     ["Offset of field: aeron_publication_image_stct::raw_log_close_func"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, raw_log_close_func) - 872usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, raw_log_close_func) - 888usize];
     ["Offset of field: aeron_publication_image_stct::raw_log_free_func"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, raw_log_free_func) - 880usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, raw_log_free_func) - 896usize];
     ["Offset of field: aeron_publication_image_stct::log"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, log) - 888usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, log) - 904usize];
     ["Offset of field: aeron_publication_image_stct::last_loss_change_number"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, last_loss_change_number) - 896usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, last_loss_change_number) - 912usize];
     ["Offset of field: aeron_publication_image_stct::begin_loss_change"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, begin_loss_change) - 904usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, begin_loss_change) - 920usize];
     ["Offset of field: aeron_publication_image_stct::end_loss_change"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, end_loss_change) - 912usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, end_loss_change) - 928usize];
     ["Offset of field: aeron_publication_image_stct::loss_term_id"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_term_id) - 920usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, loss_term_id) - 936usize];
     ["Offset of field: aeron_publication_image_stct::loss_term_offset"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_term_offset) - 924usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, loss_term_offset) - 940usize];
     ["Offset of field: aeron_publication_image_stct::loss_length"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_length) - 928usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, loss_length) - 944usize];
     ["Offset of field: aeron_publication_image_stct::begin_sm_change"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, begin_sm_change) - 936usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, begin_sm_change) - 952usize];
     ["Offset of field: aeron_publication_image_stct::end_sm_change"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, end_sm_change) - 944usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, end_sm_change) - 960usize];
     ["Offset of field: aeron_publication_image_stct::last_overrun_threshold"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, last_overrun_threshold) - 952usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, last_overrun_threshold) - 968usize];
     ["Offset of field: aeron_publication_image_stct::next_sm_position"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, next_sm_position) - 960usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, next_sm_position) - 976usize];
     ["Offset of field: aeron_publication_image_stct::next_sm_receiver_window_length"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         next_sm_receiver_window_length
-    ) - 968usize];
+    ) - 984usize];
     ["Offset of field: aeron_publication_image_stct::max_receiver_window_length"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         max_receiver_window_length
-    ) - 972usize];
+    ) - 988usize];
     ["Offset of field: aeron_publication_image_stct::last_sm_change_number"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, last_sm_change_number) - 976usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, last_sm_change_number) - 992usize];
     ["Offset of field: aeron_publication_image_stct::last_sm_position"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, last_sm_position) - 984usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, last_sm_position) - 1000usize];
     ["Offset of field: aeron_publication_image_stct::next_sm_deadline_ns"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, next_sm_deadline_ns) - 992usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, next_sm_deadline_ns) - 1008usize];
     ["Offset of field: aeron_publication_image_stct::sm_timeout_ns"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, sm_timeout_ns) - 1000usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, sm_timeout_ns) - 1016usize];
     ["Offset of field: aeron_publication_image_stct::time_of_last_packet_ns"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, time_of_last_packet_ns) - 1008usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, time_of_last_packet_ns) - 1024usize];
     ["Offset of field: aeron_publication_image_stct::invalidation_reason"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, invalidation_reason) - 1016usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, invalidation_reason) - 1032usize];
     ["Offset of field: aeron_publication_image_stct::is_sm_enabled"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, is_sm_enabled) - 1024usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, is_sm_enabled) - 1040usize];
     ["Offset of field: aeron_publication_image_stct::response_session_id"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, response_session_id) - 1032usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, response_session_id) - 1048usize];
     ["Offset of field: aeron_publication_image_stct::is_end_of_stream"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, is_end_of_stream) - 1040usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, is_end_of_stream) - 1056usize];
     ["Offset of field: aeron_publication_image_stct::is_sending_eos_sm"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, is_sending_eos_sm) - 1041usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, is_sending_eos_sm) - 1057usize];
     ["Offset of field: aeron_publication_image_stct::has_receiver_released"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, has_receiver_released) - 1042usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, has_receiver_released) - 1058usize];
     ["Offset of field: aeron_publication_image_stct::heartbeats_received_counter"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         heartbeats_received_counter
-    ) - 1048usize];
+    ) - 1064usize];
     ["Offset of field: aeron_publication_image_stct::flow_control_under_runs_counter"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         flow_control_under_runs_counter
     )
-        - 1056usize];
+        - 1072usize];
     ["Offset of field: aeron_publication_image_stct::flow_control_over_runs_counter"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         flow_control_over_runs_counter
     )
-        - 1064usize];
+        - 1080usize];
     ["Offset of field: aeron_publication_image_stct::status_messages_sent_counter"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         status_messages_sent_counter
-    ) - 1072usize];
+    ) - 1088usize];
     ["Offset of field: aeron_publication_image_stct::nak_messages_sent_counter"][::std::mem::offset_of!(
         aeron_publication_image_stct,
         nak_messages_sent_counter
-    ) - 1080usize];
+    ) - 1096usize];
     ["Offset of field: aeron_publication_image_stct::loss_gap_fills_counter"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, loss_gap_fills_counter) - 1088usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, loss_gap_fills_counter) - 1104usize];
     ["Offset of field: aeron_publication_image_stct::mapped_bytes_counter"]
-        [::std::mem::offset_of!(aeron_publication_image_stct, mapped_bytes_counter) - 1096usize];
+        [::std::mem::offset_of!(aeron_publication_image_stct, mapped_bytes_counter) - 1112usize];
 };
 impl Default for aeron_publication_image_stct {
     fn default() -> Self {

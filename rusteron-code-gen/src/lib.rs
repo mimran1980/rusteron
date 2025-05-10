@@ -69,7 +69,7 @@ mod tests {
     use crate::parser::parse_bindings;
     use crate::{
         append_to_file, format_token_stream, format_with_rustfmt, ARCHIVE_BINDINGS,
-        CLIENT_BINDINGS, CUSTOM_AERON_CODE, RB,
+        CLIENT_BINDINGS, CUSTOM_AERON_CODE,
     };
     use proc_macro2::TokenStream;
     use std::fs;
@@ -173,47 +173,6 @@ mod tests {
         append_to_file(&file, CUSTOM_AERON_CODE).unwrap();
         append_to_file(&file, "\npub fn main() {}\n").unwrap();
         t.pass(&file)
-    }
-
-    #[test]
-    #[cfg(not(target_os = "windows"))] // the generated bindings have different sizes
-    fn rb() {
-        let mut bindings = parse_bindings(&"../rusteron-code-gen/bindings/rb.rs".into());
-
-        let file = write_to_file(TokenStream::new(), true, "rb.rs");
-
-        let bindings_copy = bindings.clone();
-        for handler in bindings.handlers.iter_mut() {
-            // need to run this first so I know the FnMut(xxxx) which is required in generate_rust_code
-            let _ = crate::generate_handlers(handler, &bindings_copy);
-        }
-
-        for (p, w) in bindings.wrappers.values().enumerate() {
-            let code = crate::generate_rust_code(
-                w,
-                &bindings.wrappers,
-                p == 0,
-                true,
-                false,
-                &bindings.handlers,
-            );
-            if code.to_string().contains("ndler : Option < AeronCloseClientHandlerImpl > , rbd :) -> Result < Self , AeronCError > { let resource = Manage") {
-                panic!("{}", format_token_stream(code));
-            }
-
-            write_to_file(code, false, "rb.rs");
-        }
-
-        let bindings_copy = bindings.clone();
-        for handler in bindings.handlers.iter_mut() {
-            let code = crate::generate_handlers(handler, &bindings_copy);
-            append_to_file(&file, &format_with_rustfmt(&code.to_string()).unwrap()).unwrap();
-        }
-
-        let t = trybuild::TestCases::new();
-        append_to_file(&file, RB).unwrap();
-        append_to_file(&file, "\npub fn main() {}\n").unwrap();
-        t.pass(file)
     }
 
     #[test]

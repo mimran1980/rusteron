@@ -618,7 +618,7 @@ mod tests {
 
         let aeron_version = format!("{}.{}.{}", major, minor, patch);
 
-        let cargo_version = "1.47.4";
+        let cargo_version = "1.47.5";
         assert_eq!(aeron_version, cargo_version);
     }
 

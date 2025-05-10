@@ -48,7 +48,7 @@ fn main() -> Result<()> {
             match archive.list_recordings_for_uri(
                 0,
                 i32::MAX,
-                &channel.clone().into_c_string(),
+                &channel.into_c_string(),
                 stream_id,
                 Some(&record_reader),
             ) {
