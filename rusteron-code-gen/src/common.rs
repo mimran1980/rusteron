@@ -2,7 +2,85 @@ use crate::AeronErrorType::Unknown;
 #[cfg(feature = "backtrace")]
 use std::backtrace::Backtrace;
 use std::cell::UnsafeCell;
+use std::fmt::Formatter;
+use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
+
+pub enum CResource<T> {
+    OwnedOnHeap(std::rc::Rc<ManagedCResource<T>>),
+    /// stored on stack, unsafe, use with care
+    OwnedOnStack(std::mem::MaybeUninit<T>),
+    Borrowed(*mut T),
+}
+
+impl<T: Clone> Clone for CResource<T> {
+    fn clone(&self) -> Self {
+        unsafe {
+            match self {
+                CResource::OwnedOnHeap(r) => CResource::OwnedOnHeap(r.clone()),
+                CResource::OwnedOnStack(r) => {
+                    CResource::OwnedOnStack(MaybeUninit::new(r.assume_init_ref().clone()))
+                }
+                CResource::Borrowed(r) => CResource::Borrowed(r.clone()),
+            }
+        }
+    }
+}
+
+impl<T> CResource<T> {
+    #[inline]
+    pub fn get(&self) -> *mut T {
+        match self {
+            CResource::OwnedOnHeap(r) => r.get(),
+            CResource::OwnedOnStack(r) => r.as_ptr() as *mut T,
+            CResource::Borrowed(r) => *r,
+        }
+    }
+
+    #[inline]
+    // to prevent the dependencies from being dropped as you have a copy here
+    pub fn add_dependency<D: std::any::Any>(&self, dep: D) {
+        match self {
+            CResource::OwnedOnHeap(r) => r.add_dependency(dep),
+            CResource::OwnedOnStack(_) | CResource::Borrowed(_) => {
+                unreachable!("only owned on heap")
+            }
+        }
+    }
+    #[inline]
+    pub fn get_dependency<V: Clone + 'static>(&self) -> Option<V> {
+        match self {
+            CResource::OwnedOnHeap(r) => r.get_dependency(),
+            CResource::OwnedOnStack(_) | CResource::Borrowed(_) => None,
+        }
+    }
+
+    #[inline]
+    pub fn as_owned(&self) -> Option<&std::rc::Rc<ManagedCResource<T>>> {
+        match self {
+            CResource::OwnedOnHeap(r) => Some(r),
+            CResource::OwnedOnStack(_) | CResource::Borrowed(_) => None,
+        }
+    }
+}
+
+impl<T> std::fmt::Debug for CResource<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let name = std::any::type_name::<T>();
+
+        match self {
+            CResource::OwnedOnHeap(r) => {
+                write!(f, "{name} heap({:?})", r)
+            }
+            CResource::OwnedOnStack(r) => {
+                write!(f, "{name} stack({:?})", *r)
+            }
+            CResource::Borrowed(r) => {
+                write!(f, "{name} borrowed ({:?})", r)
+            }
+        }
+    }
+}
 
 /// A custom struct for managing C resources with automatic cleanup.
 ///

@@ -6,7 +6,7 @@
 
 The **rusteron-archive** module is intended to help Rust developers leverage Aeron's archive functionalities, including the recording and replaying of messages.
 
-For quick start use static lib with precompiled C libraries if your running on a mac. This will not require cmake or java to be installed on your system.
+For quick start use static lib with precompiled C libraries if you're running on a Mac. This will not require cmake or java to be installed on your system.
 
 ```toml
 rusteron-archive = { version = "0.1", features= ["static", "precompile"] }

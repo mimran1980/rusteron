@@ -506,7 +506,7 @@ impl CWrapper {
 
                 let set_closed = if method.struct_method_name == "close" {
                     quote! {
-                        if let Some(inner) = self.owned_inner.as_ref() {
+                        if let Some(inner) = self.inner.as_owned() {
                             inner.close_already_called.set(true);
                         }
                     }
@@ -851,10 +851,7 @@ impl CWrapper {
                         #[inline]
                         #(#method_docs)*
                         pub fn #getter_method #where_clause(#possible_self) -> Result<#return_type, AeronCError> {
-                            let mut result = #return_type::new_zeroed_on_stack();
-                            if let Some(stack) = result._owned_on_stack.as_mut() {
-                                result.inner = stack.as_mut_ptr();
-                            }
+                            let result = #return_type::new_zeroed_on_stack();
                             self.#fn_name(&result)?;
                             Ok(result)
                         }
@@ -1124,9 +1121,7 @@ impl CWrapper {
                             )?;
 
                             Ok(Self {
-                                inner: resource_constructor.get(),
-                                _owned_on_stack: None,
-                                owned_inner: Some(std::rc::Rc::new(resource_constructor)),
+                                inner: CResource::OwnedOnHeap(std::rc::Rc::new(resource_constructor)),
                                 #(#new_ref_args)*
                             })
                         }
@@ -1166,9 +1161,7 @@ impl CWrapper {
                     ).unwrap();
 
                     Self {
-                        inner: resource.get(),
-                        _owned_on_stack: None,
-                        owned_inner: Some(std::rc::Rc::new(resource))
+                        inner: CResource::OwnedOnHeap(std::rc::Rc::new(resource)),
                     }
                 }
 
@@ -1179,15 +1172,9 @@ impl CWrapper {
                     #[cfg(feature = "extra-logging")]
                     log::debug!("creating zeroed empty resource on stack {}", stringify!(#type_name));
 
-                    let mut result = Self {
-                        inner: std::ptr::null_mut(),
-                        _owned_on_stack: Some(std::mem::MaybeUninit::zeroed()),
-                        owned_inner: None
-                    };
-                    if let Some(stack) = result._owned_on_stack.as_mut() {
-                        result.inner = stack.as_mut_ptr();
+                    Self {
+                        inner: CResource::OwnedOnStack(std::mem::MaybeUninit::zeroed()),
                     }
-                    result
                 }
             };
             if self.has_default_method() {
@@ -1263,9 +1250,7 @@ impl CWrapper {
                         )?;
 
                         Ok(Self {
-                            inner: r_constructor.get(),
-                            _owned_on_stack: None,
-                            owned_inner: Some(std::rc::Rc::new(r_constructor))
+                            inner: CResource::OwnedOnHeap(std::rc::Rc::new(r_constructor)),
                         })
                     }
 
@@ -1964,7 +1949,7 @@ pub fn generate_rust_code(
                     let var_name =
                         format_ident!("{}", e.to_string().split_whitespace().next().unwrap());
                     quote! {
-                        result.owned_inner.as_mut().unwrap().add_dependency(#var_name.clone());
+                        result.inner.add_dependency(#var_name.clone());
                     }
                 })
                 .collect_vec();
@@ -2005,9 +1990,7 @@ pub fn generate_rust_code(
                                 None,
                             )?;
                             Ok(Self {
-                                inner: resource.get(),
-                                _owned_on_stack: None,
-                                owned_inner: Some(std::rc::Rc::new(resource)),
+                                inner: CResource::OwnedOnHeap(std::rc::Rc::new(resource)),
                             })
                         }
                     }
@@ -2017,7 +2000,7 @@ pub fn generate_rust_code(
                         pub fn #client_type_method_name #where_clause_async(&self, #(#async_new_args_for_client),*) -> Result<#async_class_name, AeronCError> {
                             let mut result =  #async_class_name::new(self, #(#async_new_args_name_only),*);
                             if let Ok(result) = &mut result {
-                                result.owned_inner.as_mut().unwrap().add_dependency(self.clone());
+                                result.inner.add_dependency(self.clone());
                             }
 
                             result
@@ -2060,10 +2043,8 @@ pub fn generate_rust_code(
                                 false,
                                 None,
                             )?;
-                            let mut result = Self {
-                                inner: resource_async.get(),
-                                _owned_on_stack: None,
-                                owned_inner: Some(std::rc::Rc::new(resource_async)),
+                            let result = Self {
+                                inner: CResource::OwnedOnHeap(std::rc::Rc::new(resource_async)),
                             };
                             #(#async_dependancies)*
                             Ok(result)
@@ -2074,10 +2055,10 @@ pub fn generate_rust_code(
                             let mut result = #main_class_name::new(self);
                             if let Ok(result) = &mut result {
                                 unsafe {
-                                    for d in (&mut *self.owned_inner.as_ref().unwrap().dependencies.get()).iter_mut() {
-                                      result.owned_inner.as_mut().unwrap().add_dependency(d.clone());
+                                    for d in (&mut *self.inner.as_owned().unwrap().dependencies.get()).iter_mut() {
+                                      result.inner.add_dependency(d.clone());
                                     }
-                                    result.owned_inner.as_mut().unwrap().auto_close.set(true);
+                                    result.inner.as_owned().unwrap().auto_close.set(true);
                                 }
                             }
 
@@ -2135,8 +2116,8 @@ pub fn generate_rust_code(
             additional_impls.push(quote! {
                 impl Drop for #class_name {
                     fn drop(&mut self) {
-                        if let Some(inner) = self.owned_inner.as_mut() {
-                            if (inner.cleanup.is_none() ) && std::rc::Rc::strong_count(&inner) == 1 && !inner.is_closed_already_called() {
+                        if let Some(inner) = self.inner.as_owned() {
+                            if (inner.cleanup.is_none() ) && std::rc::Rc::strong_count(inner) == 1 && !inner.is_closed_already_called() {
                                 if inner.auto_close.get() {
                                     log::info!("auto closing {}", stringify!(#class_name));
                                     let result = self.#close_method_call();
@@ -2246,45 +2227,24 @@ pub fn generate_rust_code(
 
     let is_closed_method = wrapper.get_is_closed_method_quote();
 
-    let sync_stack_var = if wrapper.methods.is_empty() && wrapper.has_default_method() {
-        quote! {
-            // since we storing variable on stack, its actually not safe, as variable can be moved.
-            // should being using the heap. But for AeronPublicationConstants, you just want to access the
-            // fields. So we need to keep updating reference everytime we access it
-            if let Some(stack) = self._owned_on_stack.as_ref() {
-                unsafe {
-                    let me: *mut #class_name = self  as *const _ as *mut _;
-                    (*me).inner = stack.as_ptr() as *mut _;
-                }
-            }
-        }
-    } else {
-        quote! {}
-    };
-
     quote! {
         #warning_code
 
         #(#class_docs)*
         #[derive(Clone)]
         pub struct #class_name {
-            // stored on heap
-            owned_inner: Option<std::rc::Rc<ManagedCResource<#type_name>>>,
-            inner: *mut #type_name,
-            // stored on stack, unsafe, use with care
-            _owned_on_stack: Option<std::mem::MaybeUninit<#type_name>>,
+            inner: CResource<#type_name>,
             #(#constructor_fields)*
         }
 
         impl core::fmt::Debug for  #class_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.inner.is_null() {
+                if self.inner.get().is_null() {
                     f.debug_struct(stringify!(#class_name))
                     .field("inner", &"null")
                     .finish()
                 } else {
                     f.debug_struct(stringify!(#class_name))
-                      .field("owned_inner", &self.owned_inner)
                       .field("inner", &self.inner)
                       #(#debug_fields)*
                       .finish()
@@ -2299,20 +2259,17 @@ pub fn generate_rust_code(
 
             #[inline(always)]
             pub fn get_inner(&self) -> *mut #type_name {
-                #sync_stack_var
-                self.inner
+                self.inner.get()
             }
 
             #[inline(always)]
             pub fn get_inner_mut(&self) -> &mut #type_name {
-                #sync_stack_var
-                unsafe { &mut *self.inner }
+                unsafe { &mut *self.inner.get() }
             }
 
             #[inline(always)]
             pub fn get_inner_ref(&self) -> & #type_name {
-                #sync_stack_var
-                unsafe { &*self.inner }
+                unsafe { &*self.inner.get() }
             }
         }
 
@@ -2328,9 +2285,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(value: *mut #type_name) -> Self {
                 #class_name {
-                    owned_inner: None,
-                    _owned_on_stack: None,
-                    inner: value,
+                    inner: CResource::Borrowed(value),
                     #(#new_ref_set_none)*
                 }
             }
@@ -2361,9 +2316,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(value: *const #type_name) -> Self {
                 #class_name {
-                    owned_inner: None,
-                    _owned_on_stack: None,
-                    inner: value as *mut #type_name,
+                    inner: CResource::Borrowed(value as *mut #type_name),
                     #(#new_ref_set_none)*
                 }
             }
@@ -2373,9 +2326,7 @@ pub fn generate_rust_code(
             #[inline]
             fn from(mut value: #type_name) -> Self {
                 #class_name {
-                    owned_inner: None,
-                    _owned_on_stack: None,
-                    inner: &mut value as *mut #type_name,
+                    inner: CResource::Borrowed(&mut value as *mut #type_name),
                     #(#new_ref_set_none)*
                 }
             }

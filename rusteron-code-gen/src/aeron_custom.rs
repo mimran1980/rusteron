@@ -1,7 +1,6 @@
 // code here is included in all modules and extends generated classes
-pub static AERON_IPC_STREAM: &std::ffi::CStr = unsafe {
-    std::ffi::CStr::from_bytes_with_nul_unchecked(b"aeron:ipc\0")
-};
+pub static AERON_IPC_STREAM: &std::ffi::CStr =
+    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"aeron:ipc\0") };
 
 unsafe impl Send for AeronCountersReader {}
 unsafe impl Send for AeronSubscription {}
@@ -25,9 +24,7 @@ impl AeronCnc {
             aeron_cnc_init(cnc, aeron_dir.as_ptr(), 0)
         })?;
         let mut cnc = Self {
-            inner: cnc,
-            _owned_on_stack: None,
-            owned_inner: None,
+            inner: CResource::Borrowed(cnc),
         };
         handler(&mut cnc);
         unsafe { aeron_cnc_close(cnc.get_inner()) };
@@ -57,9 +54,7 @@ impl AeronCnc {
         )?;
 
         let result = Self {
-            inner: resource.get(),
-            _owned_on_stack: None,
-            owned_inner: Some(std::rc::Rc::new(resource)),
+            inner: CResource::OwnedOnHeap(std::rc::Rc::new(resource)),
         };
         Ok(result)
     }
@@ -251,9 +246,7 @@ impl AeronCncMetadata {
         )?;
 
         let result = Self {
-            inner: resource.get(),
-            _owned_on_stack: None,
-            owned_inner: Some(std::rc::Rc::new(resource)),
+            inner: CResource::OwnedOnHeap(std::rc::Rc::new(resource)),
         };
         Ok(result)
     }
@@ -284,9 +277,7 @@ impl AeronCncMetadata {
         })?;
 
         let result = Self {
-            inner: ctx,
-            _owned_on_stack: None,
-            owned_inner: None,
+            inner: CResource::Borrowed(ctx),
         };
 
         handler(result);
@@ -490,223 +481,268 @@ impl AeronUriStringBuilder {
     }
 
     pub fn put_string(&self, key: &std::ffi::CStr, value: &str) -> Result<&Self, AeronCError> {
-        let value = std::ffi::CString::new(value).map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let value = std::ffi::CString::new(value)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put(&key, &value)?;
         Ok(self)
     }
 
     pub fn put_strings(&self, key: &str, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CString::new(key).map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
-        let value = std::ffi::CString::new(value).map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CString::new(key)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let value = std::ffi::CString::new(value)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put(&key, &value)?;
         Ok(self)
     }
 
     pub fn media(&self, value: Media) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_STRING_BUILDER_MEDIA_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_STRING_BUILDER_MEDIA_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value.as_str())?;
         Ok(self)
     }
 
     pub fn control_mode(&self, value: ControlMode) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_CONTROL_MODE_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_CONTROL_MODE_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value.as_str())?;
         Ok(self)
     }
 
     pub fn prefix(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_STRING_BUILDER_PREFIX_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_STRING_BUILDER_PREFIX_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
 
     pub fn initial_term_id(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_INITIAL_TERM_ID_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_INITIAL_TERM_ID_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn term_id(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TERM_ID_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TERM_ID_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn term_offset(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TERM_OFFSET_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TERM_OFFSET_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn alias(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_ALIAS_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_ALIAS_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn term_length(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TERM_LENGTH_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TERM_LENGTH_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn linger_timeout(&self, value: i64) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_LINGER_TIMEOUT_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_LINGER_TIMEOUT_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int64(key, value)?;
         Ok(self)
     }
     pub fn mtu_length(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_MTU_LENGTH_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_MTU_LENGTH_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn ttl(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_TTL_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_TTL_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn sparse_term(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SPARSE_TERM_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SPARSE_TERM_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn reliable(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_RELIABLE_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_RELIABLE_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn eos(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_EOS_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_EOS_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn tether(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TETHER_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TETHER_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn tags(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TAGS_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TAGS_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn endpoint(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_ENDPOINT_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_ENDPOINT_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn interface(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_INTERFACE_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_INTERFACE_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn control(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_CONTROL_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_UDP_CHANNEL_CONTROL_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn session_id(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SESSION_ID_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SESSION_ID_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn group(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_GROUP_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_GROUP_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn rejoin(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_REJOIN_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_REJOIN_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn fc(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_FC_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_FC_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn gtag(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_GTAG_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_GTAG_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn cc(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_CC_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_CC_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn spies_simulate_connection(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SPIES_SIMULATE_CONNECTION_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SPIES_SIMULATE_CONNECTION_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn ats(&self, value: bool) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_ATS_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_ATS_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, if value { "true" } else { "false" })?;
         Ok(self)
     }
     pub fn socket_sndbuf(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SOCKET_SNDBUF_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SOCKET_SNDBUF_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn socket_rcvbuf(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SOCKET_RCVBUF_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_SOCKET_RCVBUF_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn receiver_window(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_RECEIVER_WINDOW_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_RECEIVER_WINDOW_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn media_rcv_timestamp_offset(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_MEDIA_RCV_TIMESTAMP_OFFSET_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_MEDIA_RCV_TIMESTAMP_OFFSET_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn channel_rcv_timestamp_offset(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_CHANNEL_RCV_TIMESTAMP_OFFSET_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_CHANNEL_RCV_TIMESTAMP_OFFSET_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn channel_snd_timestamp_offset(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_CHANNEL_SND_TIMESTAMP_OFFSET_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_CHANNEL_SND_TIMESTAMP_OFFSET_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn timestamp_offset_reserved(&self, value: &str) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TIMESTAMP_OFFSET_RESERVED).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_TIMESTAMP_OFFSET_RESERVED)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_string(key, value)?;
         Ok(self)
     }
     pub fn response_correlation_id(&self, value: i64) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_RESPONSE_CORRELATION_ID_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_RESPONSE_CORRELATION_ID_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int64(key, value)?;
         Ok(self)
     }
     pub fn nak_delay(&self, value: i64) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_NAK_DELAY_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_NAK_DELAY_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int64(key, value)?;
         Ok(self)
     }
     pub fn untethered_window_limit_timeout(&self, value: i64) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_UNTETHERED_WINDOW_LIMIT_TIMEOUT_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key =
+            std::ffi::CStr::from_bytes_until_nul(AERON_URI_UNTETHERED_WINDOW_LIMIT_TIMEOUT_KEY)
+                .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int64(key, value)?;
         Ok(self)
     }
     pub fn untethered_resting_timeout(&self, value: i64) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_UNTETHERED_RESTING_TIMEOUT_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_UNTETHERED_RESTING_TIMEOUT_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int64(key, value)?;
         Ok(self)
     }
     pub fn max_resend(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_MAX_RESEND_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_MAX_RESEND_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn stream_id(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_STREAM_ID_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_STREAM_ID_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }
     pub fn publication_window(&self, value: i32) -> Result<&Self, AeronCError> {
-        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_PUBLICATION_WINDOW_KEY).map_err(|_|AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
+        let key = std::ffi::CStr::from_bytes_until_nul(AERON_URI_PUBLICATION_WINDOW_KEY)
+            .map_err(|_| AeronCError::from_code(PARSE_CSTR_ERROR_CODE))?;
         self.put_int32(key, value)?;
         Ok(self)
     }

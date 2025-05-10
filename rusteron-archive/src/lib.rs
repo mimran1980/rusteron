@@ -159,11 +159,7 @@ impl AeronArchiveAsyncConnect {
     /// recommend using this method instead of standard `new` as it will link the archive to aeron so if a drop occurs archive is dropped before aeron
     pub fn new_with_aeron(ctx: &AeronArchiveContext, aeron: &Aeron) -> Result<Self, AeronCError> {
         let resource_async = Self::new(ctx)?;
-        resource_async
-            .owned_inner
-            .clone()
-            .unwrap()
-            .add_dependency(aeron.clone());
+        resource_async.inner.add_dependency(aeron.clone());
         Ok(resource_async)
     }
 }
@@ -174,7 +170,7 @@ macro_rules! impl_archive_position_methods {
             /// Retrieves the current active live archive position using the Aeron counters.
             /// Returns an error if not found.
             pub fn get_archive_position(&self) -> Result<i64, AeronCError> {
-                if let Some(aeron) = self.owned_inner.clone().unwrap().get_dependency::<Aeron>() {
+                if let Some(aeron) = self.inner.get_dependency::<Aeron>() {
                     let counter_reader = &aeron.counters_reader();
                     self.get_archive_position_with(counter_reader)
                 } else {

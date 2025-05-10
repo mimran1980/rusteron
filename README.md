@@ -17,7 +17,7 @@ The purpose of **rusteron** is to take these C bindings and generate a Rust wrap
 
 The modules in **rusteron** aim to replicate and extend the capabilities available in the Aeron ecosystem, while simplifying their use for developers accustomed to Rust.
 
-For quick start use static lib with precompiled C libraries if your running on a mac. This will not require cmake or java to be installed on your system.
+For quick start use static lib with precompiled C libraries if you're running on a Mac. This will not require cmake or java to be installed on your system.
 
 ```toml
 rusteron-archive = { version = "0.1", features= ["static", "precompile"] }
@@ -25,7 +25,7 @@ rusteron-archive = { version = "0.1", features= ["static", "precompile"] }
 
 ## Project Status
 
-**rusteron** is currently in release candiante phase it is being planned to be used in a production system, meaning:
+**rusteron** is currently in release candidate phase and is being planned to be used in a production system, meaning:
 
 - It is still under active development.
 - APIs may be subject to breaking changes.
@@ -95,7 +95,7 @@ Below is a step-by-step example of creating and using an Aeron client.
 
 ```rust,no_ignore
 use rusteron::client::{Aeron, AeronContext, IntoCString};
-use rusteron_media_driver::AeronDriverContext;
+use rusteron_media_driver::{AeronDriverContext, AeronDriver};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -181,4 +181,3 @@ Special thanks to the authors of the original [`libaeron-sys`](https://github.co
 ---
 
 Feel free to reach out with any questions or suggestions via GitHub Issues!
-
