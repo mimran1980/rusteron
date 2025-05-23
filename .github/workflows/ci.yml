@@ -52,6 +52,30 @@ jobs:
           sudo apt-get update && sudo apt-get install -y uuid-dev
           cargo test --doc
 
+  miri:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    name: Miri Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: miri
+
+      - name: Run Miri
+#        env:
+#          MIRIFLAGS: -Zmiri-panic-abort-on-unwind
+        run: |
+          cargo miri test --all-targets --all-features
+
   build:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     name: Build

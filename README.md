@@ -27,8 +27,8 @@ rusteron-archive = { version = "0.1", features= ["static", "precompile"] }
 
 **rusteron** is currently in release candidate phase and is being planned to be used in a production system, meaning:
 
-- It is still under active development.
-- APIs may be subject to breaking changes.
+- It is stable for production use but still under active development.
+- APIs may be subject to breaking changes in future major versions.
 
 Community feedback and contributions are welcome to improve its functionality and usability.
 
@@ -101,7 +101,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // start embedded media driver to testing
+    // start embedded media driver for testing
     let media_driver_ctx = AeronDriverContext::new()?;
     let (stop, driver_handle) = AeronDriver::launch_embedded(media_driver_ctx.clone(), false);
 
