@@ -12,7 +12,7 @@
 //!   By default, the library uses dynamic linking to the Aeron C libraries.
 //! - **`backtrace`** - When enabled will log a backtrace for each AeronCError
 //! - **`extra-logging`** - When enabled will log when resource is created and destroyed. useful if your seeing a segfault due to a resource being closed
-//! - **`precompile`** - When enabled will use precompiled c code instead of requiring cmake and java to me installed
+//! - **`precompile`** - When enabled will use precompiled c code instead of requiring cmake and java to be installed
 
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -81,7 +81,7 @@ impl RecordingPos {
             std::thread::sleep(Duration::from_millis(10));
         }
 
-        return result;
+        result
     }
 
     /// Return the recordingId embedded in the key of the given counter
@@ -124,7 +124,7 @@ impl RecordingPos {
             if id == counter_id && type_id == RECORDING_POSITION_TYPE_ID {
                 let mut val = [0u8; 8];
                 val.copy_from_slice(&key[0..8]);
-                let Ok(value) = i64::from_le_bytes(val).try_into();
+                let value = i64::from_le_bytes(val);
                 recording_id.set(value);
             }
         });
@@ -164,6 +164,9 @@ impl AeronArchiveAsyncConnect {
     }
 }
 
+/// Error code for when no Aeron dependency is found
+pub const ERROR_NO_AERON_DEPENDENCY: i32 = -1;
+
 macro_rules! impl_archive_position_methods {
     ($pub_type:ty) => {
         impl $pub_type {
@@ -174,7 +177,7 @@ macro_rules! impl_archive_position_methods {
                     let counter_reader = &aeron.counters_reader();
                     self.get_archive_position_with(counter_reader)
                 } else {
-                    Err(AeronCError::from_code(-1))
+                    Err(AeronCError::from_code(ERROR_NO_AERON_DEPENDENCY))
                 }
             }
 
@@ -427,7 +430,7 @@ mod tests {
         while !publication.is_connected() {
             thread::sleep(Duration::from_millis(100));
         }
-        info!("publisher to be connected");
+        info!("publisher is connected");
         let counters_reader = aeron.counters_reader();
         let mut caught_up_count = 0;
         let publisher_thread = thread::spawn(move || {
