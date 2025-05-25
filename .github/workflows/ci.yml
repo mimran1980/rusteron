@@ -73,9 +73,9 @@ jobs:
 #        env:
 #          MIRIFLAGS: -Zmiri-panic-abort-on-unwind
         run: |
+          sudo apt-get update && sudo apt-get install -y curl pkg-config libssl-dev uuid-dev ca-certificates make cmake gcc g++ clang zlib1g-dev libbsd-dev
           rustup toolchain install nightly --component miri
-          rustup override set nightly
-          cargo miri setup
+          cargo +nightly miri setup
           cargo +nightly miri test --all-targets --all-features
 
   build:
