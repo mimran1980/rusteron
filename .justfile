@@ -46,6 +46,12 @@ build:
 build-artifacts:
   PUBLISH_ARTIFACTS=true cargo build --release --workspace --all-targets --features static,precompile
 
+# Run Miri checks
+check-miri:
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
+  MIRIFLAGS="" cargo miri test --all-targets --all-features
 
 # Build the project in release mode
 release:

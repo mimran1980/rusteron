@@ -248,6 +248,7 @@ impl AeronArchiveContext {
     }
 }
 
+#[cfg(not(miri))] // miri doesn't support spawning processes
 #[cfg(test)]
 mod tests {
     use super::*;
