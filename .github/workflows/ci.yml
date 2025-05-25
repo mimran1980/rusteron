@@ -68,6 +68,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly
+          components: clippy, rustfmt
 
       - name: Run Miri
 #        env:
