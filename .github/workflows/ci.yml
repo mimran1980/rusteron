@@ -75,9 +75,10 @@ jobs:
 #        env:
 #          MIRIFLAGS: -Zmiri-panic-abort-on-unwind
         run: |
-          rustup +nightly component add miri
+          rustup toolchain install nightly
+          rustup +nightly component add miri rust-src
           rustup +nightly run miri setup
-          cargo miri test --all-targets --all-features
+          cargo +nightly miri test --all-targets --all-features
 
   build:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
