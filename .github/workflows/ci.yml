@@ -64,12 +64,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Rust for Miri
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: nightly
-          components: miri
 
       - name: Run Miri
 #        env:
