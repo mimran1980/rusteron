@@ -1,16 +1,12 @@
 use bindgen::EnumVariation;
 use cmake::Config;
 use dunce::canonicalize;
-use flate2::bufread::GzDecoder;
 use log::info;
 use proc_macro2::TokenStream;
 use rusteron_code_gen::{append_to_file, format_with_rustfmt};
-use std::io::Cursor;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::{env, fs};
-use tar::Archive;
 use walkdir::WalkDir;
 
 #[derive(Eq, PartialEq)]
@@ -474,9 +470,9 @@ fn download_precompiled_binaries(artifacts_dir: &Path) -> Result<(), Box<dyn std
     // Download and unpack the tar.gz in one go
     let response = reqwest::blocking::get(&asset)?.error_for_status()?;
     let bytes = response.bytes()?;
-    let cursor = Cursor::new(bytes);
-    let decoder = GzDecoder::new(cursor);
-    let mut archive = Archive::new(decoder);
+    let cursor = std::io::Cursor::new(bytes);
+    let decoder = flate2::bufread::GzDecoder::new(cursor);
+    let mut archive = tar::Archive::new(decoder);
     archive.unpack(artifacts_dir)?;
 
     Ok(())
