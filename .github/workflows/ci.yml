@@ -113,37 +113,3 @@ jobs:
             rusteron-archive/artifacts
             rusteron-client/artifacts
             rusteron-media-driver/artifacts
-
-  merge-artifacts:
-    name: Merge Artifacts and Commit
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./merged-artifacts
-
-      - name: Merge Artifacts into Repository
-        run: |
-          rm -rf rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts 
-          mkdir -p rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts
-          for artifact in $(find ./merged-artifacts -mindepth 1 -maxdepth 1 -type d); do
-            cp -r "$artifact"/rusteron-archive/artifacts/* rusteron-archive/artifacts/ 2>/dev/null || true
-            cp -r "$artifact"/rusteron-client/artifacts/* rusteron-client/artifacts/ 2>/dev/null || true
-            cp -r "$artifact"/rusteron-media-driver/artifacts/* rusteron-media-driver/artifacts/ 2>/dev/null || true
-          done
-
-      - name: Commit and Push Artifacts
-        run: |
-          git config --global user.email "mimran1980@example.com"
-          git config --global user.name "Mo Imran"
-          git add rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts 
-          git commit -m "Add prebuilt binaries from CI [skip ci]" || echo "No changes to commit"
-          git push --force-with-lease origin main
