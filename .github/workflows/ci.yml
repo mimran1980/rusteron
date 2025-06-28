@@ -99,8 +99,6 @@ jobs:
       - name: Build and Test
         run: |
           rm -rf rusteron-archive/artifacts rusteron-client/artifacts rusteron-media-driver/artifacts
-          # uncomment if we need to add back support for mac x86
-          # RUSTFLAGS="-C opt-level=z -C codegen-units=1 -C debuginfo=0 -C panic=abort -C link-arg=-s"  PUBLISH_ARTIFACTS=true cargo build --release --workspace ${{ env.feature-flags }}
           PUBLISH_ARTIFACTS=true cargo build --release --workspace ${{ env.feature-flags }}
           cargo test --workspace --all --all-targets ${{ env.feature-flags }} -- --nocapture
 
