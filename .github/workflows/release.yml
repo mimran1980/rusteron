@@ -84,6 +84,7 @@ jobs:
         run: |
           version=$(grep '"rusteron-code-gen", version = ' Cargo.toml | sed -E 's/.*version = "=([^"]+)".*/\1/g')
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "found $version"
       - uses: actions/create-release@v1
         id: create_release
         with:
@@ -93,13 +94,27 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          # enable recursive globbing and skip missing
+          shopt -s globstar nullglob
+          for artifact_dir in artifacts/*; do
+            [ -d "$artifact_dir" ] || continue
+            archive="$artifact_dir.tar.gz"
+            echo "📦 Creating archive $archive"
+            tar -czf "$archive" -C artifacts "$(basename "$artifact_dir")"
+          done
+
       - name: Upload Release Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for f in artifacts/**/*; do
-            [ -f "$f" ] && gh release upload \
-              "v${{ steps.extract_version.outputs.version }}" "$f"
+          shopt -s nullglob
+          for f in artifacts/*.tar.gz; do
+            echo "⏫ Uploading $f"
+            gh release upload "v${{ steps.extract_version.outputs.version }}" "$f"
           done
 
 #      - name: Cache cargo-release binary
