@@ -59,7 +59,7 @@ pub fn main() {
         && fs::read_dir(&artifacts_dir).unwrap().next().is_none()
         && !std::env::var_os("RUSTERON_BUILD_FROM_SOURCE").is_some()
     {
-        download_precompiled_binaries(&artifacts_dir).unwrap()
+        let _ = download_precompiled_binaries(&artifacts_dir);
     }
     #[cfg(all(feature = "precompile", feature = "static"))]
     if artifacts_dir.exists()
@@ -323,10 +323,14 @@ fn get_artifact_path() -> PathBuf {
     } else {
         "default"
     };
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap(); // e.g., "macos", "linux", "windows"
+    let mut target_os = env::var("CARGO_CFG_TARGET_OS").unwrap(); // e.g., "macos", "linux", "windows"
+    if target_os == "linux" {
+        target_os = "ubuntu".to_string();
+    }
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap(); // e.g., "x86_64", "aarch64"
     let artifacts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("artifacts")
+        .join(env::var("CARGO_PKG_VERSION").unwrap())
         .join(feature)
         .join(&target_os)
         .join(&target_arch);
@@ -379,7 +383,7 @@ fn publish_artifacts(out_path: &Path, cmake_build_path: &Path) -> std::io::Resul
 
 #[cfg(all(feature = "precompile", feature = "static"))]
 fn download_precompiled_binaries(artifacts_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let version = env::var("CARGO_PKG_VERSION").unwrap(); // e.g., "macos", "linux", "windows"
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap(); // e.g., "macos", "linux", "windows"
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap(); // e.g., "x86_64", "aarch64"
     let feature = if LinkType::detect() == LinkType::Static {

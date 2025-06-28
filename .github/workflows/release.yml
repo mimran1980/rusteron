@@ -68,7 +68,7 @@ jobs:
         run: |
           # define your list here:
           # artifacts=(artifacts-macos-13-static artifacts-macos-latest-static)
-          artifacts=(artifacts-macos-latest-static)
+          artifacts=(artifacts-macos-latest-static artifacts-ubuntu-latest-static)
 
           for art in "${artifacts[@]}"; do
             echo "⏬ Downloading $art into artifacts/$art"
