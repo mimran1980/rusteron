@@ -38,9 +38,36 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y uuid-dev
 
-      # create release binary artefacts for pre-compiled feature
-      - uses: actions/download-artifact@v4
-        with: { path: artifacts }
+      - name: Determine latest CI run ID
+        id: find_ci
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              branch: context.ref.replace('refs/heads/',''),
+              status: 'success',
+              per_page: 1
+            });
+            if (!runs.data.workflow_runs.length) {
+              core.setFailed('No successful CI runs found for this branch.');
+            } else {
+              const runId = runs.data.workflow_runs[0].id;
+              core.setOutput('ci_run_id', runId);
+              console.log(`✔ Latest CI run ID is ${runId}`);
+            }
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.find_ci.outputs.ci_run_id }}
+          name: ci-artifacts
+          path: artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract version
         id: extract_version
         run: |
