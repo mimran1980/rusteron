@@ -60,13 +60,23 @@ jobs:
               console.log(`✔ Latest CI run ID is ${runId}`);
             }
 
-      - name: Download CI artifacts
-        uses: actions/download-artifact@v4
-        with:
-          run-id: ${{ steps.find_ci.outputs.ci_run_id }}
-          name: ci-artifacts
-          path: artifacts
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download all artifacts via CLI loop
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI_RUN: ${{ steps.find_ci.outputs.ci_run_id }}
+        run: |
+          # define your list here:
+          artifacts=(artifacts-macos-13-static artifacts-macos-latest-static)
+
+          for art in "${artifacts[@]}"; do
+            echo "⏬ Downloading $art into artifacts/$art"
+            gh run download "$CI_RUN" \
+              --name "$art" \
+              --dir "artifacts/$art"
+          done
+          find artifacts
+          
 
       - name: Extract version
         id: extract_version
