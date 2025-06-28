@@ -47,6 +47,9 @@ rusteron-code-gen = { workspace = true }
 log = { workspace = true}
 regex = { workspace = true}
 walkdir = { workspace = true}
+reqwest = {workspace = true}
+flate2 = {workspace = true}
+tar    = {workspace = true}
 
 [features]
 # using static as different modules have different versions of aeron which don't seem to play nicely

@@ -1,12 +1,16 @@
 use bindgen::EnumVariation;
 use cmake::Config;
 use dunce::canonicalize;
+use flate2::bufread::GzDecoder;
 use log::info;
 use proc_macro2::TokenStream;
 use rusteron_code_gen::{append_to_file, format_with_rustfmt};
+use std::io::Cursor;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::{env, fs};
+use tar::Archive;
 use walkdir::WalkDir;
 
 #[derive(Eq, PartialEq)]
@@ -64,7 +68,17 @@ pub fn main() {
 
     // If the artifacts folder exists use that instead of doing cmake and requiring java to be installed
     #[cfg(all(feature = "precompile", feature = "static"))]
-    if artifacts_dir.exists() && fs::read_dir(&artifacts_dir).unwrap().next().is_some() {
+    if artifacts_dir.exists()
+        && fs::read_dir(&artifacts_dir).unwrap().next().is_none()
+        && !std::env::var_os("RUSTERON_BUILD_FROM_SOURCE").is_some()
+    {
+        download_precompiled_binaries(&artifacts_dir).unwrap()
+    }
+    #[cfg(all(feature = "precompile", feature = "static"))]
+    if artifacts_dir.exists()
+        && fs::read_dir(&artifacts_dir).unwrap().next().is_some()
+        && !std::env::var_os("RUSTERON_BUILD_FROM_SOURCE").is_some()
+    {
         println!(
             "Artifacts found in {}. Using published artifacts.",
             artifacts_dir.display()
@@ -124,7 +138,7 @@ pub fn main() {
         // Exit early to skip rebuild since artifacts are already published.
         return;
     }
-    let publish_binaries = std::env::var("PUBLISH_ARTIFACTS").is_ok() && !cfg!(target_os = "linux");
+    let publish_binaries = std::env::var("PUBLISH_ARTIFACTS").is_ok();
 
     let aeron_path = canonicalize(Path::new("./aeron")).unwrap();
     let header_path = aeron_path.join("aeron-archive/src/main/c");
@@ -332,6 +346,7 @@ fn get_artifact_path() -> PathBuf {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap(); // e.g., "macos", "linux", "windows"
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap(); // e.g., "x86_64", "aarch64"
     let artifacts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
         .join("artifacts")
         .join(feature)
         .join(&target_os)
@@ -428,5 +443,37 @@ fn publish_artifacts(out_path: &Path, cmake_build_path: &Path) -> std::io::Resul
         "No libraries found in the cmake build directory."
     );
     println!("Artifacts published to: {}", publish_dir.display());
+    Ok(())
+}
+
+#[cfg(all(feature = "precompile", feature = "static"))]
+fn download_precompiled_binaries(artifacts_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let version = env::var("CARGO_PKG_VERSION").unwrap(); // e.g., "macos", "linux", "windows"
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap(); // e.g., "macos", "linux", "windows"
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap(); // e.g., "x86_64", "aarch64"
+    let feature = if LinkType::detect() == LinkType::Static {
+        "static"
+    } else {
+        "default"
+    };
+
+    let image = if target_os == "macos" && arch == "x86_64" {
+        "13"
+    } else {
+        "latest"
+    };
+
+    let asset = format!("https://github.com/mimran1980/rusteron/releases/download/v{version}/artifacts-{target_os}-{image}-{feature}.tar.gz");
+
+    eprintln!("downloading from {asset}");
+    // Download and extract the tar.gz to the artifacts directory
+    // Download and unpack the tar.gz in one go
+    let response = reqwest::blocking::get(&asset)?.error_for_status()?;
+    let bytes = response.bytes()?;
+    let cursor = Cursor::new(bytes);
+    let decoder = GzDecoder::new(cursor);
+    let mut archive = Archive::new(decoder);
+    archive.unpack(artifacts_dir)?;
+
     Ok(())
 }

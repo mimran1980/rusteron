@@ -43,6 +43,10 @@ regex = { workspace = true}
 log = { workspace = true}
 rusteron-code-gen = { workspace = true }
 walkdir = { workspace = true}
+reqwest = {workspace = true}
+flate2 = {workspace = true}
+tar    = {workspace = true}
+
 
 
 [dev-dependencies]
