@@ -4,10 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: "patch|minor|major"
+        description: "Release type (major, minor, patch)"
         required: true
+        default: patch
         type: choice
-        options: [patch, minor, major]
+        options:
+          - major
+          - minor
+          - patch
 
 env:
   RUST_BACKTRACE: 1
