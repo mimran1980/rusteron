@@ -63,8 +63,8 @@ jobs:
       matrix:
 #        os: [ubuntu-latest, windows-latest, macos-latest]
 #        os: [ubuntu-latest, macos-latest, ubuntu-24.04-arm, macos-13, windows-latest]
-#        os: [ubuntu-latest, macos-latest, macos-13]
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, macos-13]
+#        os: [ubuntu-latest, macos-latest]
 #        os: [ubuntu-latest]
         features: [default, static]
         rust-version: ["stable"]
