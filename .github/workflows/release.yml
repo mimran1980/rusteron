@@ -82,8 +82,7 @@ jobs:
       - name: Extract version
         id: extract_version
         run: |
-          version=$(grep 'rusteron-code-gen' Cargo.toml \
-                     | sed -E 's/.*version = "=?(.*)".*/\1/ | tail -n 1 ')
+          version=$(grep '"rusteron-code-gen", version = ' Cargo.toml | sed -E 's/.*version = "=([^"]+)".*/\1/g')
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/create-release@v1
         id: create_release
