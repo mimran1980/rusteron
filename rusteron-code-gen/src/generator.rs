@@ -1472,6 +1472,7 @@ fn get_docs(
         })
         .map(|doc| {
             let mut doc = doc.to_string();
+
             if first_param && doc.contains("@param") {
                 doc = format!("# Parameters\n{}", doc);
                 first_param = false;
@@ -1493,8 +1494,15 @@ fn get_docs(
                 acc.replace(&v.type_name, &format!("`{}`", v.class_name))
             });
 
-            quote! {
-                #[doc = #doc]
+            if doc.contains("@deprecated") {
+                quote! {
+                    #[deprecated]
+                    #[doc = #doc]
+                }
+            } else {
+                quote! {
+                    #[doc = #doc]
+                }
             }
         })
         .collect()
