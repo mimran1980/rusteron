@@ -232,7 +232,7 @@ build-docker-samples:
     cd rusteron-docker-samples/rusteron-dummy-example && cargo build --release && cd ..
     cd rusteron-docker-samples && just build
 
-# updates aeron version e.g. tags/1.47.5 or master
+# updates aeron version e.g. tags/1.48.4 or master
 update-aeron-version version:
     cd rusteron-client/aeron && git fetch && git checkout {{version}} && cd -
     cd rusteron-archive/aeron && git fetch && git checkout {{version}} && cd -
