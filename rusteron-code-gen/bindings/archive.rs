@@ -82,6 +82,7 @@ pub const AERON_URI_RESPONSE_CORRELATION_ID_KEY: &[u8; 24] = b"response-correlat
 pub const AERON_URI_NAK_DELAY_KEY: &[u8; 10] = b"nak-delay\0";
 pub const AERON_URI_UNTETHERED_WINDOW_LIMIT_TIMEOUT_KEY: &[u8; 32] =
     b"untethered-window-limit-timeout\0";
+pub const AERON_URI_UNTETHERED_LINGER_TIMEOUT_KEY: &[u8; 26] = b"untethered-linger-timeout\0";
 pub const AERON_URI_UNTETHERED_RESTING_TIMEOUT_KEY: &[u8; 27] = b"untethered-resting-timeout\0";
 pub const AERON_URI_MAX_RESEND_KEY: &[u8; 11] = b"max-resend\0";
 pub const AERON_URI_STREAM_ID_KEY: &[u8; 10] = b"stream-id\0";
@@ -1556,7 +1557,7 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
-    #[doc = " Asynchronously close the publication. Will callback on the on_complete notification when the subscription is closed.\n The callback is optional, use NULL for the on_complete callback if not required.\n\n @param publication to close\n @param on_close_complete optional callback to execute once the subscription has been closed and freed. This may\n happen on a separate thread, so the caller should ensure that clientd has the appropriate lifetime.\n @param on_close_complete_clientd parameter to pass to the on_complete callback.\n @return 0 for success or -1 for error."]
+    #[doc = " Asynchronously close the publication. Will callback on the on_complete notification when the publication is closed.\n The callback is optional, use NULL for the on_complete callback if not required.\n\n @param publication to close\n @param on_close_complete optional callback to execute once the publication has been closed and freed. This may\n happen on a separate thread, so the caller should ensure that clientd has the appropriate lifetime.\n @param on_close_complete_clientd parameter to pass to the on_complete callback.\n @return 0 for success or -1 for error."]
     pub fn aeron_publication_close(
         publication: *mut aeron_publication_t,
         on_close_complete: aeron_notification_t,
@@ -1656,6 +1657,20 @@ unsafe extern "C" {
 unsafe extern "C" {
     #[doc = " Asynchronously close the publication.\n\n @param publication to close\n @return 0 for success or -1 for error."]
     pub fn aeron_exclusive_publication_close(
+        publication: *mut aeron_exclusive_publication_t,
+        on_close_complete: aeron_notification_t,
+        on_close_complete_clientd: *mut ::std::os::raw::c_void,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " Revoke this publication when it's closed.\n\n @param publication to revoke on close"]
+    pub fn aeron_exclusive_publication_revoke_on_close(
+        publication: *mut aeron_exclusive_publication_t,
+    );
+}
+unsafe extern "C" {
+    #[doc = " Asynchronously revoke and close the publication. Will callback on the on_complete notification when the publicaiton is closed.\n The callback is optional, use NULL for the on_complete callback if not required.\n\n @param publication to revoke and close\n @param on_close_complete optional callback to execute once the publication has been revoked, closed and freed. This may\n happen on a separate thread, so the caller should ensure that clientd has the appropriate lifetime.\n @param on_close_complete_clientd parameter to pass to the on_complete callback.\n @return 0 for success or -1 for error."]
+    pub fn aeron_exclusive_publication_revoke(
         publication: *mut aeron_exclusive_publication_t,
         on_close_complete: aeron_notification_t,
         on_close_complete_clientd: *mut ::std::os::raw::c_void,
@@ -2033,6 +2048,10 @@ unsafe extern "C" {
     pub fn aeron_image_active_transport_count(image: *mut aeron_image_t) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    #[doc = " Was the associated publication revoked?\n\n @param image to check\n @return true if the associated publication was revoked."]
+    pub fn aeron_image_is_publication_revoked(image: *mut aeron_image_t) -> bool;
+}
+unsafe extern "C" {
     #[doc = " Poll for new messages in a stream. If new messages are found beyond the last consumed position then they\n will be delivered to the handler up to a limited number of fragments as specified.\n <p>\n Use a fragment assembler to assemble messages which span multiple fragments.\n\n @param image to poll.\n @param handler to which message fragments are delivered.\n @param clientd to pass to the handler.\n @param fragment_limit for the number of fragments to be consumed during one polling operation.\n @return the number of fragments that have been consumed or -1 for error."]
     pub fn aeron_image_poll(
         image: *mut aeron_image_t,
@@ -2091,6 +2110,12 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn aeron_image_is_closed(image: *mut aeron_image_t) -> bool;
+}
+unsafe extern "C" {
+    pub fn aeron_image_reject(
+        image: *mut aeron_image_t,
+        reason: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
     #[doc = " Create an image fragment assembler for use with a single image.\n\n @param assembler to be set when created successfully.\n @param delegate to call on completed.\n @param delegate_clientd to pass to delegate handler.\n @return 0 for success and -1 for error."]
@@ -2324,8 +2349,14 @@ unsafe extern "C" {
     ) -> i64;
 }
 unsafe extern "C" {
-    #[doc = " Gets the registration id for addition of the exclusive_publication. Note that using this after a call to poll the\n succeeds or errors is undefined behaviour. As the async_add_exclusive_publication_t may have been freed.\n\n @param add_exclusive_publication used to check for completion.\n @return registration id for the exclusive_publication."]
+    #[doc = " Gets the registration id for addition of the exclusive_publication. Note that using this after a call to poll the\n succeeds or errors is undefined behaviour. As the async_add_exclusive_publication_t may have been freed.\n\n @param add_exclusive_publication used to check for completion.\n @return registration id for the exclusive_publication.\n @deprecated Use aeron_async_add_exclusive_publication_get_registration_id instead."]
     pub fn aeron_async_add_exclusive_exclusive_publication_get_registration_id(
+        add_exclusive_publication: *mut aeron_async_add_exclusive_publication_t,
+    ) -> i64;
+}
+unsafe extern "C" {
+    #[doc = " Gets the registration id for addition of the exclusive_publication. Note that using this after a call to poll the\n succeeds or errors is undefined behaviour. As the async_add_exclusive_publication_t may have been freed.\n\n @param add_exclusive_publication used to check for completion.\n @return registration id for the exclusive_publication."]
+    pub fn aeron_async_add_exclusive_publication_get_registration_id(
         add_exclusive_publication: *mut aeron_async_add_exclusive_publication_t,
     ) -> i64;
 }
@@ -2367,11 +2398,12 @@ pub struct aeron_cnc_constants_stct {
     pub client_liveness_timeout: i64,
     pub start_timestamp: i64,
     pub pid: i64,
+    pub file_page_size: i32,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of aeron_cnc_constants_stct"]
-        [::std::mem::size_of::<aeron_cnc_constants_stct>() - 48usize];
+        [::std::mem::size_of::<aeron_cnc_constants_stct>() - 52usize];
     ["Alignment of aeron_cnc_constants_stct"]
         [::std::mem::align_of::<aeron_cnc_constants_stct>() - 4usize];
     ["Offset of field: aeron_cnc_constants_stct::cnc_version"]
@@ -2394,6 +2426,8 @@ const _: () = {
         [::std::mem::offset_of!(aeron_cnc_constants_stct, start_timestamp) - 32usize];
     ["Offset of field: aeron_cnc_constants_stct::pid"]
         [::std::mem::offset_of!(aeron_cnc_constants_stct, pid) - 40usize];
+    ["Offset of field: aeron_cnc_constants_stct::file_page_size"]
+        [::std::mem::offset_of!(aeron_cnc_constants_stct, file_page_size) - 48usize];
 };
 pub type aeron_cnc_constants_t = aeron_cnc_constants_stct;
 unsafe extern "C" {
@@ -4994,6 +5028,21 @@ const _: () = {
         [::std::mem::offset_of!(aeron_frame_header_stct, type_) - 6usize];
 };
 pub type aeron_frame_header_t = aeron_frame_header_stct;
+#[repr(C, packed(4))]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct aeron_data_header_as_longs_stct {
+    pub hdr: [u64; 4usize],
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of aeron_data_header_as_longs_stct"]
+        [::std::mem::size_of::<aeron_data_header_as_longs_stct>() - 32usize];
+    ["Alignment of aeron_data_header_as_longs_stct"]
+        [::std::mem::align_of::<aeron_data_header_as_longs_stct>() - 4usize];
+    ["Offset of field: aeron_data_header_as_longs_stct::hdr"]
+        [::std::mem::offset_of!(aeron_data_header_as_longs_stct, hdr) - 0usize];
+};
+pub type aeron_data_header_as_longs_t = aeron_data_header_as_longs_stct;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct aeron_setup_header_stct {
@@ -5367,11 +5416,14 @@ pub struct aeron_logbuffer_metadata_stct {
     pub signal_eos: u8,
     pub spies_simulate_connection: u8,
     pub tether: u8,
+    pub is_publication_revoked: u8,
+    pub pad3: [u8; 3usize],
+    pub untethered_linger_timeout_ns: i64,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of aeron_logbuffer_metadata_stct"]
-        [::std::mem::size_of::<aeron_logbuffer_metadata_stct>() - 496usize];
+        [::std::mem::size_of::<aeron_logbuffer_metadata_stct>() - 508usize];
     ["Alignment of aeron_logbuffer_metadata_stct"]
         [::std::mem::align_of::<aeron_logbuffer_metadata_stct>() - 4usize];
     ["Offset of field: aeron_logbuffer_metadata_stct::term_tail_counters"]
@@ -5467,6 +5519,14 @@ const _: () = {
     ) - 494usize];
     ["Offset of field: aeron_logbuffer_metadata_stct::tether"]
         [::std::mem::offset_of!(aeron_logbuffer_metadata_stct, tether) - 495usize];
+    ["Offset of field: aeron_logbuffer_metadata_stct::is_publication_revoked"]
+        [::std::mem::offset_of!(aeron_logbuffer_metadata_stct, is_publication_revoked) - 496usize];
+    ["Offset of field: aeron_logbuffer_metadata_stct::pad3"]
+        [::std::mem::offset_of!(aeron_logbuffer_metadata_stct, pad3) - 497usize];
+    ["Offset of field: aeron_logbuffer_metadata_stct::untethered_linger_timeout_ns"][::std::mem::offset_of!(
+        aeron_logbuffer_metadata_stct,
+        untethered_linger_timeout_ns
+    ) - 500usize];
 };
 impl Default for aeron_logbuffer_metadata_stct {
     fn default() -> Self {
@@ -5713,10 +5773,11 @@ pub struct aeron_cnc_metadata_stct {
     pub client_liveness_timeout: i64,
     pub start_timestamp: i64,
     pub pid: i64,
+    pub file_page_size: i32,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of aeron_cnc_metadata_stct"][::std::mem::size_of::<aeron_cnc_metadata_stct>() - 48usize];
+    ["Size of aeron_cnc_metadata_stct"][::std::mem::size_of::<aeron_cnc_metadata_stct>() - 52usize];
     ["Alignment of aeron_cnc_metadata_stct"]
         [::std::mem::align_of::<aeron_cnc_metadata_stct>() - 4usize];
     ["Offset of field: aeron_cnc_metadata_stct::cnc_version"]
@@ -5737,6 +5798,8 @@ const _: () = {
         [::std::mem::offset_of!(aeron_cnc_metadata_stct, start_timestamp) - 32usize];
     ["Offset of field: aeron_cnc_metadata_stct::pid"]
         [::std::mem::offset_of!(aeron_cnc_metadata_stct, pid) - 40usize];
+    ["Offset of field: aeron_cnc_metadata_stct::file_page_size"]
+        [::std::mem::offset_of!(aeron_cnc_metadata_stct, file_page_size) - 48usize];
 };
 pub type aeron_cnc_metadata_t = aeron_cnc_metadata_stct;
 #[repr(i32)]
